@@ -109,6 +109,8 @@ namespace p44 {
     /// @return NULL for unknown channel
     ChannelBehaviourPtr getChannelById(const string aChannelId, bool aPendingApplyOnly = false);
 
+    /// called when channel value changes
+    virtual void adjustChannelsCoupledTo(ChannelBehaviourPtr aChannel) { /* NOP */ };
 
     /// add a channel to the output
     /// @param aChannel the channel to add

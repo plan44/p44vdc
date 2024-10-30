@@ -27,6 +27,7 @@
 #include "simplescene.hpp"
 #include "jsonvdcapi.hpp"
 #include "fnv.hpp"
+#include "p44script.hpp"
 
 using namespace p44;
 

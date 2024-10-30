@@ -248,6 +248,9 @@ namespace p44 {
     /// @param aTransitional if set and the channel is in transition, the transitional value is returned
     virtual double getChannelValueCalculated(bool aTransitional) { return getChannelValue(aTransitional); /* no calculated channels in base class */ };
 
+    /// called when channel value is changed, hook for coupled channel changes
+    void adjustCoupledChannels();
+
     /// the transition time to use to change value in the hardware
     /// @return time to be used to transition to new value
     MLMicroSeconds transitionTimeToNewValue() { return mNextTransitionTime; };
@@ -283,7 +286,7 @@ namespace p44 {
     /// @}
 
 
-    /// @name interaction with Digital Strom system
+    /// @name interaction with controlling system (DS, bridges)
     /// @{
 
     /// get the identifier (unique within this device instance)

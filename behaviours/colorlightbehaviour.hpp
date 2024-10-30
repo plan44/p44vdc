@@ -211,6 +211,15 @@ namespace p44 {
     bool mDerivedValuesComplete;
     /// @}
 
+    /// @name settings
+    /// @{
+    VdcChannelCoupling mChannelCouplingMode; ///< channel coupling mode
+    double mChannelCouplingParam; ///< parameter for channel coupling, 1="normal" (e.g. intensity of coupling effect, depends on mode)
+    #if P44SCRIPT_FULL_SUPPORT
+    P44Script::ScriptHost mChannelCouplingScript; ///< channel coupling script
+    #endif
+    /// @}
+
 
     /// @name channels
     /// @{
@@ -254,20 +263,23 @@ namespace p44 {
     /// @return true if the transition must be updated again, false if end of transition already reached
     bool updateColorTransition(MLMicroSeconds aNow = 0);
 
+    /// called when channel value changes
+    virtual void adjustChannelsCoupledTo(ChannelBehaviourPtr aChannel) P44_OVERRIDE;
+
     /// @}
 
     /// check for presence of model feature (flag in dSS visibility matrix)
     /// @param aFeatureIndex the feature to check for
     /// @return yes if this output behaviour has the feature, no if (explicitly) not, undefined if asked entity does not know
-    virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex);
+    virtual Tristate hasModelFeature(DsModelFeatures aFeatureIndex) P44_OVERRIDE;
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
-    virtual string description();
+    virtual string description() P44_OVERRIDE;
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
 
     /// @name color services for implementing color lights
     /// @{
@@ -297,20 +309,40 @@ namespace p44 {
     /// @param aScene the scene to load channel values from
     /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
-    virtual void loadChannelsFromScene(DsScenePtr aScene);
+    virtual void loadChannelsFromScene(DsScenePtr aScene) P44_OVERRIDE;
 
     /// called by captureScene to save channel values to a scene.
     /// @param aScene the scene to save channel values to
     /// @note Scenes don't have 1:1 representation of all channel values for footprint and logic reasons, so this method
     ///   is implemented in the specific behaviours according to the scene layout for that behaviour.
     /// @note call markDirty on aScene in case it is changed (otherwise captured values will not be saved)
-    virtual void saveChannelsToScene(DsScenePtr aScene);
+    virtual void saveChannelsToScene(DsScenePtr aScene) P44_OVERRIDE;
 
     /// utility function, adjusts channel-level dontCare flags to current color mode
     /// @param aColorLightScene the scene to adjust
     /// @param aSetOnly only SET don't care for channels that are not native to the current colormode,
     ///    but do not touch dontCare for channels that are native.
     void adjustChannelDontCareToColorMode(ColorLightScenePtr aColorLightScene, bool aSetOnly = false);
+
+
+    // property access implementation for descriptor/settings/states
+    virtual int numSettingsProps() P44_OVERRIDE;
+    virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    // combined field access for all types of properties
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+
+    // persistence implementation
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
+
+  private:
+
+    #if P44SCRIPT_FULL_SUPPORT
+    void channelCouplingScriptDone(ScriptObjPtr aResult);
+    #endif
 
   };
 
@@ -397,22 +429,22 @@ namespace p44 {
 
     /// short (text without LFs!) description of object, mainly for referencing it in log messages
     /// @return textual description of object
-    virtual string shortDesc();
+    virtual string shortDesc() P44_OVERRIDE;
 
   protected:
 
     // property access implementation for descriptor/settings/states
-    virtual int numSettingsProps();
-    virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor);
+    virtual int numSettingsProps() P44_OVERRIDE;
+    virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     // combined field access for all types of properties
-    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor);
+    virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
     // persistence implementation
-    virtual const char *tableName();
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex);
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
+    virtual const char *tableName() P44_OVERRIDE;
+    virtual size_t numFieldDefs() P44_OVERRIDE;
+    virtual const FieldDefinition *getFieldDef(size_t aIndex) P44_OVERRIDE;
+    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP) P44_OVERRIDE;
+    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags) P44_OVERRIDE;
 
   };
 

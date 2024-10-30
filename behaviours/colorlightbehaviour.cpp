@@ -23,6 +23,7 @@
 #include "colorlightbehaviour.hpp"
 
 #include "colorutils.hpp"
+#include <math.h>
 
 using namespace p44;
 
@@ -214,7 +215,9 @@ ColorLightBehaviour::ColorLightBehaviour(Device &aDevice, bool aCtOnly) :
   inherited(aDevice),
   mCtOnly(aCtOnly),
   mColorMode(colorLightModeNone),
-  mDerivedValuesComplete(false)
+  mDerivedValuesComplete(false),
+  mChannelCouplingMode(channelcoupling_none),
+  mChannelCouplingParam(1.0) // "normal"
 {
   // primary channel of a color light is always a dimmer controlling the brightness
   setHardwareOutputConfig(mCtOnly ? outputFunction_ctdimmer : outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, -1);
@@ -640,6 +643,236 @@ bool ColorLightBehaviour::updateColorTransition(MLMicroSeconds aNow)
 }
 
 
+void ColorLightBehaviour::adjustChannelsCoupledTo(ChannelBehaviourPtr aChannel)
+{
+  if (mChannelCouplingMode==channelcoupling_none) return;
+  if (mChannelCouplingMode==channelcoupling_glowdim && aChannel->getChannelType()==channeltype_brightness) {
+    // glow dim
+    ChannelBehaviourPtr ct = getChannelByType(channeltype_colortemp);
+    if (!ct) return;
+    double mired = ct->getMax()+(ct->getMin()-ct->getMax())*::pow(aChannel->getChannelValue()/aChannel->getMax(), mChannelCouplingParam);
+    ct->setChannelValue(mired, aChannel->transitionTimeToNewValue());
+  }
+  #if P44SCRIPT_FULL_SUPPORT
+  else if (
+    (mChannelCouplingMode==channelcoupling_brightness_script && aChannel->getChannelType()==channeltype_brightness) ||
+    (mChannelCouplingMode==channelcoupling_all_script)
+  ) {
+    // run channel coupling script
+    OLOG(LOG_INFO, "Starting channel coupling script: '%s'", singleLine(mChannelCouplingScript.getSource().c_str(), true, 80).c_str() );
+    mChannelCouplingScript.setSharedMainContext(mDevice.getDeviceScriptContext(true));
+    ScriptObjPtr threadLocals = new SimpleVarContainer();
+    threadLocals->setMemberByName("value", new NumericValue(aChannel->getChannelValue()));
+    threadLocals->setMemberByName("transition", new NumericValue((double)aChannel->transitionTimeToNewValue()/Second));
+    if (mChannelCouplingMode==channelcoupling_all_script) threadLocals->setMemberByName("channelid", new StringValue(aChannel->getId()));
+    mChannelCouplingScript.run(inherit, boost::bind(&ColorLightBehaviour::channelCouplingScriptDone, this, _1), threadLocals, 1*Second);
+    return;
+  }
+  #endif
+}
+
+
+#if P44SCRIPT_FULL_SUPPORT
+void ColorLightBehaviour::channelCouplingScriptDone(ScriptObjPtr aResult)
+{
+  if (!aResult || !aResult->isErr()) return;
+  OLOG(LOG_ERR, "channel coupling script error: %s", ScriptObj::describe(aResult).c_str());
+}
+#endif
+
+
+
+// MARK: - persistence implementation
+
+
+const char *ColorLightBehaviour::tableName()
+{
+  // Important note: we MUST use the inherited (LightBehaviour) table, because we
+  //   added ColorLightBehaviour specific fields at a time where ColorLightBehaviours
+  //   already existed in the field and had their base fields saved in the
+  //   LightOutputSettings table.
+  //   So the only compatible way (without extra DB migration) is to add these new color
+  //   specific field to the base table.
+  return inherited::tableName();
+}
+
+
+// data field definitions
+
+#if P44SCRIPT_FULL_SUPPORT && !P44SCRIPT_REGISTERED_SOURCE
+static const size_t numLCFields = 3;
+#else
+static const size_t numLCFields = 2;
+#endif
+
+size_t ColorLightBehaviour::numFieldDefs()
+{
+  return inherited::numFieldDefs()+numLCFields;
+}
+
+
+const FieldDefinition *ColorLightBehaviour::getFieldDef(size_t aIndex)
+{
+  static const FieldDefinition dataDefs[numLCFields] = {
+    { "channelCoupling", SQLITE_INTEGER },
+    { "couplingParam", SQLITE_FLOAT },
+    #if P44SCRIPT_FULL_SUPPORT && !P44SCRIPT_REGISTERED_SOURCE
+    { "couplingScript", SQLITE_TEXT },
+    #endif
+  };
+  if (aIndex<inherited::numFieldDefs())
+    return inherited::getFieldDef(aIndex);
+  aIndex -= inherited::numFieldDefs();
+  if (aIndex<numLCFields)
+    return &dataDefs[aIndex];
+  return NULL;
+}
+
+
+/// load values from passed row
+void ColorLightBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP)
+{
+  inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
+  // get the fields
+  mChannelCouplingMode = aRow->getCastedWithDefault<VdcChannelCoupling, int>(aIndex++, channelcoupling_none);
+  mChannelCouplingParam = aRow->getWithDefault(aIndex++, 1); // default to 1 = normal
+  #if P44SCRIPT_FULL_SUPPORT
+  if (mChannelCouplingScript.loadAndActivate(
+    string_format("dev_%s.channelcoupling", getDevice().getDsUid().getString().c_str()),
+    scriptbody+regular+synchronously,
+    "channelcoupling",
+    "%C (%O)", // title
+    &mDevice,
+    nullptr, // standard scripting domain
+    #if P44SCRIPT_REGISTERED_SOURCE
+    nullptr // no DB field any more for this script
+    #else
+    aRow->get<const char *>(aIndex++)
+    #endif
+  )) {
+    // set up script command handler 
+    // TODO: we don't seem to need a special handler here, remove later
+    //mChannelCouplingScript.setScriptCommandHandler(boost::bind(&ColorLightBehaviour::runSceneScriptCommand, this, _1));
+  }
+  #endif
+}
+
+
+// bind values to passed statement
+void ColorLightBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
+{
+  inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
+  // bind the fields
+  aStatement.bind(aIndex++, static_cast<int>(mChannelCouplingMode));
+  aStatement.bind(aIndex++, mChannelCouplingParam);
+  #if P44SCRIPT_FULL_SUPPORT
+  mChannelCouplingScript.storeSource();
+  #if !P44SCRIPT_REGISTERED_SOURCE
+  aStatement.bind(aIndex++, mSceneScript.getSourceToStoreLocally().c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  #endif
+  #endif
+}
+
+
+
+// MARK: - property access
+
+
+static char colorlight_key;
+
+// settings properties
+
+enum {
+  couplingMode_key,
+  couplingParam_key,
+  #if P44SCRIPT_FULL_SUPPORT
+  couplingScript_key,
+  couplingScriptId_key,
+  #endif
+  numCLSettingsProperties
+};
+
+
+int ColorLightBehaviour::numSettingsProps() { return inherited::numSettingsProps()+numCLSettingsProperties; }
+const PropertyDescriptorPtr ColorLightBehaviour::getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor)
+{
+  static const PropertyDescription properties[numCLSettingsProperties] = {
+    { "x-p44-couplingMode", apivalue_uint64, couplingMode_key+settings_key_offset, OKEY(colorlight_key) },
+    { "x-p44-couplingParam", apivalue_double, couplingParam_key+settings_key_offset, OKEY(colorlight_key) },
+    #if P44SCRIPT_FULL_SUPPORT
+    { "x-p44-couplingScript", apivalue_string, couplingScript_key+settings_key_offset, OKEY(colorlight_key) },
+    { "x-p44-couplingScriptId", apivalue_string, couplingScriptId_key+settings_key_offset, OKEY(colorlight_key) },
+    #endif
+  };
+  int n = inherited::numSettingsProps();
+  if (aPropIndex<n)
+    return inherited::getSettingsDescriptorByIndex(aPropIndex, aParentDescriptor);
+  aPropIndex -= n;
+  return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+}
+
+
+// access to all fields
+
+bool ColorLightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(colorlight_key)) {
+    if (aMode==access_read) {
+      // read properties
+      switch (aPropertyDescriptor->fieldKey()) {
+        // Settings properties
+        case couplingMode_key+settings_key_offset:
+          aPropValue->setUint8Value(mChannelCouplingMode);
+          return true;
+        case couplingParam_key+settings_key_offset:
+          aPropValue->setDoubleValue(mChannelCouplingParam);
+          return true;
+        #if P44SCRIPT_FULL_SUPPORT
+        case couplingScript_key+settings_key_offset:
+          aPropValue->setStringValue(mChannelCouplingScript.getSource());
+          return true;
+        case couplingScriptId_key+settings_key_offset:
+          if (!mChannelCouplingScript.active()) return false; // no ID yet
+          aPropValue->setStringValue(mChannelCouplingScript.getSourceUid());
+          return true;
+        #endif
+      }
+    }
+    else {
+      // write properties
+      switch (aPropertyDescriptor->fieldKey()) {
+        // Settings properties
+        case couplingMode_key+settings_key_offset:
+          setPVar(mChannelCouplingMode, static_cast<VdcChannelCoupling>(aPropValue->uint8Value()));
+          return true;
+        case couplingParam_key+settings_key_offset:
+          setPVar(mChannelCouplingParam, aPropValue->doubleValue());
+          return true;
+        #if P44SCRIPT_FULL_SUPPORT
+        case couplingScript_key+settings_key_offset:
+          // lazy activation when setting a non-empty coupling script
+          if (mChannelCouplingScript.setSourceAndActivate(
+            aPropValue->stringValue(),
+            string_format("dev_%s.channelcoupling", getDevice().getDsUid().getString().c_str()),
+            scriptbody+regular+synchronously,
+            "channelcoupling",
+            "%C (%O)", // title
+            &mDevice,
+            nullptr // standard scripting domain
+          )) {
+            markDirty();
+            // set up script command handler
+            // TODO: we don't seem to need a special handler here, remove later
+            //mChannelCouplingScript.setScriptCommandHandler(boost::bind(&ColorLightBehaviour::runSceneScriptCommand, this, _1));
+          }
+          return true;
+        #endif
+      }
+    }
+  }
+  // not my field, let base class handle it
+  return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
+}
 
 // MARK: - description/shortDesc
 

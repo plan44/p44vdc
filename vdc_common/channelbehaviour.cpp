@@ -302,6 +302,11 @@ MLMicroSeconds ChannelBehaviour::remainingTransitionTime()
 }
 
 
+void ChannelBehaviour::adjustCoupledChannels()
+{
+  mOutput.adjustChannelsCoupledTo(this);
+}
+
 
 // MARK: - channel value handling
 
@@ -457,6 +462,8 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     mNextTransitionTime = aTransitionTime;
     mTransitionDirection = 0; // automatic, shortest way
     mChannelUpdatePending = true; // pending to be sent to the device
+    // possibly coupled channels can adjust to this change
+    adjustCoupledChannels();
   }
   setPVar(mIsVolatileValue, false); // channel actively set, is not volatile
 }
@@ -531,6 +538,8 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     mNextTransitionTime = aTransitionTime;
     mTransitionDirection = aIncrement>0 ? 1 : -1;
     mChannelUpdatePending = true; // pending to be sent to the device
+    // possibly coupled channels can adjust to this change
+    adjustCoupledChannels();
   }
   setPVar(mIsVolatileValue, false); // channel actively dimmed, is not volatile
   return newValue;

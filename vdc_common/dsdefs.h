@@ -548,6 +548,15 @@ typedef enum {
 } VdcSceneEffect;
 
 
+/// Channel coupling modes
+typedef enum {
+  channelcoupling_none = 0, ///< no coupled channels
+  channelcoupling_glowdim = 1, ///< color temperature rises with brightness
+  channelcoupling_brightness_script = 254, ///< script called to calculate dependencies on brightness
+  channelcoupling_all_script = 255, ///< script called for any channel changes - beware of loops
+} VdcChannelCoupling;
+
+
 /// Dim mode
 typedef enum {
   dimmode_down = -1,
