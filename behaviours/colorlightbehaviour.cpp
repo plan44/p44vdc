@@ -999,17 +999,17 @@ const char *RGBColorLightBehaviour::tableName()
 
 // data field definitions
 
-static const size_t numFields = 9;
+static const size_t numRGBFields = 11;
 
 size_t RGBColorLightBehaviour::numFieldDefs()
 {
-  return inherited::numFieldDefs()+numFields;
+  return inherited::numFieldDefs()+numRGBFields;
 }
 
 
 const FieldDefinition *RGBColorLightBehaviour::getFieldDef(size_t aIndex)
 {
-  static const FieldDefinition dataDefs[numFields] = {
+  static const FieldDefinition dataDefs[numRGBFields] = {
     { "Xr", SQLITE_FLOAT },
     { "Yr", SQLITE_FLOAT },
     { "Zr", SQLITE_FLOAT },
@@ -1019,11 +1019,13 @@ const FieldDefinition *RGBColorLightBehaviour::getFieldDef(size_t aIndex)
     { "Xb", SQLITE_FLOAT },
     { "Yb", SQLITE_FLOAT },
     { "Zb", SQLITE_FLOAT },
+    { "whiteRGB", SQLITE_TEXT },
+    { "amberRGB", SQLITE_TEXT },
   };
   if (aIndex<inherited::numFieldDefs())
     return inherited::getFieldDef(aIndex);
   aIndex -= inherited::numFieldDefs();
-  if (aIndex<numFields)
+  if (aIndex<numRGBFields)
     return &dataDefs[aIndex];
   return NULL;
 }
@@ -1040,6 +1042,9 @@ void RGBColorLightBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &
       mCalibration[j][i] = aRow->get<double>(aIndex++);
     }
   }
+  string c;
+  if (aRow->getIfNotNull(aIndex++, c)) pixelToRGB(webColorToPixel(c), mWhiteRGB);
+  if (aRow->getIfNotNull(aIndex++, c)) pixelToRGB(webColorToPixel(c), mAmberRGB);
 }
 
 
@@ -1054,6 +1059,8 @@ void RGBColorLightBehaviour::bindToStatement(sqlite3pp::statement &aStatement, i
       aStatement.bind(aIndex++, mCalibration[j][i]);
     }
   }
+  aStatement.bind(aIndex++, pixelToWebColor(rgbToPixel(mWhiteRGB), true).c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
+  aStatement.bind(aIndex++, pixelToWebColor(rgbToPixel(mAmberRGB), true).c_str(), false); // c_str() ist not static in general -> do not rely on it (even if static here)
 }
 
 
@@ -1075,14 +1082,16 @@ enum {
   Xb_key,
   Yb_key,
   Zb_key,
-  numSettingsProperties
+  whiteRGB_key,
+  amberRGB_key,
+  numRGBSettingsProperties
 };
 
 
-int RGBColorLightBehaviour::numSettingsProps() { return inherited::numSettingsProps()+numSettingsProperties; }
+int RGBColorLightBehaviour::numSettingsProps() { return inherited::numSettingsProps()+numRGBSettingsProperties; }
 const PropertyDescriptorPtr RGBColorLightBehaviour::getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor)
 {
-  static const PropertyDescription properties[numSettingsProperties] = {
+  static const PropertyDescription properties[numRGBSettingsProperties] = {
     { "Xr", apivalue_double, Xr_key+settings_key_offset, OKEY(rgblight_key) },
     { "Yr", apivalue_double, Yr_key+settings_key_offset, OKEY(rgblight_key) },
     { "Zr", apivalue_double, Zr_key+settings_key_offset, OKEY(rgblight_key) },
@@ -1092,6 +1101,8 @@ const PropertyDescriptorPtr RGBColorLightBehaviour::getSettingsDescriptorByIndex
     { "Xb", apivalue_double, Xb_key+settings_key_offset, OKEY(rgblight_key) },
     { "Yb", apivalue_double, Yb_key+settings_key_offset, OKEY(rgblight_key) },
     { "Zb", apivalue_double, Zb_key+settings_key_offset, OKEY(rgblight_key) },
+    { "whiteRGB", apivalue_string, whiteRGB_key+settings_key_offset, OKEY(rgblight_key) },
+    { "amberRGB", apivalue_string, amberRGB_key+settings_key_offset, OKEY(rgblight_key) },
   };
   int n = inherited::numSettingsProps();
   if (aPropIndex<n)
@@ -1108,6 +1119,7 @@ bool RGBColorLightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr a
   if (aPropertyDescriptor->hasObjectKey(rgblight_key)) {
     int ix = (int)aPropertyDescriptor->fieldKey()-settings_key_offset;
     if (ix>=Xr_key && ix<=Zb_key) {
+      // read or write matrix components
       if (aMode==access_read) {
         // read properties
         aPropValue->setDoubleValue(mCalibration[ix/3][ix%3]);
@@ -1118,8 +1130,29 @@ bool RGBColorLightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr a
       }
       return true;
     }
+    else if (aMode==access_read) {
+      // read
+      switch (ix) {
+        case whiteRGB_key:
+          aPropValue->setStringValue(pixelToWebColor(rgbToPixel(mWhiteRGB), true));
+          return true;
+        case amberRGB_key:
+          aPropValue->setStringValue(pixelToWebColor(rgbToPixel(mAmberRGB), true));
+          return true;
+      }
+    }
     else {
-      // check other props
+      // write
+      switch (ix) {
+        case whiteRGB_key:
+          pixelToRGB(webColorToPixel(aPropValue->stringValue()), mWhiteRGB);
+          markDirty(); // TODO: only mark if actually changed?
+          return true;
+        case amberRGB_key:
+          pixelToRGB(webColorToPixel(aPropValue->stringValue()), mAmberRGB);
+          markDirty(); // TODO: only mark if actually changed?
+          return true;
+      }
     }
   }
   // not my field, let base class handle it
