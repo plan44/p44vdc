@@ -948,7 +948,7 @@ static void loadscene_func(BuiltinFunctionContextPtr f)
     POLOG(o->output(), LOG_INFO, "loadscene(%s) loads channel values", VdcHost::sceneText(scene->mSceneNo).c_str());
     o->output()->applySceneToChannels(scene, transition);
   }
-  f->finish();
+  f->finish(o); // allow chaining
 }
 
 
@@ -978,7 +978,7 @@ static void stopactions_func(BuiltinFunctionContextPtr f)
   //   have the chance to stop device-specific ongoing actions and transition
   o->output()->getDevice().stopTransitions();
   o->output()->getDevice().stopSceneActions();
-  f->finish();
+  f->finish(o); // allow chaining
 }
 
 
@@ -1055,7 +1055,7 @@ static void channel_funcImpl(bool aDim, bool aTransitional, BuiltinFunctionConte
         channel->setChannelValue(f->arg(1)->doubleValue(), transitionTime, true); // always apply
     }
   }
-  f->finish();
+  f->finish(o); // allow chaining
 }
 
 static void channel_func(BuiltinFunctionContextPtr f)
@@ -1090,20 +1090,20 @@ static void movechannel_func(BuiltinFunctionContextPtr f)
     }
     channel->moveChannelValue(f->arg(1)->intValue(), timePerUnit);
   }
-  f->finish();
+  f->finish(o); // allow chaining
 }
 
 
 static const BuiltinMemberDescriptor outputMembers[] = {
-  FUNC_DEF_W_ARG(loadscene, executable|null),
+  FUNC_DEF_W_ARG(loadscene, executable|objectvalue),
   FUNC_DEF_W_ARG(runactions, executable|async|null),
-  FUNC_DEF_NOARG(stopactions, executable|null),
+  FUNC_DEF_NOARG(stopactions, executable|objectvalue),
   FUNC_DEF_W_ARG(applychannels, executable|async|null),
   FUNC_DEF_NOARG(syncchannels, executable|async|null),
-  FUNC_DEF_W_ARG(channel, executable|numeric),
-  FUNC_DEF_C_ARG(channel_t, executable|numeric, channel),
-  FUNC_DEF_C_ARG(dimchannel, executable|numeric, channel),
-  FUNC_DEF_W_ARG(movechannel, executable|numeric),
+  FUNC_DEF_W_ARG(channel, executable|numeric|objectvalue),
+  FUNC_DEF_C_ARG(channel_t, executable|numeric|objectvalue, channel),
+  FUNC_DEF_C_ARG(dimchannel, executable|numeric|objectvalue, channel),
+  FUNC_DEF_W_ARG(movechannel, executable|numeric|objectvalue),
   { NULL } // terminator
 };
 
