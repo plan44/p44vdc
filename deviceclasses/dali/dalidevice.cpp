@@ -2260,6 +2260,9 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
   else if (type=="bistable") {
     mInputType = input_bistable;
   }
+  else if (type=="dimmer") {
+    mInputType = input_dimmer;
+  }
   else {
     // default to pulse input
     mInputType = input_pulse;
@@ -2315,6 +2318,16 @@ DaliInputDevice::DaliInputDevice(DaliVdc *aVdcP, const string aDaliInputConfig, 
     ib->setHardwareInputConfig(binInpType_light, usage_undefined, true, Never, Never);
     ib->setHardwareName("light");
     addBehaviour(ib);
+  }
+  else if (mInputType==input_dimmer) {
+    // Standard device settings without scene table
+    mColorClass = class_yellow_light;
+    installSettings();
+    // - create one dimmer sensor input
+    SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this,"")); // automatic id
+    sb->setHardwareSensorConfig(sensorType_percent, usage_user, 0, 100, 0.25, 0.25, 0); // dimmer "sensor"
+    sb->setHardwareName("dimmer dial");
+    addBehaviour(sb);
   }
   else if (mInputType==input_bistable || mInputType==input_pulse) {
     // Standard device settings without scene table
@@ -2426,9 +2439,21 @@ bool DaliInputDevice::checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aDa
       if (inpindex>=0) {
         // check type of command
         if ((aData1 & 0x01)==0) {
-          // direct arc, always pulse
-          on = aData2 > 128; // at least half -> on
-          off = aData2==0; // -> off
+          // direct arc
+          if (mInputType==input_dimmer) {
+            // just transfer the direct arc value converted to brightness as sensor value
+            double sv = 0;
+            if (aData2>0) {
+              sv = pow(10, ((double)aData2-1)/(253.0/3)-1); // logarithmic
+            }
+            SensorBehaviourPtr sb = getSensor(inpindex);
+            sb->updateSensorValue(sv);
+          }
+          else {
+            // always pulse
+            on = aData2 > 128; // at least half -> on
+            off = aData2==0; // -> off
+          }
         }
         else {
           switch (aData2) {
@@ -2517,6 +2542,9 @@ string DaliInputDevice::modelName()
     case input_button:
       m += "button";
       break;
+    case input_dimmer:
+      m += "dimmer";
+      break;
     case input_rocker:
       m += "two-way rocker button";
       break;
@@ -2549,6 +2577,10 @@ bool DaliInputDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *a
       break;
     case input_rocker:
       iconname = "dali_rocker";
+      colored = true;
+      break;
+    case input_dimmer:
+      iconname = "dali_dimmer";
       colored = true;
       break;
     case input_motion:

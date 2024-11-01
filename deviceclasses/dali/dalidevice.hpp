@@ -740,7 +740,8 @@ namespace p44 {
       input_motion,
       input_illumination,
       input_bistable,
-      input_pulse
+      input_pulse,
+      input_dimmer
     } DaliInputType;
 
     DaliInputType mInputType;
