@@ -1772,7 +1772,7 @@ void Device::outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene)
 {
   // now let device level implementation prepare for scene call and decide if normal apply should follow
   if (prepareSceneCall(aScene)) {
-    // this scene should be applied, keep it ready for callSceneExecute()
+    // this scene should be applied, keep it ready for callSceneExecutePrepared()
     mPreparedScene = aScene;
     aPreparedCB(ntfy_callscene);
   }

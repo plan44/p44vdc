@@ -40,6 +40,8 @@
 
 using namespace p44;
 
+// MARK: - BridgeDevice
+
 #define AUTORESET_DELAY (5*Second)
 
 BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, const string &aBridgeDeviceConfig, DsGroup aGroup, bool aAllowBridging) :
@@ -140,6 +142,7 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
       o->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, false, -1);
     }
     else {
+      // on-off
       o->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_undefined, false, -1);
     }
     addBehaviour(o);
@@ -231,10 +234,48 @@ void BridgeDevice::didExamineNotificationFromConnection(VdcApiConnectionPtr aApi
 }
 
 
+void BridgeDevice::saveScene(SceneNo aSceneNo)
+{
+  if (mBridgeDeviceType==bridgedevice_scenecaller) {
+    // bridge caller cannot apply scenes and should not modify them (they are dontCare by default)
+    OLOG(LOG_INFO, "scene caller bridge does not save scene values");
+    return;
+  }
+  // save normally
+  inherited::saveScene(aSceneNo);
+}
+
+
+
 bool BridgeDevice::prepareSceneCall(DsScenePtr aScene)
 {
   DBGOLOG(LOG_INFO, "prepareSceneCall: scene=%s", VdcHost::sceneText(aScene->mSceneNo).c_str());
-  if (mBridgeDeviceType==bridgedevice_sceneresponder && !mProcessingBridgeNotification) {
+  if (mBridgeDeviceType==bridgedevice_scenecaller) {
+    // scene caller does not apply scenes, but output follows activation/deactivation state
+    int newval = -1; // no change
+    if (aScene->mSceneNo==mActivateScene) {
+      OLOG(LOG_NOTICE, "- activation scene called -> set bridged value to max");
+      newval = getChannelByType(channeltype_default)->getMax();
+    }
+    else if (aScene->mSceneNo==mResetScene) {
+      OLOG(LOG_NOTICE, "- reset scene called -> set bridged value to 0");
+      newval = 0;
+    }
+    else if (mResetScene==INVALID_SCENE_NO) {
+      OLOG(LOG_NOTICE, "- another scene called (%s) -> set bridged value to 0", VdcHost::sceneText(aScene->mSceneNo).c_str());
+      newval = 0;
+    }
+    if (newval>=0) {
+      // Note: we do not "apply" the new channel value, but just "observe" it to
+      //   become changed for "external" reasons and sync that.
+      //   We need to call reportOutputState() to inform the bridge, though.
+      getChannelByType(channeltype_default)->syncChannelValue(newval, true, true); // always, derived
+      getOutput()->reportOutputState();
+    }
+    // suppress processing the scene call locally
+    return false;
+  }
+  else if (mBridgeDeviceType==bridgedevice_sceneresponder && !mProcessingBridgeNotification) {
     bool undo = aScene->mSceneCmd==scene_cmd_undo;
     BinaryInputBehaviourPtr i = getInput(0);
     if (i) {
@@ -425,6 +466,9 @@ string BridgeDevice::description()
   switch (mBridgeDeviceType) {
     case bridgedevice_onoff:
       string_format_append(s, "\n- bridging onoff room state");
+      break;
+    case bridgedevice_dimmerdial:
+      string_format_append(s, "\n- distributing level as room/area dimmer value");
       break;
     case bridgedevice_fivelevel:
       string_format_append(s, "\n- bridging off,25,50,75,100%% level room state");

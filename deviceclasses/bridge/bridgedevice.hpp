@@ -38,31 +38,10 @@ namespace p44 {
   class BridgeVdc;
   class BridgeDevice;
 
-  class BridgeDeviceSettings : public DeviceSettings
-  {
-    typedef DeviceSettings inherited;
-    friend class BridgeDevice;
-
-  protected:
-
-    BridgeDeviceSettings(BridgeDevice &aBridgeDevice);
-
-    // persistence implementation
-    virtual const char *tableName();
-    virtual size_t numFieldDefs();
-    virtual const FieldDefinition *getFieldDef(size_t aIndex);
-    virtual void loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *aCommonFlagsP);
-    virtual void bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags);
-
-  };
-  typedef boost::intrusive_ptr<BridgeDeviceSettings> BridgeDeviceSettingsPtr;
-
-
   class BridgeDevice : public Device
   {
     typedef Device inherited;
     friend class BridgeVdc;
-    friend class BridgeDeviceSettings;
 
     long long mBridgeDeviceRowID; ///< the ROWID this device was created from (0=none)
     string mBridgeDeviceId; ///< the base for generating the dSUID
@@ -78,7 +57,7 @@ namespace p44 {
 
     BridgeDeviceType mBridgeDeviceType;
     SceneNo mActivateScene; ///< scene No for scene-specific bridges (detected or called)
-    SceneNo mResetScene; ///< scene No for scene-specific bridges (detected or called)
+    SceneNo mResetScene; ///< scene No for scene-specific bridges (detected or called). INVALID_SCENE_NO=any other, RESERVED_WILDCARD=autoreset, same as mActivateScene=undo
 
     bool mProcessingBridgeNotification; ///< set when processing state update sent by bridge
     double mPreviousV; ///< value to compare to for deciding about issuing scene calls
@@ -144,6 +123,10 @@ namespace p44 {
     /// @note this is called before interaction with dS system starts
     /// @note implementation should call inherited when complete, so superclasses could chain further activity
     virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
+
+    /// save scene on this device
+    /// @param aSceneNo the scene to save current state into
+    virtual void saveScene(SceneNo aSceneNo) P44_OVERRIDE;
 
   protected:
 

@@ -499,7 +499,7 @@ namespace p44 {
 
     /// save scene on this device
     /// @param aSceneNo the scene to save current state into
-    void saveScene(SceneNo aSceneNo);
+    virtual void saveScene(SceneNo aSceneNo);
 
     /// store updated version of a scene for this device
     /// @param aScene the updated scene object that should be stored
