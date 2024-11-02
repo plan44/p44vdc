@@ -887,7 +887,8 @@ string ButtonBehaviour::getSourceName()
 
 double ButtonBehaviour::getSourceValue()
 {
-  // 0: not pressed
+  // -1: end of sequence event
+  // <=0: not pressed
   // 1..4: number of clicks
   // >4 : held down
   if (mState==S0_idle) return 0;
@@ -907,9 +908,10 @@ double ButtonBehaviour::getSourceValue()
     case ct_hold_repeat:
       return 5;
     case ct_hold_end:
-    case ct_complete:
     default:
       return 0; // not pressed any more
+    case ct_complete:
+      return -1; // special marker to signal end of click sequence
   }
 }
 
