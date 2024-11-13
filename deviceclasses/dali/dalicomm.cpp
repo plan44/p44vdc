@@ -398,6 +398,11 @@ void DaliComm::resetIssued(int aCount, DaliCommandStatusCB aStatusCB, uint8_t aR
   }
 }
 
+// From DALI 103:
+//   In order to make itself known as a possibly anonymous transmitting bus unit, a single-master
+//   application controller shall transmit a PING message at regular intervals of 10 ± 1 min. The
+//   first such PING message shall appear at a random time between 5 min and 10 min after
+//   completion of the power-on procedure.
 
 void DaliComm::singleMasterPing(MLTimer &aMLTimer)
 {
