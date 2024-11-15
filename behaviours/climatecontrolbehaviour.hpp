@@ -126,9 +126,9 @@ namespace p44 {
     /// @name FanCoilUnitScene specific values
     /// @{
 
-    DsPowerState powerState; ///< power state
-    FcuOperationMode operationMode; ///< operation mode
-    //double targetTempOffset; ///< ??? maybe
+    DsPowerState mPowerState; ///< power state
+    FcuOperationMode mOperationMode; ///< operation mode
+    //double mTargetTempOffset; ///< ??? maybe
 
     /// @}
 
@@ -208,15 +208,15 @@ namespace p44 {
 
     /// set if climate controlling output is in idle (summer) mode - uses less energy or is switched off
     /// @note this flag is not exposed as a property, but set/reset by callScene(29=wintermode) and callScene(30=summermode)
-    bool climateControlIdle;
+    bool mClimateControlIdle;
 
     /// set if climate controlling output is turn to heating (true) or active/passive cooling (false)
     /// @note this flag is not exposed as a property, but set/reset by callScene(<0,6>=heating) and callScene(<7,11>=cooling)
-    bool climateModeHeating;
+    bool mClimateModeHeating;
 
     /// defines how "heatingLevel" is applied to the output
-    VdcHeatingSystemCapability heatingSystemCapability;
-    VdcHeatingSystemType heatingSystemType;
+    VdcHeatingSystemCapability mHeatingSystemCapability;
+    VdcHeatingSystemType mHeatingSystemType;
 
     /// @}
 
@@ -228,27 +228,27 @@ namespace p44 {
     /// Automatically resets to vs_none afterwards.
     /// @note this flag is not exposed as a property, but can be set by special scene calls
     ///   (CLIMATE_VALVE_PROPHYLAXIS, CLIMATE_VALVE_OPEN, CLIMATE_VALVE_CLOSE)
-    ValveService valveService;
+    ValveService mValveService;
 
-    MLMicroSeconds zoneTemperatureUpdated; ///< time of when zoneTemperature was last updated from processControlValue
-    double zoneTemperature; ///< current zone (room) temperature
-    MLMicroSeconds zoneTemperatureSetPointUpdated; ///< time of when zoneSetPoint was last updated from processControlValue
-    double zoneTemperatureSetPoint; ///< current zone(room) temperature set point
+    MLMicroSeconds mZoneTemperatureUpdated; ///< time of when zoneTemperature was last updated from processControlValue
+    double mZoneTemperature; ///< current zone (room) temperature
+    MLMicroSeconds mZoneTemperatureSetPointUpdated; ///< time of when zoneSetPoint was last updated from processControlValue
+    double mZoneTemperatureSetPoint; ///< current zone(room) temperature set point
 
     /// Automatic wake from forced off:
     /// -  0 : none
     /// -  1 : heating case: when temperature falls below current set temperature
     /// - -1 : cooling case: when temperature rises above current set temperature
-    int forcedOffWakeMode;
+    int mForcedOffWakeMode;
     /// the scene to call on forceOff Wake
-    SceneNo forceOffWakeSceneNo;
+    SceneNo mForceOffWakeSceneNo;
 
     /// @}
 
     /// channels
-    ChannelBehaviourPtr powerLevel; // Valve only
-    PowerStateChannelPtr powerState; // FCU only
-    IndexChannelPtr operationMode; // FCU only
+    ChannelBehaviourPtr mPowerLevel; // Valve only
+    PowerStateChannelPtr mPowerState; // FCU only
+    IndexChannelPtr mOperationMode; // FCU only
 
   public:
 
@@ -263,14 +263,14 @@ namespace p44 {
     /// @{
 
     /// @return true if device should be in idle mode
-    bool isClimateControlIdle() { return climateControlIdle; };
+    bool isClimateControlIdle() { return mClimateControlIdle; };
 
     /// @return true if device should be in heating mode
-    bool isClimateModeHeating() { return climateModeHeating; };
+    bool isClimateModeHeating() { return mClimateModeHeating; };
 
     /// @return something other than vs_none when the device should run a service operation
     /// @note automatically resets the internal state to vs_none
-    ValveService pendingServiceOperation() { ValveService s=valveService; valveService = vs_none; return s; };
+    ValveService pendingServiceOperation() { ValveService s=mValveService; mValveService = vs_none; return s; };
 
 
     /// get temperature information needed for regulation
@@ -319,8 +319,8 @@ namespace p44 {
     /// @return textual description of object
     virtual string shortDesc() P44_OVERRIDE;
 
-    VdcHeatingSystemType getHeatingSystemType()  { return heatingSystemType; }
-    VdcHeatingSystemCapability getHeatingSystemCapability() { return heatingSystemCapability; }
+    VdcHeatingSystemType getHeatingSystemType()  { return mHeatingSystemType; }
+    VdcHeatingSystemCapability getHeatingSystemCapability() { return mHeatingSystemCapability; }
 
   protected:
 
@@ -347,7 +347,8 @@ namespace p44 {
 
     // persistence implementation
     enum {
-      outputflag_climateControlIdle = 0x0002
+      climateoutputflag_controlIdle = outputflag_max<<1,
+      climateoutputflag_max = climateoutputflag_controlIdle // highest used flag on the climatecontrol level
     };
     virtual const char *tableName() P44_OVERRIDE;
     virtual size_t numFieldDefs() P44_OVERRIDE;

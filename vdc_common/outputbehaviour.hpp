@@ -363,7 +363,7 @@ namespace p44 {
     // persistence implementation
     enum {
       outputflag_pushChanges = 0x0001,
-      // Note: 0x0002 is reserved (in climate control)
+      outputflag_max = outputflag_pushChanges // highest used flag on the output level
     };
     virtual const char *tableName() P44_OVERRIDE;
     virtual size_t numFieldDefs() P44_OVERRIDE;

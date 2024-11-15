@@ -58,7 +58,7 @@ size_t DeviceSettings::numFieldDefs()
 
 // flags in mDeviceFlags
 enum {
-  // scene global
+  // device global
   deviceflags_allowBridging = 0x0001, ///< allow bridging this device
 };
 
