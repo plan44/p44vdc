@@ -607,7 +607,8 @@ void OutputBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
 // bind values to passed statement
 void OutputBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
 {
-  inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
+  // my and subclass' commonflags are stored at this level, do NOT pass to superclass!
+  inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, 0);
   // encode the flags
   if (mPushChangesToDS) aCommonFlags |= outputflag_pushChanges;
   // bind the fields

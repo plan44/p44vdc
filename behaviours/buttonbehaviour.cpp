@@ -1013,7 +1013,7 @@ void ButtonBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
 void ButtonBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const char *aParentIdentifier, uint64_t aCommonFlags)
 {
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
-  // encode the flags
+  // encode the local button flags
   int flags = 0;
   if (mSetsLocalPriority) flags |= buttonflag_setsLocalPriority;
   if (mCallsPresent) flags |= buttonflag_callsPresent;

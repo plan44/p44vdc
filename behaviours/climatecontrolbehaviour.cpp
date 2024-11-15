@@ -660,7 +660,7 @@ void ClimateControlBehaviour::bindToStatement(sqlite3pp::statement &aStatement, 
 {
   // encode the flags
   if (mClimateControlIdle) aCommonFlags |= climateoutputflag_controlIdle;
-  // bind
+  // bind superclass' fields, which includes commonFlags
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // bind the fields
   aStatement.bind(aIndex++, mHeatingSystemCapability);
