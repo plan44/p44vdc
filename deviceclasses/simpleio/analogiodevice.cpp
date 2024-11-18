@@ -75,7 +75,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     // - add simple single-channel light behaviour
     LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*this));
     l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, false, -1);
-    l->setGamma(STANDARD_PWM_GAMMA); // default gamma, assuming analog output is a PWM
+    l->setDefaultGamma(STANDARD_PWM_GAMMA); // default gamma, assuming analog output is a PWM
     addBehaviour(l);
   }
   else if (mAnalogIOType==analogio_rgbdimmer) {
@@ -109,7 +109,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
         installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
         // - add multi-channel color light behaviour (which adds a number of auxiliary channels)
         RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, false));
-        l->setGamma(STANDARD_PWM_GAMMA); // default gamma, assuming analog output are PWMs
+        l->setDefaultGamma(STANDARD_PWM_GAMMA); // default gamma, assuming analog output are PWMs
         addBehaviour(l);
       }
     }
@@ -132,7 +132,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
       installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
       // - add CT only color light behaviour (which adds a number of auxiliary channels)
       RGBColorLightBehaviourPtr l = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, true));
-      l->setGamma(STANDARD_PWM_GAMMA); // default gamma, assuming analog outputs are PWMs
+      l->setDefaultGamma(STANDARD_PWM_GAMMA); // default gamma, assuming analog outputs are PWMs
       addBehaviour(l);
     }
   }
