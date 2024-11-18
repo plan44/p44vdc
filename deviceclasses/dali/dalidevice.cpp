@@ -95,31 +95,6 @@ int DaliBusDevice::getLogLevelOffset()
 }
 
 
-/* Snippet to show brightness/DALI arcpower conversion tables in both directions
-
-  dt6LinearDim = false;
-  printf("\n\n===== Arcpower 0..254 -> brightness\n");
-  for (int a=0; a<255; a++) {
-    double b = arcpowerToBrightness(a);
-    printf("arcpower = %3d/0x%02X  -> brightness = %3d/0x%02X = dS-Brightness = %7.3f%%\n", a, a, (int)(b*2.54), (int)(b*2.54), b);
-  }
-  printf("\n\n===== Brightness byte 0..254 -> arcpower 0..254\n");
-  for (int k=0; k<255; k++) {
-    double b = (double)k/2.54;
-    uint8_t a = brightnessToArcpower(b);
-    printf("dS-Brightness = %7.3f%% == brightness = %3d/0x%02X -> arcpower = %3d/0x%02X\n", b, k, k, a, a);
-  }
-
-  printf("\n\n---- for Numbers\n");
-  for (int a=0; a<255; a++) {
-    double b = arcpowerToBrightness(a);
-    int a2 = brightnessToArcpower(b);
-    printf("%d\t%f\t%d\n", a, b, a2);
-  }
-
-*/
-
-
 string DaliBusDevice::description()
 {
   string s = mDeviceInfo->description();
@@ -499,7 +474,7 @@ void DaliBusDevice::updateParams(StatusCB aCompletedCB)
     return;
   }
   mDimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
-  // query actual arc power level
+  // query actual level
   mDaliVdc.mDaliComm.daliSendQuery(
     addressForQuery(),
     DALICMD_QUERY_ACTUAL_LEVEL,
@@ -513,9 +488,9 @@ void DaliBusDevice::queryActualLevelResponse(StatusCB aCompletedCB, bool aNoOrTi
   mCurrentBrightness = 0; // default to 0
   if (Error::isOK(aError) && !aNoOrTimeout) {
     mIsPresent = true; // answering a query means presence
-    // this is my current arc power, save it as brightness for dS system side queries
-    mCurrentBrightness = arcpowerToBrightness(aResponse);
-    OLOG(LOG_INFO, "retrieved current dimming level: arc power = %d, brightness = %0.1f", aResponse, mCurrentBrightness);
+    // this is my current level, save it in brightness scale for dS system side queries (which will apply gamma in addition)
+    mCurrentBrightness = daliLevelToBrightness(aResponse);
+    OLOG(LOG_INFO, "retrieved current dimming level: DALI level = %d/0x%02X -> DALI brightness (no gamma corr) = %0.1f%%", aResponse, aResponse, mCurrentBrightness);
   }
   // next: query the minimum dimming level
   mDaliVdc.mDaliComm.daliSendQuery(
@@ -531,9 +506,9 @@ void DaliBusDevice::queryMinLevelResponse(StatusCB aCompletedCB, bool aNoOrTimeo
   mMinBrightness = 0; // default to 0
   if (Error::isOK(aError) && !aNoOrTimeout) {
     mIsPresent = true; // answering a query means presence
-    // this is my current arc power, save it as brightness for dS system side queries
-    mMinBrightness = arcpowerToBrightness(aResponse);
-    OLOG(LOG_INFO, "retrieved minimum dimming level: arc power = %d, brightness = %0.1f", aResponse, mMinBrightness);
+    // this is the minimum dali level, in brightness scale for dS system side queries (which will apply gamma in addition)
+    mMinBrightness = daliLevelToBrightness(aResponse);
+    OLOG(LOG_INFO, "retrieved minimum dimming level: DALI level = %d/0x%02X -> DALI brightness (no gamma corr) = %0.1f%%", aResponse, aResponse, mMinBrightness);
   }
   if (mSupportsDT8) {
     // more queries on DT8 devices:
@@ -759,8 +734,8 @@ bool DaliBusDevice::setBrightness(Brightness aBrightness)
   if (mCurrentBrightness!=aBrightness || mStaleParams) {
     mStaleParams = false; // consider everything applied now
     mCurrentBrightness = aBrightness;
-    uint8_t power = brightnessToArcpower(aBrightness);
-    OLOG(LOG_INFO, "setting new brightness = %0.2f, arc power = %d", aBrightness, (int)power);
+    uint8_t power = brightnessToDaliLevel(aBrightness);
+    OLOG(LOG_INFO, "setting new brightness (gamma applied) = %0.2f, DALI level = %d/0x%02X", aBrightness, (int)power, (int)power);
     mDaliVdc.mDaliComm.daliSendDirectPower(mDeviceInfo->mShortAddress, power);
     return true; // changed
   }
@@ -773,8 +748,8 @@ void DaliBusDevice::setDefaultBrightness(Brightness aBrightness)
   if (mIsDummy) return;
   mDimRepeaterTicket.cancel(); // safety: stop dim repeater (should not be running now, but just in case)
   if (aBrightness<0) aBrightness = mCurrentBrightness; // use current brightness
-  uint8_t power = brightnessToArcpower(aBrightness);
-  OLOG(LOG_INFO, "setting default/failure brightness = %0.2f, arc power = %d", aBrightness, (int)power);
+  uint8_t power = brightnessToDaliLevel(aBrightness);
+  OLOG(LOG_INFO, "setting default/failure brightness (gamma applied) = %0.2f, DALI level = %d/0x%02X", aBrightness, (int)power, (int)power);
   mDaliVdc.mDaliComm.daliSendDtrAndConfigCommand(mDeviceInfo->mShortAddress, DALICMD_STORE_DTR_AS_POWER_ON_LEVEL, power);
   mDaliVdc.mDaliComm.daliSendDtrAndConfigCommand(mDeviceInfo->mShortAddress, DALICMD_STORE_DTR_AS_FAILURE_LEVEL, power);
 }
@@ -922,26 +897,21 @@ void DaliBusDevice::activateColorParams()
 }
 
 
-
-
-uint8_t DaliBusDevice::brightnessToArcpower(Brightness aBrightness)
+uint8_t DaliBusDevice::brightnessToDaliLevel(Brightness aBrightness)
 {
   if (aBrightness<0) aBrightness = 0;
   if (aBrightness>100) aBrightness = 100;
   // 0..254, 255 is MASK and is reserved to stop fading
-  if (aBrightness==0) return 0; // special case
-  return (uint8_t)((double)(log10(aBrightness)+1.0)*(253.0/3)+1); // logarithmic
+  // Note: aBrightness is gamma corrected via LightBehaviour already, just scale 0..100 -> 0..254
+  return aBrightness*2.54; // linear 0..254
 }
 
 
 
-Brightness DaliBusDevice::arcpowerToBrightness(int aArcpower)
+Brightness DaliBusDevice::daliLevelToBrightness(int aDaliLevel)
 {
-  if (aArcpower==0) return 0; // special off case
-  return pow(10, ((double)aArcpower-1)/(253.0/3)-1); // logarithmic
+  return (double)aDaliLevel/2.54;
 }
-
-
 
 
 
@@ -1293,6 +1263,7 @@ bool DaliSingleControllerDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
       installSettings(DeviceSettingsPtr(new ColorLightDeviceSettings(*this)));
       // set the behaviour
       RGBColorLightBehaviourPtr rgbl = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, false));
+      rgbl->setDefaultGamma(daliVdc().defaultGamma());
       rgbl->setHardwareOutputConfig(outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 0); // DALI lights are always dimmable, no power known
       rgbl->setHardwareName("DALI DT8 RGB(WA) light");
       rgbl->initMinBrightness(0.4); // min brightness is 0.4 (~= 1/256)
@@ -1304,6 +1275,7 @@ bool DaliSingleControllerDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
       // set the behaviour
       bool ctOnly = mDaliController->mDT8CT && !mDaliController->mDT8Color;
       ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this, ctOnly));
+      cl->setDefaultGamma(daliVdc().defaultGamma());
       cl->setHardwareOutputConfig(cl->isCtOnly() ? outputFunction_ctdimmer : outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 0); // DALI lights are always dimmable, no power known
       cl->setHardwareName(string_format("DALI DT8 %s light", cl->isCtOnly() ? "tunable white" : "color"));
       cl->initMinBrightness(0.4); // min brightness is 0.4 (~= 1/256)
@@ -1316,6 +1288,7 @@ bool DaliSingleControllerDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
     installSettings(DeviceSettingsPtr(new LightDeviceSettings(*this)));
     // - set the behaviour
     LightBehaviourPtr l = LightBehaviourPtr(new LightBehaviour(*this));
+    l->setDefaultGamma(daliVdc().defaultGamma());
     l->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, true, 160); // DALI ballasts are always dimmable, // TODO: %%% somewhat arbitrary 2*80W max wattage
     if (daliTechnicalType()==dalidevice_group)
       l->setHardwareName(string_format("DALI dimmer group # %d",mDaliController->mDeviceInfo->mShortAddress & DaliGroupMask));
@@ -1379,8 +1352,6 @@ string DaliSingleControllerDevice::getOpStateText()
   }
   return t;
 }
-
-
 
 
 void DaliSingleControllerDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
@@ -1732,6 +1703,7 @@ bool DaliCompositeDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
   // set the behaviour
   bool ctOnly = mDimmers[dimmer_white] && mDimmers[dimmer_amber] && !mDimmers[dimmer_red]; // no red -> must be CT only
   RGBColorLightBehaviourPtr cl = RGBColorLightBehaviourPtr(new RGBColorLightBehaviour(*this, ctOnly));
+  cl->setDefaultGamma(daliVdc().defaultGamma());
   cl->setHardwareOutputConfig(outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 0); // DALI lights are always dimmable, no power known
   cl->setHardwareName(string_format("DALI composite color light"));
   cl->initMinBrightness(0.4); // min brightness is 0.4 (~= 1/256)
@@ -2419,13 +2391,11 @@ bool DaliInputDevice::checkDaliEvent(uint8_t aEvent, uint8_t aData1, uint8_t aDa
       if (inpindex>=0) {
         // check type of command
         if ((aData1 & 0x01)==0) {
-          // direct arc
+          // direct level
           if (mInputType==input_dimmer) {
-            // just transfer the direct arc value converted to brightness as sensor value
+            // just transfer the level value in brightness scale as sensor value
             double sv = 0;
-            if (aData2>0) {
-              sv = pow(10, ((double)aData2-1)/(253.0/3)-1); // logarithmic
-            }
+            sv = (double)aData2/2.54; // convert 0..254 -> 0..100
             SensorBehaviourPtr sb = getSensor(inpindex);
             sb->updateSensorValue(sv);
           }

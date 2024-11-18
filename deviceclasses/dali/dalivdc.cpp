@@ -28,11 +28,22 @@
 
 using namespace p44;
 
+// Note:
+// - A gamma=1/5.5 curve is roughly what we historically did, which was reversing the logarithmic DALI curve entirely
+//   and effectively using brightness==power (but with a higher resolution than what would have been possible
+//   with DT6 linear dimming curve)
+// - So, for backwards compatibility, we need to retain this behaviour as default gamma for existing setups.
+#define P44_HISTORIC_DALI_GAMMA (1.0/5.5)
+// - for entirely new setups, we define a better curve, sitting between the historic brightness=power curve
+//   and the real DALI curve which has proven way too extreme in practice
+#define P44_NEW_DALI_GAMMA (1.0/2.5)
+
 
 DaliVdc::DaliVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
   mUsedDaliScenesMask(0),
   mUsedDaliGroupsMask(0),
+  mDaliDefaultGamma(P44_HISTORIC_DALI_GAMMA), // conservative - we fetch that from DB, but in case not, use old behaviour
   mDaliComm(MainLoop::currentMainLoop())
 {
   mDaliComm.isMemberVariable();
@@ -76,14 +87,16 @@ bool DaliVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResoluti
 
 // MARK: - DB and initialisation
 
+
 // Version history
 //  1 : first version
 //  2 : added groupNo (0..15) for DALI groups
 //  3 : added support for input devices
 //  4 : added dali2ScanLock to keep compatibility with old installations that might have scanned DALI 2.x devices as 1.0
 //  5 : extended dali2ScanLock to also use bit1 as dali2LUNLock
+//  6 : added daliDefaultGamma, initializing it with modern value, but using approximation of historic brightness/dalivalue when upgrading
 #define DALI_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
-#define DALI_SCHEMA_VERSION 5 // current version
+#define DALI_SCHEMA_VERSION 6 // current version
 
 string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
@@ -116,6 +129,9 @@ string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
       "ALTER TABLE globs ADD dali2ScanLock INTEGER;"
       "UPDATE globs SET dali2ScanLock=0;" // nothing locked
     );
+    // - add daliDefaultGamma with modern (2024) default value (this is a fresh installation)
+    sql.append("ALTER TABLE globs ADD daliDefaultGamma FLOAT;");
+    string_format_append(sql, "UPDATE globs SET daliDefaultGamma=%f;", P44_NEW_DALI_GAMMA);
     // reached final version in one step
     aToVersion = DALI_SCHEMA_VERSION;
   }
@@ -147,6 +163,13 @@ string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
     // reached version 5
     aToVersion = 5;
   }
+  else if (aFromVersion==5) {
+    // V5->V6: add daliDefaultGamma with historic default value to retain brightness behaviour in existing setups
+    sql = "ALTER TABLE globs ADD daliDefaultGamma FLOAT;";
+    string_format_append(sql, "UPDATE globs SET daliDefaultGamma=%f;", P44_HISTORIC_DALI_GAMMA);
+    // reached version 6
+    aToVersion = 6;
+  }
   return sql;
 }
 
@@ -161,13 +184,16 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), DALI_SCHEMA_VERSION, DALI_SCHEMA_MIN_VERSION, aFactoryReset);
   // load dali2ScanLock
   sqlite3pp::query qry(mDb);
-  if (qry.prepare("SELECT dali2ScanLock FROM globs")==SQLITE_OK) {
+  if (qry.prepare("SELECT dali2ScanLock, daliDefaultGamma FROM globs")==SQLITE_OK) {
     sqlite3pp::query::iterator i = qry.begin();
     if (i!=qry.end()) {
       // dali2ScanLock DB field contains dali2ScanLock flag in bit 0 and dali2LUNLock in bit 1
       int lockFlags = i->get<int>(0);
       mDaliComm.mDali2ScanLock = lockFlags & 0x01;
       mDaliComm.mDali2LUNLock = lockFlags & 0x02;
+      // get default gamma
+      mDaliDefaultGamma = i->get<double>(1);
+      if (mDaliDefaultGamma<=0) mDaliDefaultGamma = P44_NEW_DALI_GAMMA; // invalid DB value, use modern value
     }
   }
   // update map of groups and scenes used by manually configured groups and scene-listening input devices
@@ -1342,7 +1368,7 @@ void DaliVdc::updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimize
             // need to set up the temp color param registers before storing the scene
             dev->mDaliController->setColorParamsFromChannels(cl, false, true, false); // non-transitional, always set, not silent
           }
-          uint8_t power = dev->mDaliController->brightnessToArcpower(l->brightnessForHardware(true)); // non-transitional, final
+          uint8_t power = dev->mDaliController->brightnessToDaliLevel(l->brightnessForHardware(true)); // non-transitional, final
           mDaliComm.daliSendDtrAndConfigCommand(dev->mDaliController->mDeviceInfo->mShortAddress, DALICMD_STORE_DTR_AS_SCENE+(a&DaliSceneMask), power);
         }
         // in case this is a DT8 device, enable automatic activation at scene call (and at brightness changes)

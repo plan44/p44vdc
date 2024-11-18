@@ -69,6 +69,7 @@ namespace p44 {
 		DaliPersistence mDb;
     DaliDeviceInfoMap mDeviceInfoCache;
 
+    double mDaliDefaultGamma; ///< default gamma to use (1/5.5 for emulating pre-Nov 2024 behaviour)
     uint16_t mUsedDaliGroupsMask; ///< bitmask of DALI groups in use by optimizer or manually created composite devices
     uint16_t mUsedDaliScenesMask; ///< bitmask of DALI scenes in use by optimizer or input devices
 
@@ -127,6 +128,9 @@ namespace p44 {
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
+
+    /// @return the default gamma to use for devices in this vdc (Note: compatible historic value for pre-Nov 2024 setups, modified one for later)
+    double defaultGamma() { return mDaliDefaultGamma; }
 
   protected:
 

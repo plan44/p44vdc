@@ -152,21 +152,21 @@ namespace p44 {
     void initializeFeatures(StatusCB aCompletedCB);
 
     /// update parameters from device to local vars
+    /// @param aCompletedCB will be called when update is complete
     void updateParams(StatusCB aCompletedCB);
 
     /// update status information from device
     void updateStatus(StatusCB aCompletedCB);
 
-
     /// convert DALI arc power to dS brightness value (linear for DT6 LEDs with dt6LinearDim enabled, logarithmic otherwise)
     /// @param aBrightness 0..100%
     /// @return arcpower 0..254
-    uint8_t brightnessToArcpower(Brightness aBrightness);
+    uint8_t brightnessToDaliLevel(Brightness aBrightness);
 
     /// convert DALI arc power to dS brightness value (linear for DT6 LEDs with dt6LinearDim enabled, logarithmic otherwise)
-    /// @param aArcpower 0..254
+    /// @param aDaliLevel 0..254
     /// @return brightness 0..100%
-    Brightness arcpowerToBrightness(int aArcpower);
+    Brightness daliLevelToBrightness(int aDaliLevel);
 
     /// set transition time for subsequent brightness or color changes
     /// @param aTransitionTime time for transition
