@@ -1,6 +1,6 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
-//  Copyright (c) 2013-2023 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2024 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -71,7 +71,6 @@ namespace p44 {
     /// feature set
     bool mSupportsLED; // supports device type 6/LED features
     bool mFullySupportsDimcurve; // IEC 62386-218 / DT17 indicates that dimming curve switching should actually work
-    bool mDT6LinearDim; // linear dimming curve enabled
     bool mSupportsDT8; // supports device type 8 features
     bool mDT8Color; // supports DT 8 color features
     bool mDT8CT; // supports DT 8 color temperature features

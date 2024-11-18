@@ -1,6 +1,6 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
-//  Copyright (c) 2013-2023 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2024 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -62,7 +62,6 @@ DaliBusDevice::DaliBusDevice(DaliVdc &aDaliVdc) :
   mCurrentDimMode(dimmode_stop),
   mSupportsLED(false),
   mFullySupportsDimcurve(false),
-  mDT6LinearDim(false),
   mSupportsDT8(false),
   mDT8Color(false),
   mDT8CT(false),
@@ -126,9 +125,6 @@ string DaliBusDevice::description()
   string s = mDeviceInfo->description();
   if (mSupportsLED) {
     s += "\n- supports device type 6 (LED)";
-    if (mDT6LinearDim) {
-      s += " -> using linear dimming curve";
-    }
   }
   if (mSupportsDT8) string_format_append(s, "\n- supports device type 8 (color), features:%s%s [RGBWAF:%d] [Primary Colors:%d]", mDT8CT ? " [Tunable white]" : "", mDT8Color ? " [CIE x/y]" : "", mDT8RGBWAFchannels, mDT8PrimaryColors);
   return s;
@@ -163,9 +159,6 @@ void DaliBusDevice::daliBusDeviceSummary(ApiValuePtr aInfo) const
   ));
   // DT6
   aInfo->add("DT6", aInfo->newBool(mSupportsLED));
-  if (mSupportsLED) {
-    aInfo->add("linearDimCurve", aInfo->newBool(mDT6LinearDim));
-  }
   // DT8
   aInfo->add("DT8", aInfo->newBool(mSupportsDT8));
   if (mSupportsDT8) {
@@ -486,23 +479,16 @@ void DaliBusDevice::initializeFeatures(StatusCB aCompletedCB)
     if (aCompletedCB) aCompletedCB(ErrorPtr());
     return;
   }
-  // initialize DT6 linear dimming curve if REALLY available (meaning, not only DT6 but also DT17)
-  if (mSupportsLED && mFullySupportsDimcurve) {
-    // single device or all devices in the group support DT6 and DT17 -> use linear dimming curve
-    mDaliVdc.mDaliComm.daliSendDtrAndConfigCommand(mDeviceInfo->mShortAddress, DALICMD_DT6_SELECT_DIMMING_CURVE, 1); // linear dimming curve
-    mDT6LinearDim = true;
-  }
-  else {
-    // Note: we dont't rely on DT6 devices without DT17  implementing the dimming curve correctly (examples show otherwise)
-    // not all (or maybe none) of the devices in the group support DT6+DT17 -> make sure all devices use standard dimming curve even if they know DT6/DT17
-    // Note: non DT6-devices will just ignore the following command
+  if (mSupportsLED) {
+    // Always use standard logarithmic dimming curve, as it gives more resolution in the low brightness levels
+    // Note: the linear dimming curve is (unlike previously assumed) just direct PWM/Power output, and as such has
+    //   very poor resolution at low brightness, as proper dim-to-zero needs more that 8bit PWM. Control Gear that
+    //   has more than 8bit PWM/Power resolution can dim more smoothly using the standard (approx Gamma 5.5) DALI
+    //   dimming curve.
     mDaliVdc.mDaliComm.daliSendDtrAndConfigCommand(mDeviceInfo->mShortAddress, DALICMD_DT6_SELECT_DIMMING_CURVE, 0); // standard logarithmic dimming curve
-    mDT6LinearDim = false;
   }
   if (aCompletedCB) aCompletedCB(ErrorPtr());
 }
-
-
 
 
 void DaliBusDevice::updateParams(StatusCB aCompletedCB)
@@ -944,10 +930,7 @@ uint8_t DaliBusDevice::brightnessToArcpower(Brightness aBrightness)
   if (aBrightness>100) aBrightness = 100;
   // 0..254, 255 is MASK and is reserved to stop fading
   if (aBrightness==0) return 0; // special case
-  if (mDT6LinearDim)
-    return aBrightness*2.54; // linear 0..254
-  else
-    return (uint8_t)((double)(log10(aBrightness)+1.0)*(253.0/3)+1); // logarithmic
+  return (uint8_t)((double)(log10(aBrightness)+1.0)*(253.0/3)+1); // logarithmic
 }
 
 
@@ -955,10 +938,7 @@ uint8_t DaliBusDevice::brightnessToArcpower(Brightness aBrightness)
 Brightness DaliBusDevice::arcpowerToBrightness(int aArcpower)
 {
   if (aArcpower==0) return 0; // special off case
-  if (mDT6LinearDim)
-    return (double)aArcpower/2.54; // linear 1..254
-  else
-    return pow(10, ((double)aArcpower-1)/(253.0/3)-1); // logarithmic
+  return pow(10, ((double)aArcpower-1)/(253.0/3)-1); // logarithmic
 }
 
 
