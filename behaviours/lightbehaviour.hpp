@@ -1,6 +1,6 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
-//  Copyright (c) 2013-2023 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2024 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -100,6 +100,7 @@ namespace p44 {
 
     /// @name hardware derived parameters (constant during operation)
     /// @{
+    double mDefaultGamma; ///< the default gamma for this type of light, depends on hardware, historic errors (in how we used curves in DALI)
     /// @}
 
 
@@ -108,7 +109,8 @@ namespace p44 {
     Brightness mOnThreshold; ///< if !isDimmable, output will be on when output value is >= the threshold
     DimmingTime mDimTimeUp[3]; ///< dimming up time
     DimmingTime mDimTimeDown[3]; ///< dimming down time
-    double mGamma; ///< gamma for adjusting dimming curve, defaults to 1==linear
+    double mUserGamma; ///< user settable gamma for adjusting dimming curve, defaults to 1==linear
+    bool mPreferLinearOutput; ///< if set, hardware device should prefer communicating linear brightness (rather than PWM/ArcPower etc.) with device
     /// @}
 
 
@@ -138,8 +140,8 @@ namespace p44 {
     bool isDimmable() { return mOutputFunction!=outputFunction_switch && actualOutputMode()!=outputmode_binary; };
 
     /// Set gamma exponent for the gamma curve to apply between brightness and actually applied output value
-    /// @param aGamma the gamma value to set. Values <= 0 are treated like 1 -> linear
-    void setGamma(double aGamma) { mGamma = aGamma; };
+    /// @param aGamma the default gamma value to use for this type of hardware. Values <= 0 are treated like 1 -> linear
+    void setDefaultGamma(double aGamma) { mDefaultGamma = aGamma; };
 
     /// initialize behaviour with actual device's brightness parameters
     /// @param aMin minimal brightness that can be set
@@ -282,6 +284,8 @@ namespace p44 {
 
 
     // property access implementation for descriptor/settings/states
+    virtual int numDescProps() P44_OVERRIDE;
+    virtual const PropertyDescriptorPtr getDescDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     virtual int numSettingsProps() P44_OVERRIDE;
     virtual const PropertyDescriptorPtr getSettingsDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     // combined field access for all types of properties

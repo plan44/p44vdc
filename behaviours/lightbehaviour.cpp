@@ -1,6 +1,6 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
-//  Copyright (c) 2013-2023 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2024 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -57,7 +57,9 @@ LightBehaviour::LightBehaviour(Device &aDevice) :
   // hardware derived parameters
   // persistent settings
   mOnThreshold(50.0),
-  mGamma(1), // linear by default
+  mDefaultGamma(1), // hardware correction factor: linear by default
+  mUserGamma(1), // user correction factor: linear by default
+  mPreferLinearOutput(false), // no preference for linear!
   // volatile state
   mHardwareHasSetMinDim(false)
 {
@@ -317,13 +319,14 @@ void LightBehaviour::identifyToUser(MLMicroSeconds aDuration)
 double LightBehaviour::brightnessToOutput(Brightness aBrightness, double aMaxOutput)
 {
   if (aBrightness<=0) return 0;
-  if (mGamma==1 || mGamma<=0) {
+  double gamma = mUserGamma*mDefaultGamma;
+  if (gamma==1 || gamma<=0) {
     // gamma==1 -> linear, only scale for output
     return aBrightness/100*aMaxOutput;
   }
   else {
     // gamma(x, g) = x^g  (in 0..1 ranges for both input and output)
-    return ::pow(aBrightness/100, mGamma)*aMaxOutput;
+    return ::pow(aBrightness/100, gamma)*aMaxOutput;
   }
 }
 
@@ -331,13 +334,14 @@ double LightBehaviour::brightnessToOutput(Brightness aBrightness, double aMaxOut
 Brightness LightBehaviour::outputToBrightness(double aOutValue, double aMaxOutput)
 {
   if (aMaxOutput<=0) return 0;
-  if (mGamma==1 || mGamma<=0) {
+  double gamma = mUserGamma*mDefaultGamma;
+  if (gamma==1 || gamma<=0) {
     // gamma==1 -> linear, only scale output down to brightness
     return aOutValue/aMaxOutput*100;
   }
   else {
     // gamma(x, g) = x^g  (in 0..1 ranges for both input and output)
-    return ::pow(aOutValue/aMaxOutput, 1/mGamma)*100;
+    return ::pow(aOutValue/aMaxOutput, 1/gamma)*100;
   }
 }
 
@@ -496,7 +500,7 @@ void LightBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
     mDimTimeDown[2] = (dd>>16) & 0xFF;
   }
   // read dim curve exponent only if not NULL
-  aRow->getIfNotNull<double>(aIndex++, mGamma);
+  aRow->getIfNotNull<double>(aIndex++, mUserGamma);
 }
 
 
@@ -518,7 +522,7 @@ void LightBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
   aStatement.bind(aIndex++, mBrightness->getMinDim());
   aStatement.bind(aIndex++, (int)du);
   aStatement.bind(aIndex++, (int)dd);
-  aStatement.bind(aIndex++, mGamma);
+  aStatement.bind(aIndex++, mUserGamma);
 }
 
 
@@ -527,6 +531,28 @@ void LightBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
 
 
 static char light_key;
+
+// description properties
+
+enum {
+  defaultGamma_key,
+  numDescProperties
+};
+
+
+int LightBehaviour::numDescProps() { return inherited::numDescProps()+numDescProperties; }
+const PropertyDescriptorPtr LightBehaviour::getDescDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor)
+{
+  static const PropertyDescription properties[numDescProperties] = {
+    { "x-p44-defaultGamma", apivalue_double, defaultGamma_key+descriptions_key_offset, OKEY(light_key) },
+  };
+  int n = inherited::numDescProps();
+  if (aPropIndex<n)
+    return inherited::getDescDescriptorByIndex(aPropIndex, aParentDescriptor);
+  aPropIndex -= n;
+  return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
+}
+
 
 // settings properties
 
@@ -574,6 +600,10 @@ bool LightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
     if (aMode==access_read) {
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
+        // Description properties
+        case defaultGamma_key+descriptions_key_offset:
+          aPropValue->setDoubleValue(mDefaultGamma);
+          return true;
         // Settings properties
         case onThreshold_key+settings_key_offset:
           aPropValue->setDoubleValue(mOnThreshold);
@@ -592,7 +622,7 @@ bool LightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
           aPropValue->setUint8Value(mDimTimeDown[aPropertyDescriptor->fieldKey()-(dimTimeDown_key+settings_key_offset)]);
           return true;
         case gamma_key+settings_key_offset:
-          aPropValue->setDoubleValue(mGamma);
+          aPropValue->setDoubleValue(mUserGamma);
           return true;
       }
     }
@@ -618,7 +648,7 @@ bool LightBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
           setPVar(mDimTimeDown[aPropertyDescriptor->fieldKey()-(dimTimeDown_key+settings_key_offset)], (DimmingTime)aPropValue->int32Value());
           return true;
         case gamma_key+settings_key_offset:
-          setPVar(mGamma, aPropValue->doubleValue());
+          setPVar(mUserGamma, aPropValue->doubleValue());
           return true;
       }
     }
