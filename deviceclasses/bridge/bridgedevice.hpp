@@ -55,9 +55,18 @@ namespace p44 {
       bridgedevice_dimmerdial, ///< acts as room or area dimmer
     } BridgeDeviceType;
 
+    typedef enum {
+      reset_none, ///< do not reset
+      reset_auto, ///< automatically reset after timeout
+      reset_other, ///< reset on other scene called
+      reset_undo, ///< reset when undone
+      num_resetmodes
+    } ResetMode;
+
     BridgeDeviceType mBridgeDeviceType;
     SceneNo mActivateScene; ///< scene No for scene-specific bridges (detected or called)
-    SceneNo mResetScene; ///< scene No for scene-specific bridges (detected or called). INVALID_SCENE_NO=any other, RESERVED_WILDCARD=autoreset, same as mActivateScene=undo
+    SceneNo mResetScene; ///< scene No for scene-specific bridges (detected or called).
+    ResetMode mResetMode; ///< mode when to reset state of scene caller bridge
 
     bool mProcessingBridgeNotification; ///< set when processing state update sent by bridge
     double mPreviousV; ///< value to compare to for deciding about issuing scene calls
