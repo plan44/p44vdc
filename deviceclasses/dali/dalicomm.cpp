@@ -1061,14 +1061,17 @@ private:
   }
 
 
-  // get new unused short address (but does NOT yet add it to usedShortAddr!
+  /// get new unused short address (but does NOT yet add it to any address list)
+  /// Note: do not forget to EXPLICITLY add newly programmed addresses to
+  ///   mUsedShortAddrsPtr and mFoundDevicesPtr) after a new address is actually
+  ///   programmed and verified
   DaliAddress newShortAddress()
   {
     DaliAddress newAddr = DALI_MAXDEVICES;
     while (newAddr>0) {
       newAddr--;
       if (!isShortAddressInList(newAddr,mUsedShortAddrsPtr) && !isShortAddressInList(newAddr, mConflictedShortAddrsPtr)) {
-        // this one is free, use it
+        // this one is free and COULD be used
         return newAddr;
       }
     }
@@ -1279,6 +1282,10 @@ private:
         // prevent registering the same address twice (did happen before fixing bug with newShortAddress() 2024-06-27)
         SOLOG(mDaliComm, LOG_NOTICE, "- new short address %d programming verified", aShortAddress);
         mFoundDevicesPtr->push_back(aShortAddress);
+      }
+      // now is definitely in use - must alse be in mUsedShortAddrs
+      if (!isShortAddressInList(aShortAddress, mUsedShortAddrsPtr)) {
+        mUsedShortAddrsPtr->push_back(aShortAddress);
       }
     }
     // withdraw this device from further searches
