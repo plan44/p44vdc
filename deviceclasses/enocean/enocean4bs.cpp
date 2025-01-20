@@ -306,7 +306,8 @@ const p44::EnoceanInputDescriptor enocean4BSdescriptors[] = {
   //   -40..60
   { 0, 0x02, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -40, 62.3, DB(2,1), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
   { 1, 0x02, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -40, 62.3, DB(2,1), DB(1,0), 100, 40*60, &invSensorHandler,  tempText },
-  // A5-04-xx: Temperature and Humidity
+
+  // A5-04-01: Temperature and Humidity
   // - 0..40 degree, e.g. Alpha Sense
   //   - Default profile is indoor
   { 0, 0x04, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0, 40.8, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
@@ -314,6 +315,8 @@ const p44::EnoceanInputDescriptor enocean4BSdescriptors[] = {
   //   - Alternate profile is outdoor
   { 1, 0x04, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,      0, 40.8, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
   { 1, 0x04, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_outdoors,      0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText, },
+
+  // A5-04-02: Temperature and Humidity
   // - -20..60 degree, e.g. Alpha Sense or Eltako FFT65B
   //   - Default profile is outdoor
   { 0, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20, 61.6, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
@@ -329,6 +332,17 @@ const p44::EnoceanInputDescriptor enocean4BSdescriptors[] = {
   { 3, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20, 61.6, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
   { 3, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_outdoors,      0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText },
   { 3, 0x04, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage, usage_undefined, 0.477, 6.273, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
+  //   - KYMASGARD® AFTF-HK-FSE is outdoor and has non-standard illumination in DB3 (two DIP-switch selectable ranges 0-2k or 0-60k lux)
+  //     - 0..2000 lux
+  { 4, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20, 61.6, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
+  { 4, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_outdoors,      0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText },
+  { 4, 0x04, 0x02, 0, class_blue_climate, group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_outdoors,      0, 2040, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler,  illumText },
+  //     - 0..60000 lux
+  { 5, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20, 61.6, DB(1,7), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
+  { 5, 0x04, 0x02, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_outdoors,      0,  102, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,  humText },
+  { 5, 0x04, 0x02, 0, class_blue_climate, group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_outdoors,      0,61200, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler,  illumText },
+
+  // A5-04-03: Temperature and Humidity
   // - -20..60 degree with 10 bit resolution
   //   - Default profile is outdoor
   { 0, 0x04, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_outdoors,    -20,   60, DB(2,1), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
@@ -336,6 +350,7 @@ const p44::EnoceanInputDescriptor enocean4BSdescriptors[] = {
   //   - Alternate profile is indoor
   { 1, 0x04, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,        -20,   60, DB(2,1), DB(1,0), 100, 40*60, &stdSensorHandler,  tempText },
   { 1, 0x04, 0x03, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,          0,  100, DB(3,7), DB(3,0), 100, 40*60, &stdSensorHandler,  humText },
+
   // A5-06-xx: Light Sensors
   // - A5-06-01 outdoor
   { 0, 0x06, 0x01, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_outdoors,    300,60000, DB(2,7), DB(1,0), 100, 40*60, &illumHandler,      illumText },
@@ -696,13 +711,19 @@ static const ProfileVariantEntry profileVariants4BS[] = {
   { 27, 0x01A50220, 0, outdoorText, NULL },
   { 28, 0x00A50230, 0, indoorText, NULL },
   { 28, 0x01A50230, 0, outdoorText, NULL },
-  // - with humidity
+  // - with humidity A5-04-01
   { 29, 0x00A50401, 0, indoorText, NULL },
   { 29, 0x01A50401, 0, outdoorText, NULL },
+  // - with humidity A5-04-02
   { 30, 0x00A50402, 0, outdoorText, NULL }, // outdoor is default!
   { 30, 0x01A50402, 0, indoorText, NULL },
+  //   - Eltako FAFT/FIFT with non-standard supply voltage in DB3
   { 30, 0x02A50402, 0, "Eltako FAFT", NULL },
   { 30, 0x03A50402, 0, "Eltako FIFT", NULL },
+  //   - Kymasgard AFTF-HK-FSE with non-standard illumination in DB3
+  { 30, 0x04A50402, 0, "AFTF-HK-FSE with illumination, 0..2000 lux", NULL },
+  { 30, 0x05A50402, 0, "AFTF-HK-FSE with illumination, 0..60000 lux", NULL },
+  // - with humidity A5-04-03
   { 31, 0x00A50403, 0, outdoorText, NULL }, // outdoor is default!
   { 31, 0x01A50403, 0, indoorText, NULL },
   // heating valve alternatives
