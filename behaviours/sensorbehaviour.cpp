@@ -574,15 +574,22 @@ int SensorBehaviour::getSourceOpLevel()
 
 typedef std::vector<string> ArgsVector;
 
-typedef int (*RrdFunc)(int, char **);
+#if P44_BUILD_OW
+typedef char* RrdFuncArg;
+#else
+// newer RRD versions have added const for the args type
+typedef const char* RrdFuncArg;
+#endif
+
+typedef int (*RrdFunc)(int, RrdFuncArg*);
 
 static int rrd_call(RrdFunc aFunc, ArgsVector &aArgs)
 {
-  char **argsArrayP = new char*[aArgs.size()+1];
+  RrdFuncArg* argsArrayP = new RrdFuncArg[aArgs.size()+1];
   LOG(LOG_DEBUG, "rrd_call:");
   for (int i=0; i<aArgs.size(); ++i) {
     LOG(LOG_DEBUG, "- %s", aArgs[i].c_str());
-    argsArrayP[i] = (char *)aArgs[i].c_str();
+    argsArrayP[i] = const_cast<RrdFuncArg>(aArgs[i].c_str());
   }
   argsArrayP[aArgs.size()] = NULL;
   optind = opterr = 0; /* Because rrdtool uses getopt() */
