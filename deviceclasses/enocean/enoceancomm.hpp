@@ -215,11 +215,11 @@ namespace p44 {
   typedef uint32_t EnoceanAddress;
   const EnoceanAddress EnoceanBroadcast = 0xFFFFFFFF; // broadcast
 
-	class EnoceanComm;
+  class EnoceanComm;
 
   class Esp3Packet;
-	typedef boost::intrusive_ptr<Esp3Packet> Esp3PacketPtr;
-	/// ESP3 packet object with byte stream parser and generator
+  typedef boost::intrusive_ptr<Esp3Packet> Esp3PacketPtr;
+  /// ESP3 packet object with byte stream parser and generator
   class Esp3Packet : public P44Obj
   {
     typedef P44Obj inherited;
@@ -244,7 +244,7 @@ namespace p44 {
     PacketState state; ///< scanning state
     size_t dataIndex; ///< data scanner index
 
-    
+
   public:
     /// construct empty packet
     Esp3Packet();
@@ -485,22 +485,22 @@ namespace p44 {
     static const int AES128BlockLen = 16;
     typedef uint8_t AES128Block[AES128BlockLen];
 
-    uint8_t securityLevelFormat; ///< copy of the SLF byte from the teach-in
-    uint8_t teachInInfo; ///< copy of the TEACH_IN_INFO byte
-    AES128Block privateKey; ///< private key established at teach-in
-    AES128Block subKey1; ///< subkey1 derived from private key
-    AES128Block subKey2; ///< subkey2 derived from private key
-    uint32_t rollingCounter; ///< RLC
-    bool established; ///< set if this info is complete and established, and only RLC might get refreshed
+    uint8_t mSecurityLevelFormat; ///< copy of the SLF byte from the teach-in
+    uint8_t mTeachInInfo; ///< copy of the TEACH_IN_INFO byte
+    AES128Block mPrivateKey; ///< private key established at teach-in
+    AES128Block mSubKey1; ///< subkey1 derived from private key
+    AES128Block mSubKey2; ///< subkey2 derived from private key
+    uint32_t mRollingCounter; ///< RLC
+    bool mEstablished; ///< set if this info is complete and established, and only RLC might get refreshed
 
     // persistence management
-    uint32_t lastSavedRLC; ///< last saved RLC
-    MLMicroSeconds lastSave; ///< when was the RLC saved last time
-    bool rlcVerified; ///< actually verified RLC was correct (at least one message authenticated successfully since last restart)
+    uint32_t mLastSavedRLC; ///< last saved RLC
+    MLMicroSeconds mLastSave; ///< when was the RLC saved last time
+    bool mRlcVerified; ///< actually verified RLC was correct (at least one message authenticated successfully since last restart)
 
   private:
 
-    SecureTeachInData *teachInP; ///< data needed during secure teach-in
+    SecureTeachInData *mTeachInP; ///< data needed during secure teach-in
 
     /// size of RLC
     /// @return size of RLC in bytes, 0 if none in use
@@ -613,32 +613,32 @@ namespace p44 {
   typedef std::list<EnoceanCmd> EnoceanCmdList;
 
   typedef boost::intrusive_ptr<EnoceanComm> EnoceanCommPtr;
-	// Enocean communication
-	class EnoceanComm : public SerialOperationQueue
-	{
-		typedef SerialOperationQueue inherited;
-		
-		Esp3PacketPtr currentIncomingPacket;
-    ESPPacketCB radioPacketHandler;
-    ESPPacketCB eventPacketHandler;
+  // Enocean communication
+  class EnoceanComm : public SerialOperationQueue
+  {
+    typedef SerialOperationQueue inherited;
 
-    DigitalIoPtr enoceanResetPin;
-    MLTicket aliveCheckTicket;
+    Esp3PacketPtr mCurrentIncomingPacket;
+    ESPPacketCB mRadioPacketHandler;
+    ESPPacketCB mEventPacketHandler;
+
+    DigitalIoPtr mEnoceanResetPin;
+    MLTicket mAliveCheckTicket;
 
     // Enocean module identification and version
-    uint32_t appVersion;
-    uint32_t apiVersion;
-    EnoceanAddress myAddress; ///< real EnOcean module address
-    EnoceanAddress myIdBase; ///< base address for creating other sender addresses than my own module address (e.g. to simulate switches to control actors)
+    uint32_t mAppVersion;
+    uint32_t mApiVersion;
+    EnoceanAddress mMyAddress; ///< real EnOcean module address
+    EnoceanAddress mMyIdBase; ///< base address for creating other sender addresses than my own module address (e.g. to simulate switches to control actors)
 
     // Command queue
-    EnoceanCmdList cmdQueue; ///< commands awaiting send or receive
-    MLTicket cmdTimeoutTicket; ///< timeout for waiting for command response
+    EnoceanCmdList mCmdQueue; ///< commands awaiting send or receive
+    MLTicket mCmdTimeoutTicket; ///< timeout for waiting for command response
 
-	public:
-		
-		EnoceanComm(MainLoop &aMainLoop = MainLoop::currentMainLoop());
-		virtual ~EnoceanComm();
+  public:
+
+    EnoceanComm(MainLoop &aMainLoop = MainLoop::currentMainLoop());
+    virtual ~EnoceanComm();
 
     /// @return type (such as: device, element, vdc, trigger) of the context object
     virtual string contextType() const P44_OVERRIDE { return "EnOcean"; }
@@ -654,19 +654,19 @@ namespace p44 {
 
     /// get modem application version
     /// @return modem application version in 0xmmbbaaBB (mm=main version, bb=beta/minor, aa=alpha/revision, BB=build)
-    uint32_t modemAppVersion() const { return appVersion; }
+    uint32_t modemAppVersion() const { return mAppVersion; }
 
     /// get modem API version
     /// @return modem API version in 0xmmbbaaBB (mm=main version, bb=beta/minor, aa=alpha/revision, BB=build)
-    uint32_t modemApiVersion() const { return apiVersion; }
+    uint32_t modemApiVersion() const { return mApiVersion; }
 
     /// get modem Enocean chip ID (enocean address)
     /// @return modem enocean address
-    EnoceanAddress modemAddress() const { return myAddress; }
+    EnoceanAddress modemAddress() const { return mMyAddress; }
 
     /// get modem Enocean chip ID (enocean address)
     /// @return modem ID base address
-    EnoceanAddress idBase() const { return myIdBase; }
+    EnoceanAddress idBase() const { return mMyIdBase; }
 
     /// derived implementation: deliver bytes to the ESP3 parser
     /// @param aNumBytes number of bytes ready for accepting
@@ -739,7 +739,7 @@ namespace p44 {
     void checkCmdQueue();
     void cmdTimeout();
 
-	};
+  };
 
 
 

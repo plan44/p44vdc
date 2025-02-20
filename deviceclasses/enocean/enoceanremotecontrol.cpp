@@ -60,7 +60,7 @@ uint8_t EnoceanRemoteControlDevice::teachInSignal(int8_t aVariant)
     bool right = aVariant & 0x2;
     bool up = !(aVariant & 0x1);
     buttonAction(right, up, true); // press
-    teachInTimer.executeOnce(boost::bind(&EnoceanRemoteControlDevice::sendSwitchBeaconRelease, this, right, up), TEACH_IN_TIME);
+    mTeachInTimer.executeOnce(boost::bind(&EnoceanRemoteControlDevice::sendSwitchBeaconRelease, this, right, up), TEACH_IN_TIME);
     return 4;
   }
   return inherited::teachInSignal(aVariant);
@@ -269,7 +269,7 @@ void EnoceanRelayControlDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDi
     if (ch->needsApplying()) {
       bool up = ch->getChannelValueBool();
       buttonAction(false, up, true);
-      buttonTimer.executeOnce(boost::bind(&EnoceanRelayControlDevice::sendReleaseTelegram, this, aDoneCB, up), BUTTON_PRESS_TIME);
+      mButtonTimer.executeOnce(boost::bind(&EnoceanRelayControlDevice::sendReleaseTelegram, this, aDoneCB, up), BUTTON_PRESS_TIME);
       ch->channelValueApplied();
       return; // sendReleaseTelegram will call aDoneCB
     }
@@ -284,7 +284,7 @@ void EnoceanRelayControlDevice::sendReleaseTelegram(SimpleCB aDoneCB, bool aUp)
   buttonAction(false, aUp, false);
   // schedule callback if set
   if (aDoneCB) {
-    buttonTimer.executeOnce(boost::bind(aDoneCB), BUTTON_PRESS_PAUSE_TIME);
+    mButtonTimer.executeOnce(boost::bind(aDoneCB), BUTTON_PRESS_PAUSE_TIME);
   }
 }
 

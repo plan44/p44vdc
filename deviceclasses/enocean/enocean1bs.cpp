@@ -73,7 +73,7 @@ EnoceanDevicePtr Enocean1BSDevice::newDevice(
       bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, CONTACT_UPDATE_INTERVAL, CONTACT_UPDATE_INTERVAL*3);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName(newHandler->shortDesc());
-      newHandler->behaviour = bb;
+      newHandler->mBehaviour = bb;
       // add channel to device
       newDev->addChannelHandler(newHandler);
       // count it
@@ -105,7 +105,7 @@ const ProfileVariantEntry *Enocean1BSDevice::profileVariantsTable()
 
 SingleContactHandler::SingleContactHandler(EnoceanDevice &aDevice, bool aActiveState) :
   EnoceanChannelHandler(aDevice),
-  activeState(aActiveState)
+  mActiveState(aActiveState)
 {
 }
 
@@ -119,9 +119,9 @@ void SingleContactHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       // only look at 1BS packets of correct length
       uint8_t data = aEsp3PacketPtr->radioUserData()[0];
       // report contact state to binaryInputBehaviour
-      BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(behaviour);
+      BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(mBehaviour);
       if (bb) {
-        bb->updateInputState(((data & 0x01)!=0) == activeState); // Bit 0 is the contact, report straight or inverted depending on activeState
+        bb->updateInputState(((data & 0x01)!=0) == mActiveState); // Bit 0 is the contact, report straight or inverted depending on activeState
       }
     }
   }
@@ -131,7 +131,7 @@ void SingleContactHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 bool SingleContactHandler::isAlive()
 {
   // check if gotten no message for longer than aliveSignInterval*factor
-  if (MainLoop::now()-device.getLastPacketTime() < CONTACT_UPDATE_INTERVAL*TIMEOUT_FACTOR_FOR_INACTIVE)
+  if (MainLoop::now()-mDevice.getLastPacketTime() < CONTACT_UPDATE_INTERVAL*TIMEOUT_FACTOR_FOR_INACTIVE)
     return true;
   // timed out
   return false;

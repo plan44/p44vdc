@@ -65,7 +65,7 @@ namespace p44 {
 
   protected:
 
-    EnoceanDevice &device; ///< the associated enocean device
+    EnoceanDevice &mDevice; ///< the associated enocean device
 
     /// private constructor
     /// @note create new channels using factory static methods of specialized subclasses
@@ -73,10 +73,10 @@ namespace p44 {
 
   public:
 
-    uint8_t batPercentage; ///< this can be set by handlers to indicate battery status. Set to LOW_BAT_PERCENTAGE or below when device only reports good/bad
-    DsBehaviourPtr behaviour; ///< the associated behaviour
-    int8_t dsChannelIndex; ///< for outputs, the dS channel index
-    EnoceanChannel channel; ///< channel number
+    uint8_t mBatPercentage; ///< this can be set by handlers to indicate battery status. Set to LOW_BAT_PERCENTAGE or below when device only reports good/bad
+    DsBehaviourPtr mBehaviour; ///< the associated behaviour
+    int8_t mDsChannelIndex; ///< for outputs, the dS channel index
+    EnoceanChannel mChannel; ///< channel number
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
@@ -133,27 +133,27 @@ namespace p44 {
 
     friend class EnoceanChannelHandler;
 
-    EnoceanAddress enoceanAddress; ///< the enocean device address
-    EnoceanProfile eeProfile; ///< the EEP (RORG/FUNC/TYPE)
-    EnoceanManufacturer eeManufacturer; ///< the manufacturer ID
-    EnoceanSubDevice subDevice; ///< the subdevice number (relevant when one physical EnOcean device is represented as multiple vdSDs)
+    EnoceanAddress mEnoceanAddress; ///< the enocean device address
+    EnoceanProfile mEeProfile; ///< the EEP (RORG/FUNC/TYPE)
+    EnoceanManufacturer mEeManufacturer; ///< the manufacturer ID
+    EnoceanSubDevice mSubDevice; ///< the subdevice number (relevant when one physical EnOcean device is represented as multiple vdSDs)
 
-    string eeFunctionDesc; ///< short functional description (like: button, windowhandle, sensor...)
-    const char *iconBaseName; ///< icon base name
-    bool groupColoredIcon; ///< if set, use color suffix with icon base name
+    string mEeFunctionDesc; ///< short functional description (like: button, windowhandle, sensor...)
+    const char *mIconBaseName; ///< icon base name
+    bool mGroupColoredIcon; ///< if set, use color suffix with icon base name
 
-    EnoceanChannelHandlerVector channels; ///< the channel handlers for this device
+    EnoceanChannelHandlerVector mChannels; ///< the channel handlers for this device
 
-    bool alwaysUpdateable; ///< if set, device updates are sent immediately, otherwise, updates are only sent as response to a device message
-    bool updateAtEveryReceive; ///< if set, current values are sent to the device whenever a message is received, even if output state has not changed
-    bool pendingDeviceUpdate; ///< set when update to the device is pending
+    bool mAlwaysUpdateable; ///< if set, device updates are sent immediately, otherwise, updates are only sent as response to a device message
+    bool mUpdateAtEveryReceive; ///< if set, current values are sent to the device whenever a message is received, even if output state has not changed
+    bool mPendingDeviceUpdate; ///< set when update to the device is pending
 
-    MLMicroSeconds lastPacketTime; ///< time when device received last packet (or device was created)
-    int16_t lastRSSI; ///< RSSI of last packet received (including learn telegram)
-    uint8_t lastRepeaterCount; ///< last packet's repeater count (including learn telegram)
+    MLMicroSeconds mLastPacketTime; ///< time when device received last packet (or device was created)
+    int16_t mLastRSSI; ///< RSSI of last packet received (including learn telegram)
+    uint8_t mLastRepeaterCount; ///< last packet's repeater count (including learn telegram)
 
     #if ENABLE_ENOCEAN_SECURE
-    EnOceanSecurityPtr securityInfo; ///< security info. If this is set, the device must NOT respond to non-secure packets!
+    EnOceanSecurityPtr mSecurityInfo; ///< security info. If this is set, the device must NOT respond to non-secure packets!
     #endif
 
   public:
@@ -175,7 +175,7 @@ namespace p44 {
 
     /// return time when last packet was received for this device
     /// @return time when last packet was received or Never
-    MLMicroSeconds getLastPacketTime() { return lastPacketTime; };
+    MLMicroSeconds getLastPacketTime() { return mLastPacketTime; };
 
     /// check presence of this addressable
     /// @param aPresenceResultHandler will be called to report presence status
@@ -253,19 +253,19 @@ namespace p44 {
     virtual void setEEPInfo(EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer);
 
     /// set the icon info for the enocean device
-    void setIconInfo(const char *aIconBaseName, bool aGroupColored) { iconBaseName = aIconBaseName; groupColoredIcon = aGroupColored; };
+    void setIconInfo(const char *aIconBaseName, bool aGroupColored) { mIconBaseName = aIconBaseName; mGroupColoredIcon = aGroupColored; };
 
     /// set short functional description for this device (explaining the EEP in short, like "button", "sensor", "window handle")
     /// @param aString the description string
-    void setFunctionDesc(string aString) { eeFunctionDesc = aString; };
+    void setFunctionDesc(string aString) { mEeFunctionDesc = aString; };
+
+    /// device and channel handler implementations can call this to enable immediate sending of output changes for the device
+    /// (otherwise, output changes are sent only within 1sec after receiving a message from the device)
+    void setAlwaysUpdateable(bool aAlwaysUpdateable = true) { mAlwaysUpdateable = aAlwaysUpdateable; };
 
     /// device and channel handler implementations can call this to enable immediate sending of output changes for the device
     /// (otherwise, output changes are sent only withing 1sec after receiving a message from the device)
-    void setAlwaysUpdateable(bool aAlwaysUpdateable = true) { alwaysUpdateable = aAlwaysUpdateable; };
-
-    /// device and channel handler implementations can call this to enable immediate sending of output changes for the device
-    /// (otherwise, output changes are sent only withing 1sec after receiving a message from the device)
-    void setUpdateAtEveryReceive(bool aUpdateAtEveryReceive = true) { updateAtEveryReceive = aUpdateAtEveryReceive; };
+    void setUpdateAtEveryReceive(bool aUpdateAtEveryReceive = true) { mUpdateAtEveryReceive = aUpdateAtEveryReceive; };
 
 
     /// get the enocean address identifying the hardware that contains this logical device
@@ -316,15 +316,13 @@ namespace p44 {
     /// @param aSecurityInfo set secure info for this device or NULL to remove security
     /// @note aSecurityInfo that is not established will be treated like NULL to avoid devices getting blocked with incomplete security info
     /// @note if security info is set, the device will not get any non-secure radio packets any more
-    void setSecurity(EnOceanSecurityPtr aSecurityInfo) { securityInfo = aSecurityInfo && aSecurityInfo->established ? aSecurityInfo : NULL; };
+    void setSecurity(EnOceanSecurityPtr aSecurityInfo) { mSecurityInfo = aSecurityInfo && aSecurityInfo->mEstablished ? aSecurityInfo : NULL; };
 
     /// check for secure device
     /// @return true if this device has valid security info (i.e. MUST NOT accept any insecure packets)
-    bool secureDevice() { return securityInfo!=NULL; }
+    bool secureDevice() { return mSecurityInfo!=NULL; }
 
     #endif
-
-
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object

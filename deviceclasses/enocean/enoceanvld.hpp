@@ -78,7 +78,7 @@ namespace p44 {
   {
     typedef EnoceanVLDDevice inherited;
 
-    MLTicket cfgTicket;
+    MLTicket mCfgTicket;
 
   public:
 
@@ -119,13 +119,13 @@ namespace p44 {
       unuspported = 0x3
     } ErrorLevel;
 
-    bool overCurrent;
-    bool powerFailure;
-    ErrorLevel errorLevel;
+    bool mOverCurrent;
+    bool mPowerFailure;
+    ErrorLevel mErrorLevel;
 
-    SimpleCB syncChannelCB; ///< callback to call when channel value is synchronized back from HW
+    SimpleCB mSyncChannelCB; ///< callback to call when channel value is synchronized back from HW
 
-    MLTicket resendTicket;
+    MLTicket mResendTicket;
 
     /// private constructor, friend class' Enocean4bsHandler::newDevice is the place to call it from
     EnoceanD201XXHandler(EnoceanDevice &aDevice);
@@ -175,14 +175,14 @@ namespace p44 {
 
     // behaviours for extra sensors
     // Note: using base class' behaviour pointer for first sensor = window handle input
-    DsBehaviourPtr temperatureSensor;
-    DsBehaviourPtr humiditySensor;
-    DsBehaviourPtr illuminationSensor;
-    DsBehaviourPtr batterySensor;
-    DsBehaviourPtr burglaryAlarmInput;
-    DsBehaviourPtr protectionAlarmInput;
-    DsBehaviourPtr motionInput;
-    DsBehaviourPtr tiltInput;
+    DsBehaviourPtr mTemperatureSensor;
+    DsBehaviourPtr mHumiditySensor;
+    DsBehaviourPtr mIlluminationSensor;
+    DsBehaviourPtr mBatterySensor;
+    DsBehaviourPtr mBurglaryAlarmInput;
+    DsBehaviourPtr mProtectionAlarmInput;
+    DsBehaviourPtr mMotionInput;
+    DsBehaviourPtr mTiltInput;
 
     /// private constructor, friend class' Enocean4bsHandler::newDevice is the place to call it from
     EnoceanD20601Handler(EnoceanDevice &aDevice);
@@ -227,8 +227,8 @@ namespace p44 {
     /// private constructor, create new channels using factory static method
     EnoceanD20601ButtonHandler(EnoceanDevice &aDevice, int aSwitchIndex);
 
-    bool pressed; ///< true if currently pressed, false if released, index: 0=on/down button, 1=off/up button
-    int switchIndex; ///< which switch within the device (0..1)
+    bool mPressed; ///< true if currently pressed, false if released, index: 0=on/down button, 1=off/up button
+    int mSwitchIndex; ///< which switch within the device (0..1)
 
     /// handle radio packet related to this channel
     /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information

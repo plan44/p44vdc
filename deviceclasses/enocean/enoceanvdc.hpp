@@ -61,17 +61,17 @@ namespace p44 {
     friend class EnoceanDevice;
     typedef Vdc inherited;
 
-    bool learningMode;
-    bool disableProximityCheck;
-    Tristate onlyEstablish;
-    bool selfTesting;
+    bool mLearningMode;
+    bool mDisableProximityCheck;
+    Tristate mOnlyEstablish;
+    bool mSelfTesting;
 
-    EnoceanDeviceMap enoceanDevices; ///< local map linking EnoceanDeviceID to devices
+    EnoceanDeviceMap mEnoceanDevices; ///< local map linking EnoceanDeviceID to devices
 
-		EnoceanPersistence db;
+		EnoceanPersistence mDb;
 
     #if ENABLE_ENOCEAN_SECURE
-    EnoceanSecurityMap securityInfos; ///< local map of active security contexts
+    EnoceanSecurityMap mSecurityInfos; ///< local map of active security contexts
     #endif
 
 

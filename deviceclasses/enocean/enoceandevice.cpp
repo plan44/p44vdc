@@ -41,9 +41,9 @@ using namespace p44;
 // MARK: - EnoceanChannelHandler
 
 EnoceanChannelHandler::EnoceanChannelHandler(EnoceanDevice &aDevice) :
-  device(aDevice),
-  dsChannelIndex(0),
-  batPercentage(100)
+  mDevice(aDevice),
+  mDsChannelIndex(0),
+  mBatPercentage(100)
 {
 }
 
@@ -51,13 +51,13 @@ EnoceanChannelHandler::EnoceanChannelHandler(EnoceanDevice &aDevice) :
 int EnoceanChannelHandler::opStateLevel()
 {
   if (!isAlive()) return 0; // completely offline, operation not possible
-  if (batPercentage<=LOW_BAT_PERCENTAGE) return batPercentage; // low battery, operation critical
+  if (mBatPercentage<=LOW_BAT_PERCENTAGE) return mBatPercentage; // low battery, operation critical
   return 100;
 }
 
 string EnoceanChannelHandler::getOpStateText()
 {
-  if (batPercentage<=LOW_BAT_PERCENTAGE) return "low battery";
+  if (mBatPercentage<=LOW_BAT_PERCENTAGE) return "low battery";
   return "";
 }
 
@@ -65,13 +65,13 @@ string EnoceanChannelHandler::getOpStateText()
 int EnoceanChannelHandler::getLogLevelOffset()
 {
   // no own offset - inherit device's
-  return device.getLogLevelOffset();
+  return mDevice.getLogLevelOffset();
 }
 
 
 string EnoceanChannelHandler::logContextPrefix()
 {
-  return string_format("%s: channel[%d]", device.logContextPrefix().c_str(), channel);
+  return string_format("%s: channel[%d]", mDevice.logContextPrefix().c_str(), mChannel);
 }
 
 
@@ -81,19 +81,19 @@ string EnoceanChannelHandler::logContextPrefix()
 
 EnoceanDevice::EnoceanDevice(EnoceanVdc *aVdcP) :
   Device(aVdcP),
-  eeProfile(eep_profile_unknown),
-  eeManufacturer(manufacturer_unknown),
-  alwaysUpdateable(false),
-  pendingDeviceUpdate(false),
-  updateAtEveryReceive(false),
-  subDevice(0)
+  mEeProfile(eep_profile_unknown),
+  mEeManufacturer(manufacturer_unknown),
+  mAlwaysUpdateable(false),
+  mPendingDeviceUpdate(false),
+  mUpdateAtEveryReceive(false),
+  mSubDevice(0)
 {
-  eeFunctionDesc = "device"; // generic description is "device"
-  iconBaseName = "enocean";
-  groupColoredIcon = true;
-  lastPacketTime = MainLoop::now(); // consider packet received at time of creation (to avoid devices starting inactive)
-  lastRSSI = INVALID_RSSI; // not valid
-  lastRepeaterCount = 0; // dummy
+  mEeFunctionDesc = "device"; // generic description is "device"
+  mIconBaseName = "enocean";
+  mGroupColoredIcon = true;
+  mLastPacketTime = MainLoop::now(); // consider packet received at time of creation (to avoid devices starting inactive)
+  mLastRSSI = INVALID_RSSI; // not valid
+  mLastRepeaterCount = 0; // dummy
 }
 
 
@@ -113,40 +113,40 @@ EnoceanVdc &EnoceanDevice::getEnoceanVdc()
 
 EnoceanAddress EnoceanDevice::getAddress()
 {
-  return enoceanAddress;
+  return mEnoceanAddress;
 }
 
 
 EnoceanSubDevice EnoceanDevice::getSubDevice()
 {
-  return subDevice;
+  return mSubDevice;
 }
 
 
 void EnoceanDevice::setAddressingInfo(EnoceanAddress aAddress, EnoceanSubDevice aSubDevice)
 {
-  enoceanAddress = aAddress;
-  subDevice = aSubDevice;
+  mEnoceanAddress = aAddress;
+  mSubDevice = aSubDevice;
   deriveDsUid();
 }
 
 
 void EnoceanDevice::setEEPInfo(EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer)
 {
-  eeProfile = aEEProfile;
-  eeManufacturer = aEEManufacturer;
+  mEeProfile = aEEProfile;
+  mEeManufacturer = aEEManufacturer;
 }
 
 
 EnoceanProfile EnoceanDevice::getEEProfile()
 {
-  return eeProfile;
+  return mEeProfile;
 }
 
 
 EnoceanManufacturer EnoceanDevice::getEEManufacturer()
 {
-  return eeManufacturer;
+  return mEeManufacturer;
 }
 
 
@@ -175,21 +175,21 @@ string EnoceanDevice::hardwareModelGUID()
 
 string EnoceanDevice::modelName()
 {
-  const char *mn = EnoceanComm::manufacturerName(eeManufacturer);
-  return string_format("%s%sEnOcean %s (%02X-%02X-%02X)", mn ? mn : "", mn ? " " : "", eeFunctionDesc.c_str(), EEP_RORG(eeProfile), EEP_FUNC(eeProfile), EEP_TYPE(eeProfile));
+  const char *mn = EnoceanComm::manufacturerName(mEeManufacturer);
+  return string_format("%s%sEnOcean %s (%02X-%02X-%02X)", mn ? mn : "", mn ? " " : "", mEeFunctionDesc.c_str(), EEP_RORG(mEeProfile), EEP_FUNC(mEeProfile), EEP_TYPE(mEeProfile));
 }
 
 
 string EnoceanDevice::vendorId()
 {
-  const char *mn = EnoceanComm::manufacturerName(eeManufacturer);
-  return string_format("enoceanvendor:%03X%s%s", eeManufacturer, mn ? ":" : "", mn ? mn : "");
+  const char *mn = EnoceanComm::manufacturerName(mEeManufacturer);
+  return string_format("enoceanvendor:%03X%s%s", mEeManufacturer, mn ? ":" : "", mn ? mn : "");
 }
 
 
 string EnoceanDevice::vendorName()
 {
-  const char *mn = EnoceanComm::manufacturerName(eeManufacturer);
+  const char *mn = EnoceanComm::manufacturerName(mEeManufacturer);
   return mn ? mn : "";
 }
 
@@ -198,11 +198,11 @@ string EnoceanDevice::vendorName()
 bool EnoceanDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   bool iconFound = false;
-  if (iconBaseName) {
-    if (groupColoredIcon)
-      iconFound = getClassColoredIcon(iconBaseName, getDominantColorClass(), aIcon, aWithData, aResolutionPrefix);
+  if (mIconBaseName) {
+    if (mGroupColoredIcon)
+      iconFound = getClassColoredIcon(mIconBaseName, getDominantColorClass(), aIcon, aWithData, aResolutionPrefix);
     else
-      iconFound = getIcon(iconBaseName, aIcon, aWithData, aResolutionPrefix);
+      iconFound = getIcon(mIconBaseName, aIcon, aWithData, aResolutionPrefix);
   }
   if (iconFound)
     return true;
@@ -214,8 +214,8 @@ bool EnoceanDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aRe
 void EnoceanDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
   // clear learn-in data from DB
-  if(getEnoceanVdc().db.executef("DELETE FROM knownDevices WHERE enoceanAddress=%d AND subdevice=%d", getAddress(), getSubDevice())!=SQLITE_OK) {
-    OLOG(LOG_ERR, "Error deleting device: %s", getEnoceanVdc().db.error()->description().c_str());
+  if(getEnoceanVdc().mDb.executef("DELETE FROM knownDevices WHERE enoceanAddress=%d AND subdevice=%d", getAddress(), getSubDevice())!=SQLITE_OK) {
+    OLOG(LOG_ERR, "Error deleting device: %s", getEnoceanVdc().mDb.error()->description().c_str());
   }
   #if ENABLE_ENOCEAN_SECURE
   // clear security info if no subdevices are left
@@ -230,12 +230,12 @@ void EnoceanDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResul
 void EnoceanDevice::addChannelHandler(EnoceanChannelHandlerPtr aChannelHandler)
 {
   // create channel number
-  aChannelHandler->channel = channels.size();
+  aChannelHandler->mChannel = mChannels.size();
   // add to my local list
-  channels.push_back(aChannelHandler);
+  mChannels.push_back(aChannelHandler);
   // register behaviour of the channel (if it has a default behaviour at all) with the device
-  if (aChannelHandler->behaviour) {
-    addBehaviour(aChannelHandler->behaviour);
+  if (aChannelHandler->mBehaviour) {
+    addBehaviour(aChannelHandler->mBehaviour);
   }
 }
 
@@ -245,8 +245,8 @@ void EnoceanDevice::addChannelHandler(EnoceanChannelHandlerPtr aChannelHandler)
 EnoceanChannelHandlerPtr EnoceanDevice::channelForBehaviour(const DsBehaviour *aBehaviourP)
 {
   EnoceanChannelHandlerPtr handler;
-  for (EnoceanChannelHandlerVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
-    if ((*pos)->behaviour.get()==static_cast<const DsBehaviour *>(aBehaviourP)) {
+  for (EnoceanChannelHandlerVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
+    if ((*pos)->mBehaviour.get()==static_cast<const DsBehaviour *>(aBehaviourP)) {
       handler = *pos;
       break;
     }
@@ -267,9 +267,9 @@ void EnoceanDevice::sendCommand(Esp3PacketPtr aCommandPacket, ESPPacketCB aRespo
 void EnoceanDevice::needOutgoingUpdate()
 {
   // anyway, we need an update
-  pendingDeviceUpdate = true;
+  mPendingDeviceUpdate = true;
   // send it right away when possible (line powered devices only)
-  if (alwaysUpdateable) {
+  if (mAlwaysUpdateable) {
     sendOutgoingUpdate();
   }
   else {
@@ -280,17 +280,17 @@ void EnoceanDevice::needOutgoingUpdate()
 
 void EnoceanDevice::sendOutgoingUpdate()
 {
-  if (pendingDeviceUpdate) {
+  if (mPendingDeviceUpdate) {
     // clear flag now, so handlers can trigger yet another update in collectOutgoingMessageData() if needed (e.g. heating valve service sequence)
-    pendingDeviceUpdate = false; // done
+    mPendingDeviceUpdate = false; // done
     // collect data from all channels to compose an outgoing message
     Esp3PacketPtr outgoingEsp3Packet;
-    for (EnoceanChannelHandlerVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+    for (EnoceanChannelHandlerVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
       (*pos)->collectOutgoingMessageData(outgoingEsp3Packet);
     }
     if (outgoingEsp3Packet) {
       // set destination
-      outgoingEsp3Packet->setRadioDestination(enoceanAddress); // the target is the device I manage
+      outgoingEsp3Packet->setRadioDestination(mEnoceanAddress); // the target is the device I manage
       // send it
       sendCommand(outgoingEsp3Packet, NoOP);
     }
@@ -304,11 +304,11 @@ void EnoceanDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   for (int i=0; i<numChannels(); i++) {
     if (getChannelByIndex(i, true)) {
       // channel needs update
-      pendingDeviceUpdate = true;
+      mPendingDeviceUpdate = true;
       break; // no more checking needed, need device level update anyway
     }
   }
-  if (pendingDeviceUpdate) {
+  if (mPendingDeviceUpdate) {
     // we need to apply data
     needOutgoingUpdate();
   }
@@ -320,9 +320,9 @@ void EnoceanDevice::updateRadioMetrics(Esp3PacketPtr aEsp3PacketPtr)
 {
   if (aEsp3PacketPtr) {
     updatePresenceState(true); // when we get a telegram, we know device is present now
-    lastPacketTime = MainLoop::now();
-    lastRSSI = aEsp3PacketPtr->radioDBm();
-    lastRepeaterCount = aEsp3PacketPtr->radioRepeaterCount();
+    mLastPacketTime = MainLoop::now();
+    mLastRSSI = aEsp3PacketPtr->radioDBm();
+    mLastRepeaterCount = aEsp3PacketPtr->radioRepeaterCount();
   }
 }
 
@@ -332,13 +332,13 @@ void EnoceanDevice::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
   OLOG(LOG_INFO, "now starts processing EnOcean packet:\n%s", aEsp3PacketPtr->description().c_str());
   updateRadioMetrics(aEsp3PacketPtr);
   // pass to every channel
-  for (EnoceanChannelHandlerVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+  for (EnoceanChannelHandlerVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
     (*pos)->handleRadioPacket(aEsp3PacketPtr);
   }
   // if device cannot be updated whenever output value change is requested, send updates after receiving a message
-  if (pendingDeviceUpdate || updateAtEveryReceive) {
+  if (mPendingDeviceUpdate || mUpdateAtEveryReceive) {
     // send updates, if any
-    pendingDeviceUpdate = true; // set it in case of updateAtEveryReceive (so message goes out even if no changes pending)
+    mPendingDeviceUpdate = true; // set it in case of updateAtEveryReceive (so message goes out even if no changes pending)
     OLOG(LOG_NOTICE, "pending output update is now sent to device");
     sendOutgoingUpdate();
   }
@@ -348,7 +348,7 @@ void EnoceanDevice::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 bool EnoceanDevice::isAlive()
 {
   bool alive = true;
-  for (EnoceanChannelHandlerVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+  for (EnoceanChannelHandlerVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
     if (!(*pos)->isAlive()) {
       alive = false; // one channel not alive -> device not present
       break;
@@ -370,13 +370,13 @@ void EnoceanDevice::checkPresence(PresenceCB aPresenceResultHandler)
 int EnoceanDevice::opStateLevel()
 {
   int opState = -1;
-  if (lastRSSI>INVALID_RSSI) {
+  if (mLastRSSI>INVALID_RSSI) {
     // first judge from last RSSI
-    opState = 1+(lastRSSI-WORST_RSSI)*99/(BEST_RSSI-WORST_RSSI); // 1..100 range
+    opState = 1+(mLastRSSI-WORST_RSSI)*99/(BEST_RSSI-WORST_RSSI); // 1..100 range
     if (opState<1) opState = 1;
     else if (opState>100) opState = 100;
     // also check opstate from channels
-    for (EnoceanChannelHandlerVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+    for (EnoceanChannelHandlerVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
       int chOpState = (*pos)->opStateLevel();
       if (chOpState<opState) opState = chOpState; // lowest channel state determines overall state
     }
@@ -391,19 +391,19 @@ string EnoceanDevice::getOpStateText()
   if (!isAlive()) {
     t += "timeout, ";
   }
-  if (lastRSSI>INVALID_RSSI) {
-    string_format_append(t, "%ddBm (", lastRSSI);
-    if (lastRepeaterCount>0) {
-      string_format_append(t, "%d Rep., ", lastRepeaterCount);
+  if (mLastRSSI>INVALID_RSSI) {
+    string_format_append(t, "%ddBm (", mLastRSSI);
+    if (mLastRepeaterCount>0) {
+      string_format_append(t, "%d Rep., ", mLastRepeaterCount);
     }
-    format_duration_append(t, (MainLoop::now()-lastPacketTime)/Second, 2);
+    format_duration_append(t, (MainLoop::now()-mLastPacketTime)/Second, 2);
     t += " ago)";
   }
   else {
     t += "unseen";
   }
   // append info from enocean handlers
-  for (EnoceanChannelHandlerVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
+  for (EnoceanChannelHandlerVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
     string ht = (*pos)->getOpStateText();
     if (!ht.empty()) {
       t += ", " + ht;
@@ -421,28 +421,28 @@ string EnoceanDevice::description()
   if (secureDevice()) {
     string_format_append(s,
       "\n- With secured communication:%s%s%s%s",
-      securityInfo->securityLevelFormat & 0xC0 ? " RLC" : "",
-      securityInfo->securityLevelFormat & 0x20 ? "-TX" : "",
-      securityInfo->securityLevelFormat & 0x18 ? " MAC" : "",
-      securityInfo->securityLevelFormat & 0x07 ? " DATA_ENC" : ""
+      mSecurityInfo->mSecurityLevelFormat & 0xC0 ? " RLC" : "",
+      mSecurityInfo->mSecurityLevelFormat & 0x20 ? "-TX" : "",
+      mSecurityInfo->mSecurityLevelFormat & 0x18 ? " MAC" : "",
+      mSecurityInfo->mSecurityLevelFormat & 0x07 ? " DATA_ENC" : ""
     );
   }
   #endif
-  string_format_append(s, "\n- Enocean Address = 0x%08X, subDevice=%d", enoceanAddress, subDevice);
-  const char *mn = EnoceanComm::manufacturerName(eeManufacturer);
+  string_format_append(s, "\n- Enocean Address = 0x%08X, subDevice=%d", mEnoceanAddress, mSubDevice);
+  const char *mn = EnoceanComm::manufacturerName(mEeManufacturer);
   string_format_append(s,
     "\n- %s, EEP RORG/FUNC/TYPE: %02X %02X %02X, Manufacturer: %s (%03X), Profile variant: %02X",
-    eeFunctionDesc.c_str(),
-    EEP_RORG(eeProfile),
-    EEP_FUNC(eeProfile),
-    EEP_TYPE(eeProfile),
+    mEeFunctionDesc.c_str(),
+    EEP_RORG(mEeProfile),
+    EEP_FUNC(mEeProfile),
+    EEP_TYPE(mEeProfile),
     mn ? mn : "<unknown>",
-    eeManufacturer,
-    EEP_VARIANT(eeProfile)
+    mEeManufacturer,
+    EEP_VARIANT(mEeProfile)
   );
   // show channels
-  for (EnoceanChannelHandlerVector::iterator pos = channels.begin(); pos!=channels.end(); ++pos) {
-    string_format_append(s, "\n- EnOcean device channel #%d: %s", (*pos)->channel, (*pos)->shortDesc().c_str());
+  for (EnoceanChannelHandlerVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
+    string_format_append(s, "\n- EnOcean device channel #%d: %s", (*pos)->mChannel, (*pos)->shortDesc().c_str());
   }
   return s;
 }
@@ -657,22 +657,22 @@ bool EnoceanDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
       switch (aPropertyDescriptor->fieldKey()) {
         case packetage_key:
           // Note lastPacketTime is set to now at startup, so additionally check lastRSSI
-          if (lastPacketTime==Never || lastRSSI<=INVALID_RSSI)
+          if (mLastPacketTime==Never || mLastRSSI<=INVALID_RSSI)
             aPropValue->setNull();
           else
-            aPropValue->setDoubleValue((double)(MainLoop::now()-lastPacketTime)/Second);
+            aPropValue->setDoubleValue((double)(MainLoop::now()-mLastPacketTime)/Second);
           return true;
         case rssi_key:
-          if (lastRSSI<=INVALID_RSSI)
+          if (mLastRSSI<=INVALID_RSSI)
             aPropValue->setNull();
           else
-            aPropValue->setInt32Value(lastRSSI);
+            aPropValue->setInt32Value(mLastRSSI);
           return true;
         case repeaterCount_key:
-          if (lastRSSI<=INVALID_RSSI)
+          if (mLastRSSI<=INVALID_RSSI)
             aPropValue->setNull();
           else
-            aPropValue->setUint8Value(lastRepeaterCount);
+            aPropValue->setUint8Value(mLastRepeaterCount);
           return true;
       }
     }

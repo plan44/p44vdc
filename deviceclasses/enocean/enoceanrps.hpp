@@ -105,9 +105,9 @@ namespace p44 {
     /// private constructor, create new channels using factory static method
     EnoceanRpsRockerHandler(EnoceanDevice &aDevice);
 
-    bool pressed; ///< true if currently pressed, false if released, index: 0=on/down button, 1=off/up button
-    int switchIndex; ///< which switch within the device (A..D)
-    bool isRockerUp; ///< set if rocker up side of switch
+    bool mPressed; ///< true if currently pressed, false if released, index: 0=on/down button, 1=off/up button
+    int mSwitchIndex; ///< which switch within the device (A..D)
+    bool mIsRockerUp; ///< set if rocker up side of switch
 
 
     /// handle radio packet related to this channel
@@ -150,7 +150,7 @@ namespace p44 {
     typedef EnoceanChannelHandler inherited;
     friend class EnoceanRPSDevice;
 
-    bool isServiceCardDetector; ///< set if this represents the service card detector (otherwise, it's the card inserted status)
+    bool mIsServiceCardDetector; ///< set if this represents the service card detector (otherwise, it's the card inserted status)
 
     /// private constructor, create new channels using factory static method
     EnoceanRpsCardKeyHandler(EnoceanDevice &aDevice);
@@ -173,7 +173,7 @@ namespace p44 {
     typedef EnoceanChannelHandler inherited;
     friend class EnoceanRPSDevice;
 
-    bool isBatteryStatus; ///< set if this represents the battery status (otherwise, it's the alarm status)
+    bool mIsBatteryStatus; ///< set if this represents the battery status (otherwise, it's the alarm status)
 
     /// private constructor, create new channels using factory static method
     EnoceanRpsWindSmokeDetectorHandler(EnoceanDevice &aDevice);

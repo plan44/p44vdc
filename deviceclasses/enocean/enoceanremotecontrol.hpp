@@ -57,7 +57,7 @@ namespace p44 {
   {
     typedef EnoceanDevice inherited;
 
-    MLTicket teachInTimer;
+    MLTicket mTeachInTimer;
 
   public:
 
@@ -115,7 +115,7 @@ namespace p44 {
   {
     typedef EnoceanRemoteControlDevice inherited;
 
-    MLTicket buttonTimer;
+    MLTicket mButtonTimer;
 
   public:
 

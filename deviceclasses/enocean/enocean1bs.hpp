@@ -82,7 +82,7 @@ namespace p44 {
     SingleContactHandler(EnoceanDevice &aDevice, bool aActiveState);
 
     /// active state
-    bool activeState;
+    bool mActiveState;
 
   public:
 

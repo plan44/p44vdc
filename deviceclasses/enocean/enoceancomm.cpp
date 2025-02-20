@@ -1117,38 +1117,38 @@ const char *EnoceanComm::manufacturerName(EnoceanManufacturer aManufacturerCode)
 #if ENABLE_ENOCEAN_SECURE
 
 EnOceanSecurity::EnOceanSecurity() :
-  securityLevelFormat(0),
-  teachInInfo(0),
-  rollingCounter(0),
-  lastSavedRLC(0),
-  lastSave(Never),
-  rlcVerified(false),
-  established(false),
-  teachInP(NULL)
+  mSecurityLevelFormat(0),
+  mTeachInInfo(0),
+  mRollingCounter(0),
+  mLastSavedRLC(0),
+  mLastSave(Never),
+  mRlcVerified(false),
+  mEstablished(false),
+  mTeachInP(NULL)
 {
-  memset(&privateKey, 0, AES128BlockLen);
-  memset(&subKey1, 0, AES128BlockLen);
-  memset(&subKey2, 0, AES128BlockLen);
+  memset(&mPrivateKey, 0, AES128BlockLen);
+  memset(&mSubKey1, 0, AES128BlockLen);
+  memset(&mSubKey2, 0, AES128BlockLen);
 }
 
 EnOceanSecurity::~EnOceanSecurity()
 {
-  if (teachInP) {
-    delete teachInP;
-    teachInP = NULL;
+  if (mTeachInP) {
+    delete mTeachInP;
+    mTeachInP = NULL;
   }
 }
 
 
 void EnOceanSecurity::deriveSubkeysFromPrivateKey()
 {
-  deriveSubkeys(privateKey, subKey1, subKey2);
+  deriveSubkeys(mPrivateKey, mSubKey1, mSubKey2);
 }
 
 
 uint8_t EnOceanSecurity::rlcSize()
 {
-  uint8_t rlcAlgo = (securityLevelFormat>>6) & 0x03;
+  uint8_t rlcAlgo = (mSecurityLevelFormat>>6) & 0x03;
   uint8_t rlcBytes = 0;
   if (rlcAlgo==1) rlcBytes = 2; // 16 bit RLC
   else if (rlcAlgo==2) rlcBytes = 3; // 24 bit RLC
@@ -1158,9 +1158,9 @@ uint8_t EnOceanSecurity::rlcSize()
 
 void EnOceanSecurity::incrementRlc(int32_t aIncrement)
 {
-  rollingCounter += (uint32_t)aIncrement;
+  mRollingCounter += (uint32_t)aIncrement;
   // mask
-  rollingCounter &= (0xFFFFFFFF>>((4-rlcSize())*8));
+  mRollingCounter &= (0xFFFFFFFF>>((4-rlcSize())*8));
 }
 
 
@@ -1172,14 +1172,14 @@ uint32_t EnOceanSecurity::rlcDistance(uint32_t aNewRLC, uint32_t aOldRLC)
 
 bool EnOceanSecurity::rlcInWindow(uint32_t aRLC)
 {
-  return rlcDistance(aRLC, rollingCounter)<=RLC_WINDOW_SIZE;
+  return rlcDistance(aRLC, mRollingCounter)<=RLC_WINDOW_SIZE;
 }
 
 
 
 uint8_t EnOceanSecurity::macSize()
 {
-  uint8_t macAlgo = (securityLevelFormat>>3) & 0x03;
+  uint8_t macAlgo = (mSecurityLevelFormat>>3) & 0x03;
   uint8_t macBytes = 0;
   if (macAlgo==1) macBytes = 3; // 24 bit MAC
   else if (macAlgo==2) macBytes = 4; // 32 bit MAC
@@ -1198,15 +1198,15 @@ Esp3PacketPtr EnOceanSecurity::teachInMessage(int aSegment)
     uint8_t *d = tim->radioUserData();
     int i=0;
     // R-ORG TS | TEACH_IN_INFO | SLF | RLC | KEY (KEY_BYTES_IN_SEGMENT0 bytes)
-    d[i++] = teachInInfo;
-    d[i++] = securityLevelFormat;
+    d[i++] = mTeachInInfo;
+    d[i++] = mSecurityLevelFormat;
     while (rlcSz>0) {
       rlcSz--;
-      d[i++] = (rollingCounter>>(8*rlcSz))&0xFF;
+      d[i++] = (mRollingCounter>>(8*rlcSz))&0xFF;
     }
     // KEY_BYTES_IN_SEGMENT0 bytes of key
     for (int j=0; j<KEY_BYTES_IN_SEGMENT0; j++) {
-      d[i++] = privateKey[j];
+      d[i++] = mPrivateKey[j];
     }
   }
   else if (aSegment==1) {
@@ -1217,7 +1217,7 @@ Esp3PacketPtr EnOceanSecurity::teachInMessage(int aSegment)
     d[i++] = 0x40; // TEACH_IN_INFO for segment 1
     // rest of key
     for (int j=KEY_BYTES_IN_SEGMENT0; j<AES128BlockLen; j++) {
-      d[i++] = privateKey[j];
+      d[i++] = mPrivateKey[j];
     }
   }
   else {
@@ -1240,87 +1240,87 @@ Tristate EnOceanSecurity::processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Blo
   uint8_t sidx = (ti>>6) & 0x03; // IDX
   if (sidx==0) {
     // IDX=0, new teach-in begins
-    if (teachInP) delete teachInP;
-    teachInP = new SecureTeachInData;
-    teachInInfo = ti;
-    teachInP->numTeachInBytes = 0;
-    teachInP->segmentIndex = 0;
+    if (mTeachInP) delete mTeachInP;
+    mTeachInP = new SecureTeachInData;
+    mTeachInInfo = ti;
+    mTeachInP->numTeachInBytes = 0;
+    mTeachInP->segmentIndex = 0;
   }
   else {
     // IDX>0, is an additional segment
-    if (!teachInP || sidx-teachInP->segmentIndex!=1) {
+    if (!mTeachInP || sidx-mTeachInP->segmentIndex!=1) {
       // not started teach-in or segment out of order
       return no;
     }
-    teachInP->segmentIndex = sidx;
+    mTeachInP->segmentIndex = sidx;
   }
   // accumulate bytes
   while (l>0) {
-    if (teachInP->numTeachInBytes>=maxTeachInDataSize) return no; // too much teach-in data
-    teachInP->teachInData[teachInP->numTeachInBytes++] = *dataP++; l--;
+    if (mTeachInP->numTeachInBytes>=maxTeachInDataSize) return no; // too much teach-in data
+    mTeachInP->teachInData[mTeachInP->numTeachInBytes++] = *dataP++; l--;
   }
   // check if all segments received
-  uint8_t numSegments = (teachInInfo>>4) & 0x03;
+  uint8_t numSegments = (mTeachInInfo>>4) & 0x03;
   //DBGOLOG(LOG_INFO, "%08X: teach-in segment %d/%d received", aTeachInMsg->radioSender(), teachInP->segmentIndex+1, numSegments);
-  if (teachInP->segmentIndex+1>=numSegments) {
+  if (mTeachInP->segmentIndex+1>=numSegments) {
     // if learning, this replaces earlier established info
-    if (aLearning) established = false;
+    if (aLearning) mEstablished = false;
     // all teach-in data accumulated
     // Note: if this is already an established security info at this point
     //       only RLC can be updated, if and only if private key matches
-    int b = teachInP->numTeachInBytes;
+    int b = mTeachInP->numTeachInBytes;
     int idx = 0; // start with SLF
     // - get SLF
-    if (!established) {
-      securityLevelFormat = teachInP->teachInData[idx];
+    if (!mEstablished) {
+      mSecurityLevelFormat = mTeachInP->teachInData[idx];
     }
-    else if (securityLevelFormat!=teachInP->teachInData[idx]) {
+    else if (mSecurityLevelFormat!=mTeachInP->teachInData[idx]) {
       OLOG(LOG_WARNING, "%08X: RLC update attempt with non-matching security level -> ignored", aTeachInMsg->radioSender());
       return no; // not a valid security info update
     }
     idx++; b--;
     // - RLC and key
-    if (teachInInfo & 0x08) {
+    if (mTeachInInfo & 0x08) {
       // teach-in data is encrypted by preshared key (PSK)
       if (!aPskP) return no; // we don't have a PSK, cannot decrypt
       uint8_t di[maxTeachInDataSize];
-      memcpy(di, &teachInP->teachInData[idx], b); // copy encrypted version
-      VAEScrypt(*aPskP, 0x0000, 2, di, &teachInP->teachInData[idx], b); // decrypt
+      memcpy(di, &mTeachInP->teachInData[idx], b); // copy encrypted version
+      VAEScrypt(*aPskP, 0x0000, 2, di, &mTeachInP->teachInData[idx], b); // decrypt
     }
     // - RLC if set
     uint32_t newRollingCounter = 0; // init with zero
     for (int i=0; i<rlcSize(); i++) {
       if (b<=0) return no; // not enough bytes
-      newRollingCounter = (newRollingCounter<<8) + teachInP->teachInData[idx++]; b--;
+      newRollingCounter = (newRollingCounter<<8) + mTeachInP->teachInData[idx++]; b--;
     }
     // - private key
     for (int i=0; i<AES128BlockLen; i++) {
       if (b<=0) return no; // not enough bytes
-      if (!established) {
-        privateKey[i] = teachInP->teachInData[idx];
+      if (!mEstablished) {
+        mPrivateKey[i] = mTeachInP->teachInData[idx];
       }
       else {
-        if (privateKey[i]!=teachInP->teachInData[idx]) {
+        if (mPrivateKey[i]!=mTeachInP->teachInData[idx]) {
           OLOG(LOG_ERR, "%08X: RLC update attempt with wrong private key -> ignored", aTeachInMsg->radioSender());
           return no; // not a valid security info update -> abort
         }
       }
       idx++; b--;
     }
-    if (!established) {
+    if (!mEstablished) {
       // - now established
-      established = true;
+      mEstablished = true;
       // - store RLC
-      rollingCounter = newRollingCounter;
+      mRollingCounter = newRollingCounter;
       // - derive subkeys
       deriveSubkeysFromPrivateKey();
     }
     else if (rlcSize()>0) {
       // was already established, only update RLC (matching key was checked above)
-      rollingCounter = newRollingCounter;
+      mRollingCounter = newRollingCounter;
     }
     // Security info is now complete
-    delete teachInP; teachInP = NULL;
+    delete mTeachInP; mTeachInP = NULL;
     return yes;
   }
   return undefined; // not yet complete
@@ -1353,7 +1353,7 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
     OLOG(LOG_WARNING, "%08X: Non-secure radio packet, but device is secure -> ignored", aSecureMsg->radioSender());
     return Esp3PacketPtr(); // none
   }
-  if (!established) {
+  if (!mEstablished) {
     OLOG(LOG_NOTICE, "%08X: Incomplete security info -> packet ignored", aSecureMsg->radioSender());
     return Esp3PacketPtr(); // none
   }
@@ -1375,7 +1375,7 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
   }
   // check for transmitted RLC
   uint8_t rlcsz = rlcSize();
-  bool transmittedRlc = securityLevelFormat & 0x20;
+  bool transmittedRlc = mSecurityLevelFormat & 0x20;
   if (transmittedRlc) {
     uint32_t rlc = 0;
     // RLC_TX set -> RLC is in the message
@@ -1392,25 +1392,25 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
       return Esp3PacketPtr(); // invalid CMAC
     }
     // update RLC
-    rollingCounter = rlc;
+    mRollingCounter = rlc;
   }
   // verify CMAC
   if (macsz) {
     int rlcRetries = 0;
-    uint32_t origRLC = rollingCounter;
+    uint32_t origRLC = mRollingCounter;
     // Note: allow for more retries when we might have lost RLC increments because of lazy persistence
-    int maxRetries = rlcVerified ? RLC_WINDOW_SIZE : RLC_WINDOW_SIZE+MIN_RLC_DISTANCE_FOR_SAVE;
+    int maxRetries = mRlcVerified ? RLC_WINDOW_SIZE : RLC_WINDOW_SIZE+MIN_RLC_DISTANCE_FOR_SAVE;
     while(true) {
       if (rlcRetries>=maxRetries) {
         OLOG(LOG_NOTICE, "%08X: No matching CMAC %X found within window of current RLC + %d", aSecureMsg->radioSender(), cmac_sent, maxRetries);
-        rollingCounter = origRLC; // do not change RLC
+        mRollingCounter = origRLC; // do not change RLC
         return Esp3PacketPtr(); // invalid CMAC
       }
       // calc CMAC
-      uint32_t cmac_calc = calcCMAC(privateKey, subKey1, subKey2, rollingCounter, rlcsz, macsz, org, d, n);
+      uint32_t cmac_calc = calcCMAC(mPrivateKey, mSubKey1, mSubKey2, mRollingCounter, rlcsz, macsz, org, d, n);
       if (cmac_calc==cmac_sent) {
         // CMAC matches
-        rlcVerified = true; // this RLC matches
+        mRlcVerified = true; // this RLC matches
         if (rlcRetries>0) {
           OLOG(LOG_NOTICE, "%08X: RLC increment of %d required to match CMAC %X (indicates missing packets)", aSecureMsg->radioSender(), rlcRetries, cmac_sent);
         }
@@ -1418,7 +1418,7 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
       }
       // no match
       if (transmittedRlc) {
-        OLOG(LOG_NOTICE, "%08X: No CMAC %X match with transmitted RLC %X", aSecureMsg->radioSender(), cmac_sent, rollingCounter);
+        OLOG(LOG_NOTICE, "%08X: No CMAC %X match with transmitted RLC %X", aSecureMsg->radioSender(), cmac_sent, mRollingCounter);
         return Esp3PacketPtr(); // invalid CMAC
       }
       OLOG(LOG_DEBUG, "- No matching CMAC %X for current RLC, check next RLC in window", cmac_sent);
@@ -1431,7 +1431,7 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
     OLOG(LOG_INFO, "%08X: packet has no payload", aSecureMsg->radioSender());
     return Esp3PacketPtr(); // invalid CMAC
   }
-  uint8_t encMode = securityLevelFormat & 0x07;
+  uint8_t encMode = mSecurityLevelFormat & 0x07;
   Esp3PacketPtr outMsg = Esp3PacketPtr(new Esp3Packet);
   uint8_t *outd = new uint8_t[n];
   if (encMode==0) {
@@ -1439,7 +1439,7 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
     memcpy(outd, d, n);
   }
   else if (encMode==3) {
-    VAEScrypt(privateKey, rollingCounter, rlcsz, d, outd, n);
+    VAEScrypt(mPrivateKey, mRollingCounter, rlcsz, d, outd, n);
   }
   else {
     // TODO: support other modes
@@ -1650,10 +1650,10 @@ uint32_t EnOceanSecurity::calcCMAC(const AES128Block &aKey, const AES128Block &a
 
 EnoceanComm::EnoceanComm(MainLoop &aMainLoop) :
 	inherited(aMainLoop),
-  apiVersion(0),
-  appVersion(0),
-  myAddress(0),
-  myIdBase(0)
+  mApiVersion(0),
+  mAppVersion(0),
+  mMyAddress(0),
+  mMyIdBase(0)
 {
 }
 
@@ -1670,7 +1670,7 @@ void EnoceanComm::setConnectionSpecification(const char *aConnectionSpec, uint16
   // create the EnOcean reset IO pin
   if (aEnoceanResetPinName) {
     // init, initially inactive = not reset
-    enoceanResetPin = DigitalIoPtr(new DigitalIo(aEnoceanResetPinName, true, false));
+    mEnoceanResetPin = DigitalIoPtr(new DigitalIo(aEnoceanResetPinName, true, false));
   }
 	// open connection so we can receive
 	mSerialComm->requestConnection();
@@ -1704,7 +1704,7 @@ void EnoceanComm::initError(StatusCB aCompletedCB, int aRetriesLeft, ErrorPtr aE
     }
     mSerialComm->closeConnection();
     // retry initializing later
-    aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::initializeInternal, this, aCompletedCB, aRetriesLeft), ENOCEAN_INIT_RETRY_INTERVAL);
+    mAliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::initializeInternal, this, aCompletedCB, aRetriesLeft), ENOCEAN_INIT_RETRY_INTERVAL);
   }
   else {
     // no more retries, just return
@@ -1720,10 +1720,10 @@ void EnoceanComm::versionReceived(StatusCB aCompletedCB, int aRetriesLeft, Esp3P
   // extract versions
   if (Error::isOK(aError)) {
     uint8_t *d = aEsp3PacketPtr->data();
-    appVersion = (d[1]<<24)+(d[2]<<16)+(d[3]<<8)+d[4];
-    apiVersion = (d[5]<<24)+(d[6]<<16)+(d[7]<<8)+d[8];
-    myAddress = (d[9]<<24)+(d[10]<<16)+(d[11]<<8)+d[12];
-    OLOG(LOG_INFO, "Modem info (CO_RD_VERSION): appVersion=0x%08X, apiVersion=0x%08X, modemAddress=0x%08X", appVersion, apiVersion, myAddress);
+    mAppVersion = (d[1]<<24)+(d[2]<<16)+(d[3]<<8)+d[4];
+    mApiVersion = (d[5]<<24)+(d[6]<<16)+(d[7]<<8)+d[8];
+    mMyAddress = (d[9]<<24)+(d[10]<<16)+(d[11]<<8)+d[12];
+    OLOG(LOG_INFO, "Modem info (CO_RD_VERSION): appVersion=0x%08X, apiVersion=0x%08X, modemAddress=0x%08X", mAppVersion, mApiVersion, mMyAddress);
   }
   else {
     initError(aCompletedCB, aRetriesLeft, aError);
@@ -1738,8 +1738,8 @@ void EnoceanComm::idbaseReceived(StatusCB aCompletedCB, int aRetriesLeft, Esp3Pa
 {
   if (Error::isOK(aError)) {
     uint8_t *d = aEsp3PacketPtr->data();
-    myIdBase = (d[1]<<24)+(d[2]<<16)+(d[3]<<8)+d[4];
-    OLOG(LOG_INFO, "Modem info (CO_RD_IDBASE): idBase=0x%08X", myIdBase);
+    mMyIdBase = (d[1]<<24)+(d[2]<<16)+(d[3]<<8)+d[4];
+    OLOG(LOG_INFO, "Modem info (CO_RD_IDBASE): idBase=0x%08X", mMyIdBase);
   }
   else {
     initError(aCompletedCB, aRetriesLeft, aError);
@@ -1748,7 +1748,7 @@ void EnoceanComm::idbaseReceived(StatusCB aCompletedCB, int aRetriesLeft, Esp3Pa
   // completed successfully
   if (aCompletedCB) aCompletedCB(aError);
   // schedule first alive check quickly
-  aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), 2*Second);
+  mAliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), 2*Second);
 }
 
 
@@ -1835,9 +1835,9 @@ void EnoceanComm::aliveCheckResponse(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aErr
     // - close the connection
     mSerialComm->closeConnection();
     // - do a hardware reset of the module if possible
-    if (enoceanResetPin) enoceanResetPin->set(true); // reset
+    if (mEnoceanResetPin) mEnoceanResetPin->set(true); // reset
     // - using alive check ticket for reset sequence
-    aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::resetDone, this), 2*Second);
+    mAliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::resetDone, this), 2*Second);
   }
   else {
     // response received, should be answer to CO_RD_VERSION
@@ -1846,7 +1846,7 @@ void EnoceanComm::aliveCheckResponse(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aErr
       FOCUSOLOG("Alive check received packet after sending CO_RD_VERSION, but hat wrong data length (%zu instead of 33)", aEsp3PacketPtr->dataLength());
     }
     // also schedule the next alive check
-    aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), ENOCEAN_ESP3_ALIVECHECK_INTERVAL);
+    mAliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), ENOCEAN_ESP3_ALIVECHECK_INTERVAL);
   }
 }
 
@@ -1854,9 +1854,9 @@ void EnoceanComm::aliveCheckResponse(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aErr
 void EnoceanComm::resetDone()
 {
   OLOG(LOG_NOTICE, "releasing enocean reset");
-  if (enoceanResetPin) enoceanResetPin->set(false); // release reset
+  if (mEnoceanResetPin) mEnoceanResetPin->set(false); // release reset
   // wait a little, then re-open connection
-  aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::reopenConnection, this), 2*Second);
+  mAliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::reopenConnection, this), 2*Second);
 }
 
 
@@ -1865,19 +1865,19 @@ void EnoceanComm::reopenConnection()
   OLOG(LOG_NOTICE, "re-opening connection");
 	mSerialComm->requestConnection(); // re-open connection
   // restart alive checks, not too soon after reset
-  aliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), 10*Second);
+  mAliveCheckTicket.executeOnce(boost::bind(&EnoceanComm::aliveCheck, this), 10*Second);
 }
 
 
 void EnoceanComm::setRadioPacketHandler(ESPPacketCB aRadioPacketCB)
 {
-  radioPacketHandler = aRadioPacketCB;
+  mRadioPacketHandler = aRadioPacketCB;
 }
 
 
 void EnoceanComm::setEventPacketHandler(ESPPacketCB aEventPacketCB)
 {
-  eventPacketHandler = aEventPacketCB;
+  mEventPacketHandler = aEventPacketCB;
 }
 
 
@@ -1892,16 +1892,16 @@ size_t EnoceanComm::acceptBytes(size_t aNumBytes, uint8_t *aBytes)
   }
 	size_t remainingBytes = aNumBytes;
 	while (remainingBytes>0) {
-		if (!currentIncomingPacket) {
-			currentIncomingPacket = Esp3PacketPtr(new Esp3Packet);
+		if (!mCurrentIncomingPacket) {
+			mCurrentIncomingPacket = Esp3PacketPtr(new Esp3Packet);
 		}
 		// pass bytes to current telegram
-		size_t consumedBytes = currentIncomingPacket->acceptBytes(remainingBytes, aBytes);
-		if (currentIncomingPacket->isComplete()) {
-      FOCUSOLOG("Received Packet:\n%s", currentIncomingPacket->description().c_str());
-      dispatchPacket(currentIncomingPacket);
+		size_t consumedBytes = mCurrentIncomingPacket->acceptBytes(remainingBytes, aBytes);
+		if (mCurrentIncomingPacket->isComplete()) {
+      FOCUSOLOG("Received Packet:\n%s", mCurrentIncomingPacket->description().c_str());
+      dispatchPacket(mCurrentIncomingPacket);
       // forget the packet, further incoming bytes will create new packet
-			currentIncomingPacket = Esp3PacketPtr(); // forget
+			mCurrentIncomingPacket = Esp3PacketPtr(); // forget
 		}
 		// continue with rest (if any)
 		aBytes+=consumedBytes;
@@ -1917,9 +1917,9 @@ void EnoceanComm::dispatchPacket(Esp3PacketPtr aPacket)
   PacketType pt = aPacket->packetType();
   if (pt==pt_radio_erp1) {
     // incoming radio packet
-    if (radioPacketHandler) {
+    if (mRadioPacketHandler) {
       // call the handler
-      radioPacketHandler(aPacket, ErrorPtr());
+      mRadioPacketHandler(aPacket, ErrorPtr());
     }
     else {
       OLOG(LOG_INFO, "Received radio packet, but no packet handler is installed -> ignored");
@@ -1928,17 +1928,17 @@ void EnoceanComm::dispatchPacket(Esp3PacketPtr aPacket)
   else if (pt==pt_response) {
     // This is a command response
     // - stop timeout
-    cmdTimeoutTicket.cancel();
-    if (cmdQueue.empty() || cmdQueue.front().commandPacket) {
+    mCmdTimeoutTicket.cancel();
+    if (mCmdQueue.empty() || mCmdQueue.front().commandPacket) {
       // received unexpected answer
       OLOG(LOG_WARNING, "Received unexpected response packet of length %zu", aPacket->dataLength());
     }
     else {
       // must be response to first entry in queue
       // - deliver to waiting callback, if any
-      ESPPacketCB callback = cmdQueue.front().responseCB;
+      ESPPacketCB callback = mCmdQueue.front().responseCB;
       // - remove waiting marker from queue
-      cmdQueue.pop_front();
+      mCmdQueue.pop_front();
       // - now call handler
       if (callback) {
         // pass packet and response status
@@ -1950,9 +1950,9 @@ void EnoceanComm::dispatchPacket(Esp3PacketPtr aPacket)
   }
   else if (pt==pt_event_message) {
     // This is a event
-    if (eventPacketHandler) {
+    if (mEventPacketHandler) {
       // call the handler
-      eventPacketHandler(aPacket, ErrorPtr());
+      mEventPacketHandler(aPacket, ErrorPtr());
     }
     else {
       OLOG(LOG_INFO, "Received event code %d, but no packet handler is installed -> ignored", aPacket->data()[0]);
@@ -2018,24 +2018,24 @@ void EnoceanComm::sendCommand(Esp3PacketPtr aCommandPacket, ESPPacketCB aRespons
   FOCUSOLOG("Queueing command packet to send: \n%s", aCommandPacket->description().c_str());
   cmd.commandPacket = aCommandPacket;
   cmd.responseCB = aResponsePacketCB;
-  cmdQueue.push_back(cmd);
+  mCmdQueue.push_back(cmd);
   checkCmdQueue();
 }
 
 
 void EnoceanComm::checkCmdQueue()
 {
-  if (cmdQueue.empty()) return; // queue empty
-  EnoceanCmd cmd = cmdQueue.front();
+  if (mCmdQueue.empty()) return; // queue empty
+  EnoceanCmd cmd = mCmdQueue.front();
   if (cmd.commandPacket) {
     // front is command to be sent -> send it
     sendPacket(cmd.commandPacket);
     // remove original entry, put waiting-for-response marker there instead
     cmd.commandPacket.reset(); // clear out, marks this entry for "waiting for response"
-    cmdQueue.pop_front();
-    cmdQueue.push_front(cmd);
+    mCmdQueue.pop_front();
+    mCmdQueue.push_front(cmd);
     // schedule timeout
-    cmdTimeoutTicket.executeOnce(boost::bind(&EnoceanComm::cmdTimeout, this), ENOCEAN_ESP3_COMMAND_TIMEOUT);
+    mCmdTimeoutTicket.executeOnce(boost::bind(&EnoceanComm::cmdTimeout, this), ENOCEAN_ESP3_COMMAND_TIMEOUT);
   }
 }
 
@@ -2043,14 +2043,14 @@ void EnoceanComm::checkCmdQueue()
 void EnoceanComm::cmdTimeout()
 {
   // currently waiting command has timed out
-  if (cmdQueue.empty()) return; // queue empty -> NOP (should not happen, no timeout should be running when queue is empty!)
+  if (mCmdQueue.empty()) return; // queue empty -> NOP (should not happen, no timeout should be running when queue is empty!)
   FOCUSLOG("EnOcean Command timeout");
-  EnoceanCmd cmd = cmdQueue.front();
+  EnoceanCmd cmd = mCmdQueue.front();
   // Note: commandPacket should always be NULL here (because we are waiting for a response)
   if (!cmd.commandPacket) {
     // done with this command
     // - remove from queue
-    cmdQueue.pop_front();
+    mCmdQueue.pop_front();
     // - now call handler with error
     if (cmd.responseCB) {
       cmd.responseCB(Esp3PacketPtr(), ErrorPtr(new EnoceanCommError(EnoceanCommError::CmdTimeout)));

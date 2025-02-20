@@ -124,7 +124,7 @@ void p44::EnoceanInputs::stdButtonHandler(const struct EnoceanInputDescriptor &a
 void p44::EnoceanInputs::lowBatInputHandler(const struct EnoceanInputDescriptor &aInputDescriptor, DsBehaviourPtr aBehaviour, uint8_t *aDataP, int aDataSize, EnoceanChannelHandler* aChannelP)
 {
   bool lowBat = bitsExtractor(aInputDescriptor, aDataP, aDataSize)>0 ? aInputDescriptor.max : aInputDescriptor.min; // max for set bits, min for cleared bits
-  aChannelP->batPercentage = lowBat ? LOW_BAT_PERCENTAGE : 100; // just bad or fully ok
+  aChannelP->mBatPercentage = lowBat ? LOW_BAT_PERCENTAGE : 100; // just bad or fully ok
   // now pass to behaviour
   BinaryInputBehaviourPtr ib = boost::dynamic_pointer_cast<BinaryInputBehaviour>(aBehaviour);
   if (ib) {
@@ -139,7 +139,7 @@ void p44::EnoceanInputs::batPercSensorHandler(const struct EnoceanInputDescripto
   // now pass to behaviour
   if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
     sb->updateEngineeringValue(value);
-    aChannelP->batPercentage = sb->getCurrentValue(); // also update battery percentage
+    aChannelP->mBatPercentage = sb->getCurrentValue(); // also update battery percentage
   }
 }
 
@@ -150,7 +150,7 @@ void p44::EnoceanInputs::batVoltSensorHandler(const struct EnoceanInputDescripto
   // now pass to behaviour
   if (SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(aBehaviour)) {
     sb->updateEngineeringValue(value);
-    aChannelP->batPercentage = (sb->getCurrentValue()-LOW_BAT_VOLTAGE_LEVEL)*100/(FULL_BAT_VOLTAGE_LEVEL-LOW_BAT_VOLTAGE_LEVEL)+LOW_BAT_PERCENTAGE;
+    aChannelP->mBatPercentage = (sb->getCurrentValue()-LOW_BAT_VOLTAGE_LEVEL)*100/(FULL_BAT_VOLTAGE_LEVEL-LOW_BAT_VOLTAGE_LEVEL)+LOW_BAT_PERCENTAGE;
   }
 }
 
@@ -211,7 +211,7 @@ bool EnoceanInputHandler::isAlive()
   if (sensorChannelDescriptorP->aliveSignInterval<=0)
     return true; // no alive sign interval to check, assume alive
   // check if gotten no message for longer than aliveSignInterval*factor
-  if (MainLoop::now()-device.getLastPacketTime() < sensorChannelDescriptorP->aliveSignInterval*Second*TIMEOUT_FACTOR_FOR_INACTIVE)
+  if (MainLoop::now()-mDevice.getLastPacketTime() < sensorChannelDescriptorP->aliveSignInterval*Second*TIMEOUT_FACTOR_FOR_INACTIVE)
     return true;
   // timed out
   return false;
@@ -295,7 +295,7 @@ void EnoceanInputHandler::addInputChannel(
   // assign descriptor
   newHandler->sensorChannelDescriptorP = &aInputDescriptor;
   // create the behaviour
-  newHandler->behaviour = EnoceanInputHandler::newInputChannelBehaviour(aInputDescriptor, aDevice, aId);
+  newHandler->mBehaviour = EnoceanInputHandler::newInputChannelBehaviour(aInputDescriptor, aDevice, aId);
   switch (aInputDescriptor.behaviourType) {
     case behaviour_sensor: {
       if (aSetDeviceDescription) {
@@ -387,7 +387,7 @@ void EnoceanInputHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     // only look at non-teach-in packets
     if (sensorChannelDescriptorP && sensorChannelDescriptorP->bitFieldHandler) {
       // call bit field handler, will pass result to behaviour
-      handleBitField(*sensorChannelDescriptorP, behaviour, aEsp3PacketPtr->radioUserData(), (int)aEsp3PacketPtr->radioUserDataLength(), this);
+      handleBitField(*sensorChannelDescriptorP, mBehaviour, aEsp3PacketPtr->radioUserData(), (int)aEsp3PacketPtr->radioUserDataLength(), this);
     }
   }
 }

@@ -29,9 +29,9 @@ using namespace p44;
 
 EnoceanVdc::EnoceanVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-  learningMode(false),
-  selfTesting(false),
-  disableProximityCheck(false),
+  mLearningMode(false),
+  mSelfTesting(false),
+  mDisableProximityCheck(false),
 	enoceanComm(MainLoop::currentMainLoop())
 {
   enoceanComm.isMemberVariable();
@@ -42,7 +42,7 @@ void EnoceanVdc::setLogLevelOffset(int aLogLevelOffset)
 {
   enoceanComm.setLogLevelOffset(aLogLevelOffset);
   #if ENABLE_ENOCEAN_SECURE
-  for (EnoceanSecurityMap::iterator pos = securityInfos.begin(); pos!=securityInfos.end(); ++pos) {
+  for (EnoceanSecurityMap::iterator pos = mSecurityInfos.begin(); pos!=mSecurityInfos.end(); ++pos) {
     pos->second->setLogLevelOffset(aLogLevelOffset);
   }
   #endif
@@ -152,7 +152,7 @@ void EnoceanVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // load private data
 	string databaseName = getPersistentDataDir();
 	string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), ENOCEAN_SCHEMA_VERSION, ENOCEAN_SCHEMA_MIN_VERSION, aFactoryReset);
+  ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), ENOCEAN_SCHEMA_VERSION, ENOCEAN_SCHEMA_MIN_VERSION, aFactoryReset);
   if (Error::notOK(error)) {
     // failed DB, no point in starting communication
     aCompletedCB(error); // return status of DB init
@@ -175,7 +175,7 @@ void EnoceanVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 void EnoceanVdc::removeDevices(bool aForget)
 {
   inherited::removeDevices(aForget);
-  enoceanDevices.clear();
+  mEnoceanDevices.clear();
 }
 
 
@@ -190,7 +190,7 @@ void EnoceanVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // start with zero
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // - read learned-in EnOcean device IDs from DB
-    sqlite3pp::query qry(db);
+    sqlite3pp::query qry(mDb);
     if (qry.prepare("SELECT enoceanAddress, subdevice, eeProfile, eeManufacturer FROM knownDevices")==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         EnoceanSubDevice subDeviceIndex = i->get<int>(1);
@@ -223,7 +223,7 @@ bool EnoceanVdc::addKnownDevice(EnoceanDevicePtr aEnoceanDevice)
 {
   if (simpleIdentifyAndAddDevice(aEnoceanDevice)) {
     // not a duplicate, actually added - add to my own list
-    enoceanDevices.insert(make_pair(aEnoceanDevice->getAddress(), aEnoceanDevice));
+    mEnoceanDevices.insert(make_pair(aEnoceanDevice->getAddress(), aEnoceanDevice));
     #if ENABLE_ENOCEAN_SECURE
     // set device security info if available
     EnOceanSecurityPtr sec = findSecurityInfoForSender(aEnoceanDevice->getAddress());
@@ -242,14 +242,14 @@ bool EnoceanVdc::addAndRememberDevice(EnoceanDevicePtr aEnoceanDevice)
 {
   if (addKnownDevice(aEnoceanDevice)) {
     // save enocean ID to DB
-    if(db.executef(
+    if(mDb.executef(
       "INSERT OR REPLACE INTO knownDevices (enoceanAddress, subdevice, eeProfile, eeManufacturer) VALUES (%d,%d,%d,%d)",
       aEnoceanDevice->getAddress(),
       aEnoceanDevice->getSubDevice(),
       aEnoceanDevice->getEEProfile(),
       aEnoceanDevice->getEEManufacturer()
     )!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error saving device: %s", db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error saving device: %s", mDb.error()->description().c_str());
     }
     return true;
   }
@@ -264,11 +264,11 @@ void EnoceanVdc::removeDevice(DevicePtr aDevice, bool aForget)
     // - remove single device from superclass
     inherited::removeDevice(aDevice, aForget);
     // - remove only selected subdevice from my own list, other subdevices might be other devices
-    EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(ed->getAddress());
-    while (pos!=enoceanDevices.upper_bound(ed->getAddress())) {
+    EnoceanDeviceMap::iterator pos = mEnoceanDevices.lower_bound(ed->getAddress());
+    while (pos!=mEnoceanDevices.upper_bound(ed->getAddress())) {
       if (pos->second->getSubDevice()==ed->getSubDevice()) {
         // this is the subdevice we want deleted
-        enoceanDevices.erase(pos);
+        mEnoceanDevices.erase(pos);
         break; // done
       }
       pos++;
@@ -283,7 +283,7 @@ bool EnoceanVdc::unpairDevicesByAddressAndEEP(EnoceanAddress aEnoceanAddress, En
   typedef list<EnoceanDevicePtr> TbdList;
   TbdList toBeDeleted;
   // collect those we need to remove
-  for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(aEnoceanAddress); pos!=enoceanDevices.upper_bound(aEnoceanAddress); ++pos) {
+  for (EnoceanDeviceMap::iterator pos = mEnoceanDevices.lower_bound(aEnoceanAddress); pos!=mEnoceanDevices.upper_bound(aEnoceanAddress); ++pos) {
     // check EEP if specified
     if (EEP_PURE(aEEP)==EEP_PURE(pos->second->getEEProfile())) {
       // check subdevice index
@@ -346,7 +346,7 @@ ErrorPtr EnoceanVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         // - get map of already used offsets
         string usedOffsetMap;
         usedOffsetMap.assign(128,'0');
-        for (EnoceanDeviceMap::iterator pos = enoceanDevices.begin(); pos!=enoceanDevices.end(); ++pos) {
+        for (EnoceanDeviceMap::iterator pos = mEnoceanDevices.begin(); pos!=mEnoceanDevices.end(); ++pos) {
           pos->second->markUsedBaseOffsets(usedOffsetMap);
         }
         addr &= 0xFF; // extract offset
@@ -488,8 +488,8 @@ void EnoceanVdc::sendCommandResponse(VdcApiRequestPtr aRequest, Esp3PacketPtr aE
 
 EnOceanSecurityPtr EnoceanVdc::findSecurityInfoForSender(EnoceanAddress aSender)
 {
-  EnoceanSecurityMap::iterator pos = securityInfos.find(aSender);
-  if (pos==securityInfos.end()) {
+  EnoceanSecurityMap::iterator pos = mSecurityInfos.find(aSender);
+  if (pos==mSecurityInfos.end()) {
     return EnOceanSecurityPtr(); // none
   }
   return pos->second;
@@ -501,7 +501,7 @@ EnOceanSecurityPtr EnoceanVdc::newSecurityInfoForSender(EnoceanAddress aSender)
   // create new
   EnOceanSecurityPtr sec = EnOceanSecurityPtr(new EnOceanSecurity);
   sec->setLogLevelOffset(getLogLevelOffset());
-  securityInfos[aSender] = sec;
+  mSecurityInfos[aSender] = sec;
   return sec;
 }
 
@@ -509,7 +509,7 @@ EnOceanSecurityPtr EnoceanVdc::newSecurityInfoForSender(EnoceanAddress aSender)
 void EnoceanVdc::associateSecurityInfoWithSender(EnOceanSecurityPtr aSecurityInfo, EnoceanAddress aSender)
 {
   // - link all existing devices to this security info
-  for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(aSender); pos!=enoceanDevices.upper_bound(aSender); ++pos) {
+  for (EnoceanDeviceMap::iterator pos = mEnoceanDevices.lower_bound(aSender); pos!=mEnoceanDevices.upper_bound(aSender); ++pos) {
     pos->second->setSecurity(aSecurityInfo);
   }
 }
@@ -517,10 +517,10 @@ void EnoceanVdc::associateSecurityInfoWithSender(EnOceanSecurityPtr aSecurityInf
 
 bool EnoceanVdc::dropSecurityInfoForSender(EnoceanAddress aSender)
 {
-  if (securityInfos.erase(aSender)>0) {
+  if (mSecurityInfos.erase(aSender)>0) {
     // also delete from db
-    if (db.executef("DELETE FROM secureDevices WHERE enoceanAddress=%d", aSender)!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error deleting security info for device %08X: %s", aSender, db.error()->description().c_str());
+    if (mDb.executef("DELETE FROM secureDevices WHERE enoceanAddress=%d", aSender)!=SQLITE_OK) {
+      OLOG(LOG_ERR, "Error deleting security info for device %08X: %s", aSender, mDb.error()->description().c_str());
       return false;
     }
     OLOG(LOG_INFO, "Deleted security info for device %08X", aSender);
@@ -532,7 +532,7 @@ bool EnoceanVdc::dropSecurityInfoForSender(EnoceanAddress aSender)
 void EnoceanVdc::removeUnusedSecurity(EnoceanDevice &aDevice)
 {
   bool otherSubdevices = false;
-  for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(aDevice.getAddress()); pos!=enoceanDevices.upper_bound(aDevice.getAddress()); ++pos) {
+  for (EnoceanDeviceMap::iterator pos = mEnoceanDevices.lower_bound(aDevice.getAddress()); pos!=mEnoceanDevices.upper_bound(aDevice.getAddress()); ++pos) {
     // check subdevice index
     if (pos->second!=&aDevice) {
       otherSubdevices = true;
@@ -548,8 +548,8 @@ void EnoceanVdc::removeUnusedSecurity(EnoceanDevice &aDevice)
 
 void EnoceanVdc::loadSecurityInfos()
 {
-  securityInfos.clear();
-  sqlite3pp::query qry(db);
+  mSecurityInfos.clear();
+  sqlite3pp::query qry(mDb);
   MLMicroSeconds now = MainLoop::now();
   if (qry.prepare("SELECT enoceanAddress, slf, rlc, key, teachInInfo FROM secureDevices")==SQLITE_OK) {
     for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
@@ -558,67 +558,67 @@ void EnoceanVdc::loadSecurityInfos()
       // get info from DB
       int idx = 0;
       EnoceanAddress addr = i->get<int>(idx++);
-      sec->securityLevelFormat = i->get<int>(idx++);
-      sec->rollingCounter = i->get<int>(idx++);
-      memcpy(sec->privateKey, i->get<const void *>(idx++), EnOceanSecurity::AES128BlockLen);
-      sec->teachInInfo = i->get<int>(idx++);
+      sec->mSecurityLevelFormat = i->get<int>(idx++);
+      sec->mRollingCounter = i->get<int>(idx++);
+      memcpy(sec->mPrivateKey, i->get<const void *>(idx++), EnOceanSecurity::AES128BlockLen);
+      sec->mTeachInInfo = i->get<int>(idx++);
       // derived values
-      sec->lastSavedRLC = sec->rollingCounter; // this value is saved
-      sec->lastSave = now;
-      sec->established = true;
+      sec->mLastSavedRLC = sec->mRollingCounter; // this value is saved
+      sec->mLastSave = now;
+      sec->mEstablished = true;
       sec->deriveSubkeysFromPrivateKey();
       // store in list
-      securityInfos[addr] = sec;
+      mSecurityInfos[addr] = sec;
     }
   }
-  OLOG(LOG_INFO, "loaded security info for %lu devices", securityInfos.size());
+  OLOG(LOG_INFO, "loaded security info for %lu devices", mSecurityInfos.size());
 }
 
 
 bool EnoceanVdc::saveSecurityInfo(EnOceanSecurityPtr aSecurityInfo, EnoceanAddress aEnoceanAddress, bool aRLCOnly, bool aOnlyIfNeeded)
 {
-  if (!aSecurityInfo->established) {
+  if (!aSecurityInfo->mEstablished) {
     OLOG(LOG_INFO, "Not saving security info for %08X because not yet fully established", aEnoceanAddress);
   }
   if (aOnlyIfNeeded) {
     // avoid too many saves
-    uint32_t d = aSecurityInfo->rlcDistance(aSecurityInfo->rollingCounter, aSecurityInfo->lastSavedRLC);
+    uint32_t d = aSecurityInfo->rlcDistance(aSecurityInfo->mRollingCounter, aSecurityInfo->mLastSavedRLC);
     if (d<MIN_RLC_DISTANCE_FOR_SAVE) {
       OLOG(LOG_DEBUG, "Not saving because RLC distance (%u) is not high enough", d);
       return true; // not saved, but ok
     }
   }
   if (aRLCOnly) {
-    if (db.executef(
+    if (mDb.executef(
       "UPDATE secureDevices SET rlc=%d WHERE enoceanAddress=%d",
-      aSecurityInfo->rollingCounter,
+      aSecurityInfo->mRollingCounter,
       aEnoceanAddress
     )!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error updating RLC for device %08X: %s", aEnoceanAddress, db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error updating RLC for device %08X: %s", aEnoceanAddress, mDb.error()->description().c_str());
       return false;
     }
   }
   else {
-    sqlite3pp::command cmd(db);
+    sqlite3pp::command cmd(mDb);
     if (cmd.prepare("INSERT OR REPLACE INTO secureDevices (enoceanAddress, slf, rlc, key, teachInInfo) VALUES (?,?,?,?,?)")!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error preparing SQL for device %08X: %s", aEnoceanAddress, db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error preparing SQL for device %08X: %s", aEnoceanAddress, mDb.error()->description().c_str());
       return false;
     }
     else {
       int idx = 1; // SQLite parameter indexes are 1-based!
       cmd.bind(idx++, (int)aEnoceanAddress);
-      cmd.bind(idx++, aSecurityInfo->securityLevelFormat);
-      cmd.bind(idx++, (int)aSecurityInfo->rollingCounter);
-      cmd.bind(idx++, aSecurityInfo->privateKey, EnOceanSecurity::AES128BlockLen, true); // is static
-      cmd.bind(idx++, aSecurityInfo->teachInInfo);
+      cmd.bind(idx++, aSecurityInfo->mSecurityLevelFormat);
+      cmd.bind(idx++, (int)aSecurityInfo->mRollingCounter);
+      cmd.bind(idx++, aSecurityInfo->mPrivateKey, EnOceanSecurity::AES128BlockLen, true); // is static
+      cmd.bind(idx++, aSecurityInfo->mTeachInInfo);
       if (cmd.execute()!=SQLITE_OK) {
-        OLOG(LOG_ERR, "Error saving security info for device %08X: %s", aEnoceanAddress, db.error()->description().c_str());
+        OLOG(LOG_ERR, "Error saving security info for device %08X: %s", aEnoceanAddress, mDb.error()->description().c_str());
       }
     }
   }
   // saved
-  aSecurityInfo->lastSavedRLC = aSecurityInfo->rollingCounter;
-  aSecurityInfo->lastSave = MainLoop::now();
+  aSecurityInfo->mLastSavedRLC = aSecurityInfo->mRollingCounter;
+  aSecurityInfo->mLastSave = MainLoop::now();
   OLOG(LOG_INFO, "Saved/updated security info for device %08X", aEnoceanAddress);
   return true;
 }
@@ -648,7 +648,7 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
   // no learn/unlearn actions detected so far
   // - check if we know that device address AND EEP already. If so, it is a learn-out
   bool learnIn = true;
-  for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(aDeviceAddress); pos!=enoceanDevices.upper_bound(aDeviceAddress); ++pos) {
+  for (EnoceanDeviceMap::iterator pos = mEnoceanDevices.lower_bound(aDeviceAddress); pos!=mEnoceanDevices.upper_bound(aDeviceAddress); ++pos) {
     if (EEP_PURE(aEEProfile)==EEP_PURE(pos->second->getEEProfile())) {
       // device with same address and same EEP already known
       learnIn = false;
@@ -656,7 +656,7 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
   }
   if (learnIn) {
     // this is a not-yet known device, so we might be able to learn it in
-    if  (onlyEstablish!=no && aTeachInfoType!=no) {
+    if  (mOnlyEstablish!=no && aTeachInfoType!=no) {
       // neither our side nor the info in the telegram insists on learn-out, so we can learn-in
       // - create devices from EEP
       int numNewDevices = EnoceanDevice::createDevicesFromEEP(this, aDeviceAddress, aEEProfile, aManufacturer, aLearnType, aLearnPacket, aSecurityInfo);
@@ -687,7 +687,7 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
   }
   else {
     // this is an already known device, so we might be able to learn it out
-    if (onlyEstablish!=yes && aTeachInfoType!=yes) {
+    if (mOnlyEstablish!=yes && aTeachInfoType!=yes) {
       // neither our side nor the info in the telegram insists on learn-in, so we can learn-out
       // - un-pair all logical dS devices it has represented
       //   but keep dS level config in case it is reconnected
@@ -736,18 +736,18 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
   // look for existing security info for this device
   EnOceanSecurityPtr sec = findSecurityInfoForSender(sender);
   if (rorg==rorg_SEC_TEACHIN) {
-    bool known = enoceanDevices.find(sender)!=enoceanDevices.end();
-    bool alreadySecure = sec && sec->established;
+    bool known = mEnoceanDevices.find(sender)!=mEnoceanDevices.end();
+    bool alreadySecure = sec && sec->mEstablished;
     OLOG(LOG_NOTICE, "Secure teach-in packet received from %08X (%sknown%s)", sender, known ? "" : "un", alreadySecure ? ", already secure" : "");
     // allow creating new security info records in learning mode only. This can be teach-in or upgrade to secure mode
-    if (!sec && learningMode) {
+    if (!sec && mLearningMode) {
       sec = newSecurityInfoForSender(sender);
     }
     if (sec) {
-      Tristate res = sec->processTeachInMsg(aEsp3PacketPtr, NULL, learningMode); // TODO: pass in PSK once we have one
+      Tristate res = sec->processTeachInMsg(aEsp3PacketPtr, NULL, mLearningMode); // TODO: pass in PSK once we have one
       if (res==yes) {
         // complete secure teach-in info or RLC refresh found
-        if ((sec->teachInInfo & 0x07)==0x01) {
+        if ((sec->mTeachInInfo & 0x07)==0x01) {
           // bidirectional teach-in (or refresh) requested - send immediately because it must occur not later than 500mS after receiving teach-in (750mS device side timeout)
           OLOG(LOG_NOTICE, "- Device %08X requests bidirectional secure teach-in, sending response now", sender);
           for (int seg=0; seg<2; seg++) {
@@ -757,7 +757,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
             OLOG(LOG_DEBUG, "Sent secure teach-in response segment #%d:\n%s", seg, secTeachInResponse->description().c_str());
           }
         }
-        if (!learningMode) {
+        if (!mLearningMode) {
           // the only valid thing that can happen outside learning mode is a RLC refresh
           if (alreadySecure && known) {
             OLOG(LOG_NOTICE, "- Device %08X refreshed RLC", sender);
@@ -776,13 +776,13 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
             saveSecurityInfo(sec, sender, false, false);
             // do NOT process the actual learn-in (neither implicit, nor subseqent)
             // exit learning mode here
-            learningMode = false;
+            mLearningMode = false;
             // - report it as a kind of learn-in for the user (which will in turn disable smart-ack learn)
             getVdcHost().reportLearnEvent(true, ErrorPtr());
             return;
           }
           // - check type
-          if ((sec->teachInInfo & 0x06)==0x04) {
+          if ((sec->mTeachInInfo & 0x06)==0x04) {
             // PTM implicit teach-in (PTM: bit2=1, INFO: bit1==0, bit0==X)
             OLOG(LOG_NOTICE, "- is implicit PTM learn in");
             // process as F6-02-01 dual rocker (altough the pseudo-profile is called D2-03-00)
@@ -793,7 +793,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
                 saveSecurityInfo(sec, sender, false, false);
               }
               // implicit learn (in or out) done
-              learningMode = false;
+              mLearningMode = false;
             }
           }
         }
@@ -813,7 +813,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     return;
   }
   // unwrap secure telegrams, if any
-  if (sec && sec->established) {
+  if (sec && sec->mEstablished) {
     // established security context for that device exists -> only encrypted messages are allowed
     Esp3PacketPtr unpackedMsg = sec->unpackSecureMessage(aEsp3PacketPtr);
     if (!unpackedMsg) {
@@ -839,11 +839,11 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     }
   }
   // check learning mode
-  if (learningMode) {
+  if (mLearningMode) {
     // now add/remove the device (if the action is a valid learn/unlearn)
     // detect implicit (RPS) learn in only with sufficient radio strength (or explicit override of that check),
     // explicit ones are always recognized
-    if (aEsp3PacketPtr->radioHasTeachInfo(disableProximityCheck ? 0 : MIN_LEARN_DBM, false)) {
+    if (aEsp3PacketPtr->radioHasTeachInfo(mDisableProximityCheck ? 0 : MIN_LEARN_DBM, false)) {
       OLOG(LOG_NOTICE, "Learn mode enabled: processing EnOcean learn packet:\n%s", aEsp3PacketPtr->description().c_str());
       EnoceanLearnType lt = aEsp3PacketPtr->eepRorg()==rorg_UTE ? learn_UTE : learn_simple;
       Tristate lrn = processLearn(sender, aEsp3PacketPtr->eepProfile(), aEsp3PacketPtr->eepManufacturer(), aEsp3PacketPtr->teachInfoType(), lt, aEsp3PacketPtr, sec);
@@ -856,7 +856,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
         #endif
         // - only allow one learn action (to prevent learning out device when
         //   button is released or other repetition of radio packet)
-        learningMode = false;
+        mLearningMode = false;
       }
     } // learn action
     else {
@@ -866,7 +866,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
   else {
     // not learning mode, dispatch packet to all devices known for that address
     bool reachedDevice = false;
-    for (EnoceanDeviceMap::iterator pos = enoceanDevices.lower_bound(sender); pos!=enoceanDevices.upper_bound(sender); ++pos) {
+    for (EnoceanDeviceMap::iterator pos = mEnoceanDevices.lower_bound(sender); pos!=mEnoceanDevices.upper_bound(sender); ++pos) {
       if (aEsp3PacketPtr->radioHasTeachInfo(MIN_LEARN_DBM, false) && aEsp3PacketPtr->eepRorg()!=rorg_RPS) {
         // learning packet in non-learn mode -> report as non-regular user action, might be attempt to identify a device
         // Note: RPS devices are excluded because for these all telegrams are regular user actions.
@@ -896,7 +896,7 @@ void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
   uint8_t *dataP = aEsp3PacketPtr->data();
   uint8_t eventCode = dataP[0];
   if (eventCode==SA_CONFIRM_LEARN) {
-    if (learningMode) {
+    if (mLearningMode) {
       // process smart-ack learn
       // - extract learn data
       uint8_t postmasterFlags = dataP[1];
@@ -957,9 +957,9 @@ void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
 void EnoceanVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish)
 {
   // put normal radio packet evaluator into learn mode
-  learningMode = aEnableLearning;
-  disableProximityCheck = aDisableProximityCheck;
-  onlyEstablish = aOnlyEstablish;
+  mLearningMode = aEnableLearning;
+  mDisableProximityCheck = aDisableProximityCheck;
+  mOnlyEstablish = aOnlyEstablish;
   // also enable smartAck learn mode in the EnOcean module
   enoceanComm.smartAckLearnMode(aEnableLearning, 60*Second); // actual timeout of learn is usually smaller
 }

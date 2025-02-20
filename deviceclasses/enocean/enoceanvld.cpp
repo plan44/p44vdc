@@ -337,9 +337,9 @@ static const D201Descriptor D201descriptors[numD201Descriptors] = {
 
 EnoceanD201XXHandler::EnoceanD201XXHandler(EnoceanDevice &aDevice) :
   inherited(aDevice),
-  overCurrent(false),
-  powerFailure(false),
-  errorLevel(ok)
+  mOverCurrent(false),
+  mPowerFailure(false),
+  mErrorLevel(ok)
 {
 }
 
@@ -389,7 +389,7 @@ EnoceanDevicePtr EnoceanD201XXHandler::newDevice(
       }
       // add a channel handler with output behaviour
       EnoceanChannelHandlerPtr d201handler = EnoceanChannelHandlerPtr(new EnoceanD201XXHandler(*newDev.get()));
-      d201handler->behaviour = l;
+      d201handler->mBehaviour = l;
       newDev->addChannelHandler(d201handler);
       // count it
       aSubDeviceIndex++;
@@ -403,7 +403,7 @@ EnoceanDevicePtr EnoceanD201XXHandler::newDevice(
 
 string EnoceanD201XXHandler::shortDesc()
 {
-  const D201Descriptor &d201desc = D201descriptors[EEP_TYPE(device.getEEProfile())];
+  const D201Descriptor &d201desc = D201descriptors[EEP_TYPE(mDevice.getEEProfile())];
   return string_format("%d channel %s", d201desc.numChannels, d201desc.features & dimming ? "dimmer" : "switch");
 }
 
@@ -421,26 +421,26 @@ void EnoceanD201XXHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     if (cmd==0x4 && datasize==3) {
       // Actuator Status Response
       // - channel must match
-      if ((dataP[1] & 0x1F)!=device.getSubDevice()) return; // not this channel handler
-      resendTicket.cancel();
+      if ((dataP[1] & 0x1F)!=mDevice.getSubDevice()) return; // not this channel handler
+      mResendTicket.cancel();
       // - sync current output state
       uint8_t outVal = dataP[2] & 0x7F;
-      LightBehaviourPtr l = device.getOutput<LightBehaviour>();
+      LightBehaviourPtr l = mDevice.getOutput<LightBehaviour>();
       if (l) {
         l->syncBrightnessFromHardware(outVal);
       }
       else {
-        ChannelBehaviourPtr ch = device.getOutput()->getChannelByType(channeltype_default);
+        ChannelBehaviourPtr ch = mDevice.getOutput()->getChannelByType(channeltype_default);
         ch->syncChannelValue(outVal);
       }
       // - update error info
-      powerFailure = (dataP[0] & 0x40)!=0;
-      overCurrent = (dataP[1] & 0x80)!=0;
-      errorLevel = (ErrorLevel)((dataP[1]>>5) & 0x03);
+      mPowerFailure = (dataP[0] & 0x40)!=0;
+      mOverCurrent = (dataP[1] & 0x80)!=0;
+      mErrorLevel = (ErrorLevel)((dataP[1]>>5) & 0x03);
     }
-    if (syncChannelCB) {
-      SimpleCB cb = syncChannelCB;
-      syncChannelCB = NoOP;
+    if (mSyncChannelCB) {
+      SimpleCB cb = mSyncChannelCB;
+      mSyncChannelCB = NoOP;
       cb();
     }
   }
@@ -449,17 +449,17 @@ void EnoceanD201XXHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 
 int EnoceanD201XXHandler::opStateLevel()
 {
-  if (errorLevel==failure || powerFailure) return 0; // complete failure
-  if (errorLevel==warning || overCurrent) return 20; // warning
+  if (mErrorLevel==failure || mPowerFailure) return 0; // complete failure
+  if (mErrorLevel==warning || mOverCurrent) return 20; // warning
   return inherited::opStateLevel();
 }
 
 string EnoceanD201XXHandler::getOpStateText()
 {
-  if (powerFailure) return "power failure";
-  if (overCurrent) return "overcurrent";
-  if (errorLevel==failure) return "failure";
-  if (errorLevel==warning) return "warning";
+  if (mPowerFailure) return "power failure";
+  if (mOverCurrent) return "overcurrent";
+  if (mErrorLevel==failure) return "failure";
+  if (mErrorLevel==warning) return "warning";
   return inherited::getOpStateText();
 }
 
@@ -474,7 +474,7 @@ EnoceanD201XXDevice::EnoceanD201XXDevice(EnoceanVdc *aVdcP) :
 void EnoceanD201XXDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // send a little later to not interfere with teach-ins
-  cfgTicket.executeOnce(boost::bind(&EnoceanD201XXDevice::configureD201XX, this), 1*Second);
+  mCfgTicket.executeOnce(boost::bind(&EnoceanD201XXDevice::configureD201XX, this), 1*Second);
   // let inherited complete initialisation
   inherited::initializeDevice(aCompletedCB, aFactoryReset);
 }
@@ -551,7 +551,7 @@ void EnoceanD201XXDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       // re-send later again when we get no response (ticket gets cancelled when receiving confirmation)
       EnoceanD201XXHandlerPtr c = boost::dynamic_pointer_cast<EnoceanD201XXHandler>(channelForBehaviour(getOutput().get()));
       if (c) {
-        c->resendTicket.executeOnce(boost::bind(&EnoceanD201XXDevice::updateOutput, this, percentOn, dimValue), 1*Second);
+        c->mResendTicket.executeOnce(boost::bind(&EnoceanD201XXDevice::updateOutput, this, percentOn, dimValue), 1*Second);
       }
     }
   }
@@ -579,7 +579,7 @@ void EnoceanD201XXDevice::syncChannelValues(SimpleCB aDoneCB)
 {
   EnoceanD201XXHandlerPtr c = boost::dynamic_pointer_cast<EnoceanD201XXHandler>(channelForBehaviour(getOutput().get()));
   if (c) {
-    c->syncChannelCB = aDoneCB;
+    c->mSyncChannelCB = aDoneCB;
     // trigger device report
     OLOG(LOG_INFO, "D2-01-xx: sending Actuator Status Query");
     Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
@@ -724,7 +724,7 @@ EnoceanDevicePtr EnoceanD20601Handler::newDevice(
       buttonBhvr->setLongFunctionDelay(800*MilliSecond); // SODA buttons report release not sooner than 500mS -> extend long function delay to 800mS to allow proper click detection
       buttonBhvr->setGroup(group_grey_shadow); // pre-configure for shadow
       buttonBhvr->setHardwareName(bidx==0 ? "down key" : "up key");
-      buttonHandler->behaviour = buttonBhvr;
+      buttonHandler->mBehaviour = buttonBhvr;
       newDev->addChannelHandler(buttonHandler);
       // count it
       // - separate buttons use all indices 0,1,2,3...
@@ -740,26 +740,26 @@ EnoceanDevicePtr EnoceanD20601Handler::newDevice(
       // - create D2-06-01 specific handler (which handles all sensors and inputs, but not buttons)
       EnoceanD20601HandlerPtr newHandler = EnoceanD20601HandlerPtr(new EnoceanD20601Handler(*newDev.get()));
       // - channel-built-in behaviour is main function = window position
-      newHandler->behaviour = EnoceanInputHandler::newInputChannelBehaviour(D20601handleposition, newDev, NULL); // automatic id;
+      newHandler->mBehaviour = EnoceanInputHandler::newInputChannelBehaviour(D20601handleposition, newDev, NULL); // automatic id;
       newDev->addChannelHandler(newHandler);
       // - add extra sensors
-      newHandler->temperatureSensor = EnoceanInputHandler::newInputChannelBehaviour(D20601temperature, newDev, NULL); // automatic id
-      newDev->addBehaviour(newHandler->temperatureSensor);
-      newHandler->humiditySensor = EnoceanInputHandler::newInputChannelBehaviour(D20601humidity, newDev, NULL); // automatic id
-      newDev->addBehaviour(newHandler->humiditySensor);
-      newHandler->illuminationSensor = EnoceanInputHandler::newInputChannelBehaviour(D20601illumination, newDev, NULL); // automatic id
-      newDev->addBehaviour(newHandler->illuminationSensor);
-      newHandler->batterySensor = EnoceanInputHandler::newInputChannelBehaviour(D20601battery, newDev, NULL); // automatic id
-      newDev->addBehaviour(newHandler->batterySensor);
+      newHandler->mTemperatureSensor = EnoceanInputHandler::newInputChannelBehaviour(D20601temperature, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->mTemperatureSensor);
+      newHandler->mHumiditySensor = EnoceanInputHandler::newInputChannelBehaviour(D20601humidity, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->mHumiditySensor);
+      newHandler->mIlluminationSensor = EnoceanInputHandler::newInputChannelBehaviour(D20601illumination, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->mIlluminationSensor);
+      newHandler->mBatterySensor = EnoceanInputHandler::newInputChannelBehaviour(D20601battery, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->mBatterySensor);
       // - and input behaviours
-      newHandler->burglaryAlarmInput = EnoceanInputHandler::newInputChannelBehaviour(D20601burglaryAlarm, newDev, "burglary"); // specific id
-      newDev->addBehaviour(newHandler->burglaryAlarmInput);
-      newHandler->protectionAlarmInput = EnoceanInputHandler::newInputChannelBehaviour(D20601protectionAlarm, newDev, "protection"); // specific id
-      newDev->addBehaviour(newHandler->protectionAlarmInput);
-      newHandler->motionInput = EnoceanInputHandler::newInputChannelBehaviour(D20601motion, newDev, NULL); // automatic id
-      newDev->addBehaviour(newHandler->motionInput);
-      newHandler->tiltInput = EnoceanInputHandler::newInputChannelBehaviour(D20601tilt, newDev, "tilted"); // specific id
-      newDev->addBehaviour(newHandler->tiltInput);
+      newHandler->mBurglaryAlarmInput = EnoceanInputHandler::newInputChannelBehaviour(D20601burglaryAlarm, newDev, "burglary"); // specific id
+      newDev->addBehaviour(newHandler->mBurglaryAlarmInput);
+      newHandler->mProtectionAlarmInput = EnoceanInputHandler::newInputChannelBehaviour(D20601protectionAlarm, newDev, "protection"); // specific id
+      newDev->addBehaviour(newHandler->mProtectionAlarmInput);
+      newHandler->mMotionInput = EnoceanInputHandler::newInputChannelBehaviour(D20601motion, newDev, NULL); // automatic id
+      newDev->addBehaviour(newHandler->mMotionInput);
+      newHandler->mTiltInput = EnoceanInputHandler::newInputChannelBehaviour(D20601tilt, newDev, "tilted"); // specific id
+      newDev->addBehaviour(newHandler->mTiltInput);
       // count it
       aSubDeviceIndex++;
     }
@@ -781,21 +781,21 @@ void EnoceanD20601Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     // check message type
     if (dataP[0]==0x00) {
       // Sensor Values message
-      if (behaviour) handleBitField(D20601handleposition, behaviour, dataP, datasize, this);
-      if (temperatureSensor) handleBitField(D20601temperature, temperatureSensor, dataP, datasize, this);
-      if (humiditySensor) handleBitField(D20601humidity, humiditySensor, dataP, datasize, this);
-      if (illuminationSensor) handleBitField(D20601illumination, illuminationSensor, dataP, datasize, this);
-      if (batterySensor) {
-        handleBitField(D20601battery, batterySensor, dataP, datasize, this);
-        SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(batterySensor);
+      if (mBehaviour) handleBitField(D20601handleposition, mBehaviour, dataP, datasize, this);
+      if (mTemperatureSensor) handleBitField(D20601temperature, mTemperatureSensor, dataP, datasize, this);
+      if (mHumiditySensor) handleBitField(D20601humidity, mHumiditySensor, dataP, datasize, this);
+      if (mIlluminationSensor) handleBitField(D20601illumination, mIlluminationSensor, dataP, datasize, this);
+      if (mBatterySensor) {
+        handleBitField(D20601battery, mBatterySensor, dataP, datasize, this);
+        SensorBehaviourPtr sb = boost::dynamic_pointer_cast<SensorBehaviour>(mBatterySensor);
         if (sb && sb->hasDefinedState()) {
-          batPercentage = sb->getCurrentValue();
+          mBatPercentage = sb->getCurrentValue();
         }
       }
-      if (burglaryAlarmInput) handleBitField(D20601burglaryAlarm, burglaryAlarmInput, dataP, datasize, this);
-      if (protectionAlarmInput) handleBitField(D20601protectionAlarm, protectionAlarmInput, dataP, datasize, this);
-      if (motionInput) handleBitField(D20601motion, motionInput, dataP, datasize, this);
-      if (tiltInput) handleBitField(D20601tilt, tiltInput, dataP, datasize, this);
+      if (mBurglaryAlarmInput) handleBitField(D20601burglaryAlarm, mBurglaryAlarmInput, dataP, datasize, this);
+      if (mProtectionAlarmInput) handleBitField(D20601protectionAlarm, mProtectionAlarmInput, dataP, datasize, this);
+      if (mMotionInput) handleBitField(D20601motion, mMotionInput, dataP, datasize, this);
+      if (mTiltInput) handleBitField(D20601tilt, mTiltInput, dataP, datasize, this);
     }
   }
 }
@@ -813,8 +813,8 @@ string EnoceanD20601Handler::shortDesc()
 EnoceanD20601ButtonHandler::EnoceanD20601ButtonHandler(EnoceanDevice &aDevice, int aSwitchIndex) :
   inherited(aDevice)
 {
-  switchIndex = aSwitchIndex;
-  pressed = false;
+  mSwitchIndex = aSwitchIndex;
+  mPressed = false;
 }
 
 
@@ -823,8 +823,8 @@ void EnoceanD20601ButtonHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 {
   // BR = down = index 0 = DB(6,7..4)
   // BL = up = index 1 = DB(6,3..0)
-  uint8_t buttonActivity = (aEsp3PacketPtr->radioUserData()[3]>>(switchIndex ? 0 : 4)) & 0x0F;
-  ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(behaviour);
+  uint8_t buttonActivity = (aEsp3PacketPtr->radioUserData()[3]>>(mSwitchIndex ? 0 : 4)) & 0x0F;
+  ButtonBehaviourPtr bb = boost::dynamic_pointer_cast<ButtonBehaviour>(mBehaviour);
   if (bb) {
     if (buttonActivity==1)
       bb->updateButtonState(true); // pressed

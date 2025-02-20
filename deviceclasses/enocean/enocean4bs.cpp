@@ -864,8 +864,8 @@ void Enocean4BSDevice::prepare4BSpacket(Esp3PacketPtr &aOutgoingPacket, uint32_t
 EnoceanA52001Handler::EnoceanA52001Handler(EnoceanDevice &aDevice) :
   inherited(aDevice),
   serviceState(service_idle),
-  lastActualValvePos(50), // assume centered
-  lastRequestedValvePos(50) // assume centered
+  mLastActualValvePos(50), // assume centered
+  mLastRequestedValvePos(50) // assume centered
 {
 }
 
@@ -907,7 +907,7 @@ EnoceanDevicePtr EnoceanA52001Handler::newDevice(
     cb->setHardwareName("valve");
     // - create A5-20-01 specific handler for output
     EnoceanA52001HandlerPtr newHandler = EnoceanA52001HandlerPtr(new EnoceanA52001Handler(*newDev.get()));
-    newHandler->behaviour = cb;
+    newHandler->mBehaviour = cb;
     newDev->addChannelHandler(newHandler);
     if (EEP_VARIANT(aEEProfile)!=0) {
       // all non-default profiles have the valve sensor enabled -> add built-in temp sensor
@@ -941,11 +941,11 @@ void EnoceanA52001Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       uint32_t data = aEsp3PacketPtr->get4BSdata();
       if ((data & DBMASK(2,0))!=0) {
         OLOG(LOG_ERR, "EnOcean valve error: actuator obstructed");
-        behaviour->setHardwareError(hardwareError_overload);
+        mBehaviour->setHardwareError(hardwareError_overload);
       }
       else if ((data & DBMASK(2,4))==0 && (data & DBMASK(2,5))==0) {
         OLOG(LOG_ERR, "EnOcean valve error: energy storage AND battery are low");
-        behaviour->setHardwareError(hardwareError_lowBattery);
+        mBehaviour->setHardwareError(hardwareError_lowBattery);
       }
       // show general status
       OLOG(LOG_NOTICE,
@@ -969,10 +969,10 @@ void EnoceanA52001Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 
 void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3PacketPtr)
 {
-  ClimateControlBehaviourPtr cb = boost::dynamic_pointer_cast<ClimateControlBehaviour>(behaviour);
+  ClimateControlBehaviourPtr cb = boost::dynamic_pointer_cast<ClimateControlBehaviour>(mBehaviour);
   if (cb) {
     // get the right channel
-    ChannelBehaviourPtr ch = cb->getChannelByIndex(dsChannelIndex);
+    ChannelBehaviourPtr ch = cb->getChannelByIndex(mDsChannelIndex);
     // prepare 4BS packet (create packet if none created already)
     uint32_t data;
     Enocean4BSDevice::prepare4BSpacket(aEsp3PacketPtr, data);
@@ -998,12 +998,12 @@ void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
         if (serviceState==service_openandclosevalve) {
           // next is closing
           serviceState = service_closevalve;
-          device.needOutgoingUpdate();
+          mDevice.needOutgoingUpdate();
         }
         else {
           // already done
           serviceState = service_idle;
-          device.needOutgoingUpdate();
+          mDevice.needOutgoingUpdate();
         }
       }
       else if (serviceState==service_closevalve) {
@@ -1012,7 +1012,7 @@ void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
         data |= DBMASK(1,4); // service: close
         // next is normal operation again
         serviceState = service_idle;
-        device.needOutgoingUpdate();
+        mDevice.needOutgoingUpdate();
       }
     }
     else {
@@ -1024,7 +1024,7 @@ void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
       //   - if DB(1,2)==0: valve position 0..100% (0..255 is only for temperature set point mode!)
       //   - if DB(1,2)==1: set point 0..40 degree Celsius mapped to 0..255
       // - DB(2,7)..DB(2,0) is current temperature when using built-in regulator (inverse mapping 0..40 -> 255..0)
-      if (EEP_VARIANT(device.getEEProfile())==3) {
+      if (EEP_VARIANT(mDevice.getEEProfile())==3) {
         // use valve's own regulation
         double currentTemp, setPoint;
         if (cb->getZoneTemperatures(currentTemp, setPoint)) {
@@ -1039,8 +1039,8 @@ void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
         }
         else {
           // no control values available, use last actual valve position (which is initially 50%)
-          LOG(LOG_NOTICE, "- self regulating mode, but control values not (yet) available -> keep valve at %d%% open", lastActualValvePos);
-          data |= (lastActualValvePos<<DB(3,0)); // insert data into DB(3,0..7)
+          LOG(LOG_NOTICE, "- self regulating mode, but control values not (yet) available -> keep valve at %d%% open", mLastActualValvePos);
+          data |= (mLastActualValvePos<<DB(3,0)); // insert data into DB(3,0..7)
         }
       }
       else {
@@ -1050,28 +1050,28 @@ void EnoceanA52001Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
         if (newValue<0) newValue = 0;
         else if (newValue>100) newValue=100;
         // Special transformation in case valve is binary
-        if (EEP_VARIANT(device.getEEProfile())==2) {
+        if (EEP_VARIANT(mDevice.getEEProfile())==2) {
           // this valve can only adjust output by about 4k around the mechanically preset set point
-          if (newValue>lastRequestedValvePos) {
+          if (newValue>mLastRequestedValvePos) {
             // increase -> open to at least 51%
-            LOG(LOG_NOTICE, "- Binary valve: requested set point has increased from %d%% to %d%% -> open to 51%% or more", lastRequestedValvePos, newValue);
-            lastRequestedValvePos = newValue;
+            LOG(LOG_NOTICE, "- Binary valve: requested set point has increased from %d%% to %d%% -> open to 51%% or more", mLastRequestedValvePos, newValue);
+            mLastRequestedValvePos = newValue;
             if (newValue<=50) newValue = 51;
           }
-          else if (newValue<lastRequestedValvePos) {
+          else if (newValue<mLastRequestedValvePos) {
             // decrease -> close to at least 49%
-            LOG(LOG_NOTICE, "- Binary valve: requested set point has decreased from %d%% to %d%% -> close to 49%% or less", lastRequestedValvePos, newValue);
-            lastRequestedValvePos = newValue;
+            LOG(LOG_NOTICE, "- Binary valve: requested set point has decreased from %d%% to %d%% -> close to 49%% or less", mLastRequestedValvePos, newValue);
+            mLastRequestedValvePos = newValue;
             if (newValue>=50) newValue = 49;
           }
           else {
             // no change, just repeat last valve position
-            LOG(LOG_NOTICE, "- Binary valve: requested set point has not changed (%d%%) -> send last actual value (%d%%) again", lastRequestedValvePos, lastActualValvePos);
-            newValue = lastActualValvePos;
+            LOG(LOG_NOTICE, "- Binary valve: requested set point has not changed (%d%%) -> send last actual value (%d%%) again", mLastRequestedValvePos, mLastActualValvePos);
+            newValue = mLastActualValvePos;
           }
         }
         // remember last actually transmitted value
-        lastActualValvePos = newValue;
+        mLastActualValvePos = newValue;
         // - DB3 is set point with range 0..100 (0..255 is only for temperature set point)
         data |= (newValue<<DB(3,0)); // insert data into DB(3,0..7)
         // - DB(1,3) is summer mode
@@ -1149,7 +1149,7 @@ EnoceanDevicePtr EnoceanA52004Handler::newDevice(
     cb->setHardwareName("valve");
     // - create A5-20-04 specific handler for output
     EnoceanA52004HandlerPtr newHandler = EnoceanA52004HandlerPtr(new EnoceanA52004Handler(*newDev.get()));
-    newHandler->behaviour = cb;
+    newHandler->mBehaviour = cb;
     newDev->addChannelHandler(newHandler);
     if (EEP_VARIANT(aEEProfile)!=0) {
       // all non-default profiles have the sensors enabled
@@ -1201,7 +1201,7 @@ void EnoceanA52004Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
           case 18:
             // battery empty
             OLOG(LOG_ERR, "EnOcean valve error: battery is low");
-            behaviour->setHardwareError(hardwareError_lowBattery);
+            mBehaviour->setHardwareError(hardwareError_lowBattery);
             lowBat = true;
             break;
           case 33:
@@ -1210,7 +1210,7 @@ void EnoceanA52004Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
           case 36:
             OLOG(LOG_ERR, "EnOcean valve error: end point detection error");
           valveErr:
-            behaviour->setHardwareError(hardwareError_overload);
+            mBehaviour->setHardwareError(hardwareError_overload);
             break;
         }
       }
@@ -1220,7 +1220,7 @@ void EnoceanA52004Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       }
       // - update low battery state here (can't use bit field handler, because lowBat is not a bit but a enum decoded above)
       boost::dynamic_pointer_cast<BinaryInputBehaviour>(lowBatInput)->updateInputState(lowBat);
-      batPercentage = lowBat ? LOW_BAT_PERCENTAGE : 100;
+      mBatPercentage = lowBat ? LOW_BAT_PERCENTAGE : 100;
       if (ENOBIT(0, 1, dataP, datasize)) {
         // set point transmitted
         if (setpointTemp) EnoceanInputs::handleBitField(A52004setpointTemp, setpointTemp, dataP, datasize, this);
@@ -1245,10 +1245,10 @@ void EnoceanA52004Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 
 void EnoceanA52004Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3PacketPtr)
 {
-  ClimateControlBehaviourPtr cb = boost::dynamic_pointer_cast<ClimateControlBehaviour>(behaviour);
+  ClimateControlBehaviourPtr cb = boost::dynamic_pointer_cast<ClimateControlBehaviour>(mBehaviour);
   if (cb) {
     // get the right channel
-    ChannelBehaviourPtr ch = cb->getChannelByIndex(dsChannelIndex);
+    ChannelBehaviourPtr ch = cb->getChannelByIndex(mDsChannelIndex);
     // prepare 4BS packet (create packet if none created already)
     uint32_t data;
     Enocean4BSDevice::prepare4BSpacket(aEsp3PacketPtr, data);
@@ -1273,12 +1273,12 @@ void EnoceanA52004Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
         if (serviceState==service_openandclosevalve) {
           // next is closing
           serviceState = service_closevalve;
-          device.needOutgoingUpdate();
+          mDevice.needOutgoingUpdate();
         }
         else {
           // already done
           serviceState = service_idle;
-          device.needOutgoingUpdate();
+          mDevice.needOutgoingUpdate();
         }
       }
       else if (serviceState==service_closevalve) {
@@ -1288,7 +1288,7 @@ void EnoceanA52004Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
         data |= 3<<DB(1,0); // 2 min
         // next is normal operation again
         serviceState = service_idle;
-        device.needOutgoingUpdate();
+        mDevice.needOutgoingUpdate();
       }
     }
     else {
@@ -1408,7 +1408,7 @@ EnoceanDevicePtr EnoceanA52006Handler::newDevice(
     cb->setHardwareName("valve");
     // - create A5-20-06 specific handler for output
     EnoceanA52006HandlerPtr newHandler = EnoceanA52006HandlerPtr(new EnoceanA52006Handler(*newDev.get()));
-    newHandler->behaviour = cb;
+    newHandler->mBehaviour = cb;
     newDev->addChannelHandler(newHandler);
     // Bit 0 in variant code means sensors enabled
     if (EEP_VARIANT(aEEProfile) & 0x01) {
@@ -1459,13 +1459,13 @@ void EnoceanA52006Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       // - check ACO - actuator obstructed
       if (ENOBIT(0, 0, dataP, datasize)) {
         OLOG(LOG_ERR, "EnOcean valve error: actuator obstructed");
-        behaviour->setHardwareError(hardwareError_overload);
+        mBehaviour->setHardwareError(hardwareError_overload);
       }
       // - get current valve position
       currentValvePos = ENOBYTE(3, dataP, datasize);
       // - check ES - energy storage level (1=sufficient, 0=discharged)
       bool lowBat = ENOBIT(0, 5, dataP, datasize)==0;
-      batPercentage = lowBat ? LOW_BAT_PERCENTAGE : 100;
+      mBatPercentage = lowBat ? LOW_BAT_PERCENTAGE : 100;
       boost::dynamic_pointer_cast<BinaryInputBehaviour>(lowBatInput)->updateInputState(lowBat);
       // - temperatures
       if (ENOBIT(0, 7, dataP, datasize)) {
@@ -1477,7 +1477,7 @@ void EnoceanA52006Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
         if (roomTemp) EnoceanInputs::handleBitField(A52006roomTemp, roomTemp, dataP, datasize, this);
       }
       if (setpoint) {
-        if (EEP_VARIANT(device.getEEProfile()) & 0x02) {
+        if (EEP_VARIANT(mDevice.getEEProfile()) & 0x02) {
           // set point is absolute
           if (ENOBIT(2, 7, dataP, datasize)) {
             // LOM=1, absolute temperature
@@ -1512,10 +1512,10 @@ void EnoceanA52006Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 
 void EnoceanA52006Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3PacketPtr)
 {
-  ClimateControlBehaviourPtr cb = boost::dynamic_pointer_cast<ClimateControlBehaviour>(behaviour);
+  ClimateControlBehaviourPtr cb = boost::dynamic_pointer_cast<ClimateControlBehaviour>(mBehaviour);
   if (cb) {
     // get the right channel
-    ChannelBehaviourPtr ch = cb->getChannelByIndex(dsChannelIndex);
+    ChannelBehaviourPtr ch = cb->getChannelByIndex(mDsChannelIndex);
     // prepare 4BS packet (create packet if none created already)
     uint32_t data;
     Enocean4BSDevice::prepare4BSpacket(aEsp3PacketPtr, data);
@@ -1540,12 +1540,12 @@ void EnoceanA52006Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
         if (serviceState==service_openandclosevalve) {
           // next is closing
           serviceState = service_closevalve;
-          device.needOutgoingUpdate();
+          mDevice.needOutgoingUpdate();
         }
         else {
           // already done
           serviceState = service_idle;
-          device.needOutgoingUpdate();
+          mDevice.needOutgoingUpdate();
         }
       }
       else if (serviceState==service_closevalve) {
@@ -1555,7 +1555,7 @@ void EnoceanA52006Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
         data |= 1<<DB(1,4); // 2 min (0b001 in bits 4..6)
         // next is normal operation again
         serviceState = service_idle;
-        device.needOutgoingUpdate();
+        mDevice.needOutgoingUpdate();
       }
     }
     else {
@@ -1569,7 +1569,7 @@ void EnoceanA52006Handler::collectOutgoingMessageData(Esp3PacketPtr &aEsp3Packet
         data |= 0<<DB(1,4); // Winter: automatic 2,5 or 10min communication interval (0b000 in bits 4..6)
       }
       // - valve position
-      if (EEP_VARIANT(device.getEEProfile()) & 0x02) {
+      if (EEP_VARIANT(mDevice.getEEProfile()) & 0x02) {
         // self-regulating mode, only send set point and actual room temperature
         double currentTemp, setPoint;
         if (cb->getZoneTemperatures(currentTemp, setPoint)) {
@@ -1690,7 +1690,7 @@ EnoceanDevicePtr EnoceanA5130XHandler::newDevice(
       // this is the main device
       newDev->setFunctionDesc("environmental multisensor");
       // - Add channel-built-in behaviour: low light measurement at dawn and dusk (below 1000lx)
-      newHandler->behaviour = EnoceanInputHandler::newInputChannelBehaviour(A513lowLightSensor, newDev, NULL); // automatic id
+      newHandler->mBehaviour = EnoceanInputHandler::newInputChannelBehaviour(A513lowLightSensor, newDev, NULL); // automatic id
       // - register the handler and the default behaviour
       newDev->addChannelHandler(newHandler);
       // - Add extra behaviours for A5-13-01
@@ -1778,7 +1778,7 @@ void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
         else {
           // A5-13-01
           nowBroken = false;
-          if (behaviour) handleBitField(A513lowLightSensor, behaviour, dataP, datasize, this);
+          if (mBehaviour) handleBitField(A513lowLightSensor, mBehaviour, dataP, datasize, this);
           if (outdoorTemp) handleBitField(A513outdoorTemp, outdoorTemp, dataP, datasize, this);
           if (windSpeed) handleBitField(A513windSpeed, windSpeed, dataP, datasize, this);
           if (gustSpeed) handleBitField(A513gustSpeed, gustSpeed, dataP, datasize, this);
@@ -1801,7 +1801,7 @@ void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     if (nowBroken!=broken) {
       broken = nowBroken;
       VdcHardwareError e = broken ? hardwareError_openCircuit : hardwareError_none;
-      if (behaviour) behaviour->setHardwareError(e);
+      if (mBehaviour) mBehaviour->setHardwareError(e);
       if (outdoorTemp) outdoorTemp->setHardwareError(e);
       if (windSpeed) windSpeed->setHardwareError(e);
       if (gustSpeed) gustSpeed->setHardwareError(e);
@@ -1813,7 +1813,7 @@ void EnoceanA5130XHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     }
     // re-validate all sensors whenever we get any radio packet and not broken
     if (!broken) {
-      if (behaviour) behaviour->revalidateState();
+      if (mBehaviour) mBehaviour->revalidateState();
       if (outdoorTemp) outdoorTemp->revalidateState();
       if (windSpeed) windSpeed->revalidateState();
       if (gustSpeed) gustSpeed->revalidateState();

@@ -107,7 +107,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       buttonBhvr->setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, 0); // not combinable
       buttonBhvr->setGroup(group_yellow_light); // pre-configure for light
       buttonBhvr->setHardwareName("button");
-      buttonHandler->behaviour = buttonBhvr;
+      buttonHandler->mBehaviour = buttonBhvr;
       newDev->addChannelHandler(buttonHandler);
       // count it
       aSubDeviceIndex++;
@@ -134,7 +134,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, CONTACT_UPDATE_INTERVAL, CONTACT_UPDATE_INTERVAL*3);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName(newHandler->shortDesc());
-      newHandler->behaviour = bb;
+      newHandler->mBehaviour = bb;
       // add channel to device
       newDev->addChannelHandler(newHandler);
       // count it
@@ -165,13 +165,13 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         // Create single handler, up button for even aSubDevice, down button for odd aSubDevice
         bool isUp = (aSubDeviceIndex & 0x01)==0;
         EnoceanRpsRockerHandlerPtr buttonHandler = EnoceanRpsRockerHandlerPtr(new EnoceanRpsRockerHandler(*newDev.get()));
-        buttonHandler->switchIndex = aSubDeviceIndex/2; // subdevices are half-switches, so switch index == subDeviceIndex/2
-        buttonHandler->isRockerUp = isUp;
+        buttonHandler->mSwitchIndex = aSubDeviceIndex/2; // subdevices are half-switches, so switch index == subDeviceIndex/2
+        buttonHandler->mIsRockerUp = isUp;
         ButtonBehaviourPtr buttonBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
         buttonBhvr->setHardwareButtonConfig(0, buttonType_single, buttonElement_center, false, 0, 2); // combinable in pairs
         buttonBhvr->setGroup(group_yellow_light); // pre-configure for light
         buttonBhvr->setHardwareName(isUp ? "upper key" : "lower key");
-        buttonHandler->behaviour = buttonBhvr;
+        buttonHandler->mBehaviour = buttonBhvr;
         newDev->addChannelHandler(buttonHandler);
         // count it
         // - separate buttons use all indices 0,1,2,3...
@@ -199,23 +199,23 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         // Create two handlers, one for the up button, one for the down button
         // - create button input for what dS will handle as "down key" (actual button depends on "reversed")
         EnoceanRpsRockerHandlerPtr downHandler = EnoceanRpsRockerHandlerPtr(new EnoceanRpsRockerHandler(*newDev.get()));
-        downHandler->switchIndex = aSubDeviceIndex/2; // subdevices are half-switches, so switch index == subDeviceIndex/2
-        downHandler->isRockerUp = reversed; // normal: first button is the hardware-down-button, reversed: hardware-up-button
+        downHandler->mSwitchIndex = aSubDeviceIndex/2; // subdevices are half-switches, so switch index == subDeviceIndex/2
+        downHandler->mIsRockerUp = reversed; // normal: first button is the hardware-down-button, reversed: hardware-up-button
         ButtonBehaviourPtr downBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),""));  // automatic id
         downBhvr->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 1, 0); // counterpart up-button has buttonIndex 1, fixed mode
         downBhvr->setGroup(group_yellow_light); // pre-configure for light
         downBhvr->setHardwareName("down key");
-        downHandler->behaviour = downBhvr;
+        downHandler->mBehaviour = downBhvr;
         newDev->addChannelHandler(downHandler);
         // - create button input for what dS will handle as "up key" (actual button depends on "reversed")
         EnoceanRpsRockerHandlerPtr upHandler = EnoceanRpsRockerHandlerPtr(new EnoceanRpsRockerHandler(*newDev.get()));
-        upHandler->switchIndex = aSubDeviceIndex/2; // subdevices are half-switches, so switch index == subDeviceIndex/2
-        upHandler->isRockerUp = !reversed; // normal: second button is the hardware-up-button, reversed: hardware-down-button
+        upHandler->mSwitchIndex = aSubDeviceIndex/2; // subdevices are half-switches, so switch index == subDeviceIndex/2
+        upHandler->mIsRockerUp = !reversed; // normal: second button is the hardware-up-button, reversed: hardware-down-button
         ButtonBehaviourPtr upBhvr = ButtonBehaviourPtr(new ButtonBehaviour(*newDev.get(),"")); // automatic id
         upBhvr->setGroup(group_yellow_light); // pre-configure for light
         upBhvr->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, 0); // counterpart down-button has buttonIndex 0, fixed mode
         upBhvr->setHardwareName("up key");
-        upHandler->behaviour = upBhvr;
+        upHandler->mBehaviour = upBhvr;
         newDev->addChannelHandler(upHandler);
         // count it
         // - 2-way rocker switches use indices 0,2,4,6,... to leave room for separate button mode without shifting indices
@@ -244,7 +244,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       bb->setHardwareInputConfig(binInpType_windowHandle, usage_undefined, true, Never, Never);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("Window open/tilted");
-      newHandler->behaviour = bb;
+      newHandler->mBehaviour = bb;
       newDev->addChannelHandler(newHandler);
       // count it
       aSubDeviceIndex++;
@@ -272,8 +272,8 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("Card inserted");
-      newHandler->isServiceCardDetector = false;
-      newHandler->behaviour = bb;
+      newHandler->mIsServiceCardDetector = false;
+      newHandler->mBehaviour = bb;
       newDev->addChannelHandler(newHandler);
       // FKC/FKF can distinguish guest and service cards and have a second input
       if (aEEProfile==0xF604C0) {
@@ -283,8 +283,8 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
         bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
         bb->setGroup(group_black_variable); // joker by default
         bb->setHardwareName("Service card");
-        newHandler->isServiceCardDetector = true;
-        newHandler->behaviour = bb;
+        newHandler->mIsServiceCardDetector = true;
+        newHandler->mBehaviour = bb;
         newDev->addChannelHandler(newHandler);
       }
       // count it
@@ -314,7 +314,7 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       bb->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never); // generic because dS does not have a binary sensor function for leakage yet
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("Leakage detector");
-      newHandler->behaviour = bb;
+      newHandler->mBehaviour = bb;
       newDev->addChannelHandler(newHandler);
       // count it
       aSubDeviceIndex++;
@@ -346,8 +346,8 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       bb->setHardwareInputConfig(aEEProfile==0xF60500 ? binInpType_wind : binInpType_smoke, usage_room, true, Never, Never);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName(aEEProfile==0xF60500 ? "Wind alarm" : "Smoke alarm");
-      newHandler->behaviour = bb;
-      newHandler->isBatteryStatus = false;
+      newHandler->mBehaviour = bb;
+      newHandler->mIsBatteryStatus = false;
       newDev->addChannelHandler(newHandler);
       // - Low Battery: 1: battery low, 0: battery OK
       newHandler = EnoceanRpsWindSmokeDetectorHandlerPtr(new EnoceanRpsWindSmokeDetectorHandler(*newDev.get()));
@@ -355,8 +355,8 @@ EnoceanDevicePtr EnoceanRPSDevice::newDevice(
       bb->setHardwareInputConfig(binInpType_lowBattery, usage_room, true, Never, Never);
       bb->setGroup(group_black_variable); // joker by default
       bb->setHardwareName("Low battery");
-      newHandler->behaviour = bb;
-      newHandler->isBatteryStatus = true;
+      newHandler->mBehaviour = bb;
+      newHandler->mIsBatteryStatus = true;
       newDev->addChannelHandler(newHandler);
       // count it
       aSubDeviceIndex++;
@@ -388,15 +388,15 @@ void EnoceanRpsButtonHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     bool pressed = data==0x10;
     if (mBinContactClosedValue==undefined) {
       // handle as button
-      ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(behaviour);
+      ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(mBehaviour);
       if (b) {
-        LOG(LOG_INFO, "Enocean Button %s - %08X: reports state %s", b->getHardwareName().c_str(), device.getAddress(), pressed ? "PRESSED" : "RELEASED");
+        LOG(LOG_INFO, "Enocean Button %s - %08X: reports state %s", b->getHardwareName().c_str(), mDevice.getAddress(), pressed ? "PRESSED" : "RELEASED");
         b->updateButtonState(pressed);
       }
     }
     else {
       // handle as contact
-      BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(behaviour);
+      BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(mBehaviour);
       if (bb) {
         bb->updateInputState(pressed==(mBinContactClosedValue==yes));
       }
@@ -415,9 +415,9 @@ string EnoceanRpsButtonHandler::shortDesc()
 
 EnoceanRpsRockerHandler::EnoceanRpsRockerHandler(EnoceanDevice &aDevice) :
   inherited(aDevice),
-  pressed(false)
+  mPressed(false)
 {
-  switchIndex = 0; // default to first
+  mSwitchIndex = 0; // default to first
 }
 
 
@@ -427,7 +427,7 @@ void EnoceanRpsRockerHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
   // extract payload data
   uint8_t data = aEsp3PacketPtr->radioUserData()[0];
   uint8_t status = aEsp3PacketPtr->radioStatus();
-  FOCUSLOG("RPS message processing: data=0x%02X, status=0x%02X (switchIndex=%d, isRockerUp=%d)", data, status, switchIndex, isRockerUp);
+  FOCUSLOG("RPS message processing: data=0x%02X, status=0x%02X (switchIndex=%d, isRockerUp=%d)", data, status, mSwitchIndex, mIsRockerUp);
   // decode
   if (status & status_NU) {
     // N-Message
@@ -439,11 +439,11 @@ void EnoceanRpsRockerHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       if (ai==0 && (data&0x01)==0)
         break; // no second action
       FOCUSLOG("- action #%d = %d", 2-ai, a);
-      if (((a>>1) & 0x03)==switchIndex) {
+      if (((a>>1) & 0x03)==mSwitchIndex) {
         // querying this subdevice/rocker
-        FOCUSLOG("- is my switchIndex == %d", switchIndex);
-        if (((a & 0x01)!=0) == isRockerUp) {
-          FOCUSLOG("- is my side (%s) of the switch, isRockerUp == %d", isRockerUp ? "Up" : "Down", isRockerUp);
+        FOCUSLOG("- is my switchIndex == %d", mSwitchIndex);
+        if (((a & 0x01)!=0) == mIsRockerUp) {
+          FOCUSLOG("- is my side (%s) of the switch, isRockerUp == %d", mIsRockerUp ? "Up" : "Down", mIsRockerUp);
           // my half of the rocker, DB4 is button state (1=pressed, 0=released)
           setButtonState((data & 0x10)!=0);
         }
@@ -475,15 +475,15 @@ void EnoceanRpsRockerHandler::setButtonState(bool aPressed)
   // (because we also get called here for release of other buttons. updateButtonState()
   // works with reporting release multiple times, but we'd produce confusing log entries, so
   // we suppress these EnOcean technology specific extra updates)
-  if (aPressed!=pressed) {
+  if (aPressed!=mPressed) {
     // real change, propagate to behaviour
-    ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(behaviour);
+    ButtonBehaviourPtr b = boost::dynamic_pointer_cast<ButtonBehaviour>(mBehaviour);
     if (b) {
-      OLOG(LOG_INFO, "Enocean Button %s - %08X, subDevice %d: changed state to %s", b->getHardwareName().c_str(), device.getAddress(), device.getSubDevice(), aPressed ? "PRESSED" : "RELEASED");
+      OLOG(LOG_INFO, "Enocean Button %s - %08X, subDevice %d: changed state to %s", b->getHardwareName().c_str(), mDevice.getAddress(), mDevice.getSubDevice(), aPressed ? "PRESSED" : "RELEASED");
       b->updateButtonState(aPressed);
     }
     // update cached status
-    pressed = aPressed;
+    mPressed = aPressed;
   }
 }
 
@@ -523,9 +523,9 @@ void EnoceanRpsWindowHandleHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketP
     return; // unknown data, don't update binary inputs at all
   }
   // report data for this binary input
-  BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(behaviour);
+  BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(mBehaviour);
   if (bb) {
-    LOG(LOG_INFO, "Enocean Window Handle %08X reports state: %s", device.getAddress(), closed ? "closed" : (tilted ? "tilted open" : "fully open"));
+    LOG(LOG_INFO, "Enocean Window Handle %08X reports state: %s", mDevice.getAddress(), closed ? "closed" : (tilted ? "tilted open" : "fully open"));
     bb->updateInputState(closed ? 0 : (tilted ? 2 : 1)); // report the extendedValue state: 0=closed, 1=fully open, 2=tilted open
   }
 }
@@ -568,7 +568,7 @@ void EnoceanRpsCardKeyHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
   // extract payload data
   uint8_t data = aEsp3PacketPtr->radioUserData()[0];
   uint8_t rpsStatus = aEsp3PacketPtr->radioStatus() & status_rps_mask;
-  if (device.getEEProfile()==0xF604C0) {
+  if (mDevice.getEEProfile()==0xF604C0) {
     // FKC or FKF style switch (no official EEP for this)
     isInserted = data & 0x10; // Bit4
     if (isInserted && ((rpsStatus & status_NU)!=0)) {
@@ -581,14 +581,14 @@ void EnoceanRpsCardKeyHandler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     isInserted = (rpsStatus & status_NU)!=0 && data==0x70;
   }
   // report data for this binary input
-  BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(behaviour);
+  BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(mBehaviour);
   if (bb) {
-    if (isServiceCardDetector) {
-      LOG(LOG_INFO, "Enocean Key Card Switch %08X reports: %s", device.getAddress(), isServiceCard ? "Service Card" : "Guest Card");
+    if (mIsServiceCardDetector) {
+      LOG(LOG_INFO, "Enocean Key Card Switch %08X reports: %s", mDevice.getAddress(), isServiceCard ? "Service Card" : "Guest Card");
       bb->updateInputState(isServiceCard); // report the card type
     }
     else {
-      LOG(LOG_INFO, "Enocean Key Card Switch %08X reports state: %s", device.getAddress(), isInserted ? "inserted" : "extracted");
+      LOG(LOG_INFO, "Enocean Key Card Switch %08X reports state: %s", mDevice.getAddress(), isInserted ? "inserted" : "extracted");
       bb->updateInputState(isInserted); // report the status
     }
   }
@@ -614,18 +614,18 @@ void EnoceanRpsWindSmokeDetectorHandler::handleRadioPacket(Esp3PacketPtr aEsp3Pa
 {
   // extract payload data
   uint8_t data = aEsp3PacketPtr->radioUserData()[0];
-  BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(behaviour);
-  if (isBatteryStatus) {
+  BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(mBehaviour);
+  if (mIsBatteryStatus) {
     // battery status channel (member field of EnoceanChannelHandler, influences opStateLevel())
     bool lowBat = (data & 0x30)==0x30;
-    batPercentage = lowBat ? LOW_BAT_PERCENTAGE : 100;
-    LOG(LOG_INFO, "Enocean Detector %08X reports state: Battery %s", device.getAddress(), lowBat ? "LOW" : "ok");
+    mBatPercentage = lowBat ? LOW_BAT_PERCENTAGE : 100;
+    LOG(LOG_INFO, "Enocean Detector %08X reports state: Battery %s", mDevice.getAddress(), lowBat ? "LOW" : "ok");
     bb->updateInputState(lowBat);
   }
   else {
     // smoke alarm status
     bool alarm = (data & 0x30)==0x10;
-    LOG(LOG_INFO, "Enocean Detector %08X reports state: %s", device.getAddress(), alarm ? "ALARM" : "no alarm");
+    LOG(LOG_INFO, "Enocean Detector %08X reports state: %s", mDevice.getAddress(), alarm ? "ALARM" : "no alarm");
     bb->updateInputState(alarm);
   }
 }
@@ -656,12 +656,12 @@ void EnoceanRpsLeakageDetectorHandler::handleRadioPacket(Esp3PacketPtr aEsp3Pack
 {
   // extract payload data
   uint8_t data = aEsp3PacketPtr->radioUserData()[0];
-  BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(behaviour);
+  BinaryInputBehaviourPtr bb = boost::dynamic_pointer_cast<BinaryInputBehaviour>(mBehaviour);
   // smoke alarm status
   bool leakage =
     (data==0x11) && // data must be 0x11
     ((aEsp3PacketPtr->radioStatus() & status_rps_mask)==status_T21+status_NU); // AND NU and T21 must be set
-  LOG(LOG_INFO, "Enocean Liquid Leakage Detector %08X reports state: %s", device.getAddress(), leakage ? "LEAKAGE" : "no leakage");
+  LOG(LOG_INFO, "Enocean Liquid Leakage Detector %08X reports state: %s", mDevice.getAddress(), leakage ? "LEAKAGE" : "no leakage");
   bb->updateInputState(leakage);
 }
 
