@@ -105,6 +105,7 @@ namespace p44 {
     rorg_SYS_EX = 0xC5, ///< Remote Management
     rorg_SEC = 0x30, ///< Secure telegram
     rorg_SEC_ENCAPS = 0x31, ///< Secure telegram with R-ORG encapsulation
+    rorg_SEC_CHAINED = 0x33, ///< Secure telegram sequence for longer payload with R-ORG encapsulation
     rorg_SEC_TEACHIN = 0x35 ///< Secure teach-in
   } RadioOrg;
 
@@ -497,6 +498,12 @@ namespace p44 {
     uint32_t mLastSavedRLC; ///< last saved RLC
     MLMicroSeconds mLastSave; ///< when was the RLC saved last time
     bool mRlcVerified; ///< actually verified RLC was correct (at least one message authenticated successfully since last restart)
+
+    // chained messages
+    uint8_t mSeqExpIdx; ///< 0:no sequence in progress, >0:expected next sequence index
+    uint8_t mSeqID; ///< when mSeqExpIdx>0: expected sequence ID (0..3)
+    uint16_t mSeqLen; ///< combined length of RORG, Payload, RLC and CMAC
+    string mSeqData; ///< recombined encrypted payload
 
   private:
 

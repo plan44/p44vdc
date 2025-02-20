@@ -1349,7 +1349,7 @@ static uint16_t ptmMapping[16] = {
 Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
 {
   RadioOrg org = aSecureMsg->eepRorg();
-  if (org!=rorg_SEC_ENCAPS && org!=rorg_SEC) {
+  if (org!=rorg_SEC_ENCAPS && org!=rorg_SEC && org!=rorg_SEC_CHAINED) {
     OLOG(LOG_WARNING, "%08X: Non-secure radio packet, but device is secure -> ignored", aSecureMsg->radioSender());
     return Esp3PacketPtr(); // none
   }
@@ -1360,12 +1360,55 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
   // something to decrypt
   size_t n = aSecureMsg->radioUserDataLength();
   uint8_t *d = aSecureMsg->radioUserData();
+  if (org==rorg_SEC_CHAINED) {
+    uint8_t seqhdr = *d++; n--; // consumed, don't count for processing below
+    uint8_t seqIdx = seqhdr & 0x3F; // sequence index
+    uint8_t seqID = seqhdr>>6; // bit 6&7 are the sequence ID
+    if (seqIdx==0) {
+      // starting new sequence
+      mSeqExpIdx = 1; // next part expected
+      mSeqID = seqID;
+      mSeqData.clear();
+      // sequence start, also get length
+      mSeqLen = ((*d)<<8)+*(d+1);
+      d+=2; n-=2; // consumed, don't count for processing below
+      OLOG(LOG_DEBUG, "Start of Secure Message Chaining: SEQ=%d, IDX=0, Len=%d, bytes now=%zd", mSeqID, mSeqLen, n);
+    }
+    else if (seqID==mSeqID && seqIdx==mSeqExpIdx) {
+      // continuation
+      OLOG(LOG_DEBUG, "Continuation of Secure Message Chaining: SEQ=%d, IDX=%d, Len=%d, bytes now=%zd", mSeqID, seqIdx, mSeqLen, n);
+      mSeqExpIdx++;
+    }
+    else {
+      OLOG(LOG_WARNING, "Unexpected sequence continuation: got SEQ=%d, IDX=%d, expected SEQ=%d, IDX=%d -> ignored", seqID, seqIdx, mSeqID, mSeqLen);
+      return Esp3PacketPtr(); // ignore
+    }
+    // collect data
+    mSeqData.append((char *)d, n);
+    n = mSeqData.size();
+    if (n<mSeqLen) {
+      // expecting more data
+      OLOG(LOG_DEBUG, "Secure Message Chaining: expecting more data, no result to process yet");
+      return Esp3PacketPtr(); // need more data before decrypting
+    }
+    else {
+      // reached expected length
+      if (n>mSeqLen) {
+        OLOG(LOG_WARNING, "Sequence data longer than expected: got %zd bytes, expected only %d", mSeqData.size(), mSeqLen);
+      }
+      mSeqExpIdx = 0; // end of sequence, reset
+      // now process entire sequence data as if it was a rorg_SEC_ENCAPS message
+      d = (uint8_t*)mSeqData.c_str();
+      org = rorg_SEC_ENCAPS;
+    }
+  }
   // check for CMAC
   uint32_t cmac_sent = 0;
   uint8_t macsz = macSize();
   if (macsz>0) {
     // there is a MAC
     if (macsz>n) {
+      OLOG(LOG_WARNING, "invalid secure packet, not enough data for MAC (got %zd, expected >=%d)", n, macsz);
       return Esp3PacketPtr(); // not enough data
     }
     n -= macsz;
@@ -1380,6 +1423,7 @@ Esp3PacketPtr EnOceanSecurity::unpackSecureMessage(Esp3PacketPtr aSecureMsg)
     uint32_t rlc = 0;
     // RLC_TX set -> RLC is in the message
     if (rlcsz>n) {
+      OLOG(LOG_WARNING, "invalid secure packet, not enough data for RLC (got %zd, expected >=%d)", n, rlcsz);
       return Esp3PacketPtr(); // not enough data
     }
     n -= rlcsz;

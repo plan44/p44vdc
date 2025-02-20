@@ -817,7 +817,8 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     // established security context for that device exists -> only encrypted messages are allowed
     Esp3PacketPtr unpackedMsg = sec->unpackSecureMessage(aEsp3PacketPtr);
     if (!unpackedMsg) {
-      OLOG(LOG_NOTICE, "Ignoring invalid packet for secure device (not secure or not authenticated):\n%s", aEsp3PacketPtr->description().c_str());
+      // no output package because of error or ongoing sequence
+      OLOG(LOG_INFO, "No decrypted payload (yet) to process from this packet\n%s", aEsp3PacketPtr->description().c_str());
       return;
     }
     OLOG(LOG_INFO, "Received and unpacked secure radio packet, original is:\n%s", aEsp3PacketPtr->description().c_str());
