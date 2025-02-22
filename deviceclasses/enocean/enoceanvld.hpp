@@ -72,6 +72,7 @@ namespace p44 {
   };
 
 
+  // MARK: D201xx
 
   /// Electronic Switches and Dimmers with local control
   class EnoceanD201XXDevice : public EnoceanVLDDevice
@@ -127,7 +128,7 @@ namespace p44 {
 
     MLTicket mResendTicket;
 
-    /// private constructor, friend class' Enocean4bsHandler::newDevice is the place to call it from
+    /// private constructor, factory method newDevice is the place to call it from
     EnoceanD201XXHandler(EnoceanDevice &aDevice);
 
   public:
@@ -168,6 +169,106 @@ namespace p44 {
   typedef boost::intrusive_ptr<EnoceanD201XXHandler> EnoceanD201XXHandlerPtr;
 
 
+  // MARK: D20620
+
+  /// Roto electric window Drive controller
+  class EnoceanD20620Device : public EnoceanVLDDevice
+  {
+    typedef EnoceanVLDDevice inherited;
+
+    bool mAutoLockAt0; ///< if set, window is locked when tilt position is set to 0
+    MLTicket mStatusTicket;
+
+  public:
+
+    /// constructor
+    EnoceanD20620Device(EnoceanVdc *aVdcP);
+
+    /// device type identifier
+    /// @return constant identifier for this type of device (one container might contain more than one type)
+    virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "enocean_window_controller"; };
+
+    /// initializes the physical device for being used
+    /// @param aFactoryReset if set, the device will be inititalized as thoroughly as possible (factory reset, default settings etc.)
+    virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
+
+    /// apply channel values
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
+
+    /// synchronize channel values by reading them back from the device's hardware (if possible)
+    virtual void syncChannelValues(SimpleCB aDoneCB) P44_OVERRIDE;
+
+  private:
+
+    void requestD20620status();
+
+  };
+
+
+  /// Roto electric window Drive controller handler
+  class EnoceanD20620Handler : public EnoceanChannelHandler
+  {
+    typedef EnoceanChannelHandler inherited;
+    friend class EnoceanD20620Device;
+
+    /// failure codes according to D2-06-20 specs
+    typedef enum {
+      no_failure = 0x00,
+      close_failure = 0x01,
+      tilt_failure = 0x02,
+      connection_failure = 0x03,
+      overcurrent = 0x04,
+      timeout = 0x05,
+      drive_failure = 0x06
+    } FailureCode;
+
+    FailureCode mFailureCode;
+    SimpleCB mSyncChannelCB; ///< callback to call when channel value is synchronized back from HW
+
+    /// private constructor, factory method newDevice is the place to call it from
+    EnoceanD20620Handler(EnoceanDevice &aDevice);
+
+  public:
+
+    /// factory: (re-)create logical device from address|channel|profile|manufacturer tuple
+    /// @param aVdcP the class container
+    /// @param aSubDeviceIndex subdevice number (multiple logical EnoceanDevices might exists for the same EnoceanAddress)
+    ///   upon exit, this will be incremented by the number of subdevice indices the device occupies in the index space
+    ///   (usually 1, but some profiles might reserve extra space, such as up/down buttons)
+    /// @param aEEProfile VARIANT/RORG/FUNC/TYPE EEP profile number
+    /// @param aEEManufacturer manufacturer number (or manufacturer_unknown)
+    /// @param aSendTeachInResponse enable sending teach-in response for this device
+    /// @return returns NULL if no device can be created for the given aSubDeviceIndex, new device otherwise
+    static EnoceanDevicePtr newDevice(
+      EnoceanVdc *aVdcP,
+      EnoceanAddress aAddress,
+      EnoceanSubDevice &aSubDeviceIndex,
+      EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer,
+      bool aSendTeachInResponse
+    );
+
+    /// handle radio packet related to this channel
+    /// @param aEsp3PacketPtr the radio packet to analyze and extract channel related information
+    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr) P44_OVERRIDE;
+
+    /// Get an indication how good/critical the operation state of this channel is (usually: battery level indicator)
+    /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
+    virtual int opStateLevel() P44_OVERRIDE;
+
+    /// Get short text to describe the operation state (such as radio RSSI, critical battery level, etc.)
+    /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
+    virtual string getOpStateText() P44_OVERRIDE;
+
+    /// short (text without LFs!) description of object, mainly for referencing it in log messages
+    /// @return textual description of object
+    virtual string shortDesc() P44_OVERRIDE;
+  };
+  typedef boost::intrusive_ptr<EnoceanD20620Handler> EnoceanD20620HandlerPtr;
+
+
+
+  // MARK: D20601
+
   /// SODA window handle handler
   class EnoceanD20601Handler : public EnoceanChannelHandler
   {
@@ -184,7 +285,7 @@ namespace p44 {
     DsBehaviourPtr mMotionInput;
     DsBehaviourPtr mTiltInput;
 
-    /// private constructor, friend class' Enocean4bsHandler::newDevice is the place to call it from
+    /// private constructor, factory method newDevice is the place to call it from
     EnoceanD20601Handler(EnoceanDevice &aDevice);
 
   public:
@@ -215,7 +316,6 @@ namespace p44 {
     virtual string shortDesc() P44_OVERRIDE;
   };
   typedef boost::intrusive_ptr<EnoceanD20601Handler> EnoceanD20601HandlerPtr;
-
 
 
   /// single EnOcean button channel

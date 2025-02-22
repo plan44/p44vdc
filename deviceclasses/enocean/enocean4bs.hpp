@@ -99,7 +99,7 @@ namespace p44 {
     int8_t mLastRequestedValvePos; ///< last valve position requested (used to calculate output for binary valves like MD10-FTL)
     int8_t mLastActualValvePos; ///< last actually applied valve position (first derivative of lastRequestedValvePos)
 
-    /// private constructor, friend class' Enocean4bsHandler::newDevice is the place to call it from
+    /// private constructor, factory method newDevice is the place to call it from
     EnoceanA52001Handler(EnoceanDevice &aDevice);
 
   public:
@@ -157,7 +157,7 @@ namespace p44 {
     DsBehaviourPtr setpointTemp;
     DsBehaviourPtr lowBatInput;
 
-    /// private constructor, friend class' Enocean4bsHandler::newDevice is the place to call it from
+    /// private constructor, factory method newDevice is the place to call it from
     EnoceanA52004Handler(EnoceanDevice &aDevice);
 
   public:
@@ -218,7 +218,7 @@ namespace p44 {
     int8_t currentValvePos; ///< current valve position (as received from device)
     bool askForFeed; ///< toggle to alternate between room and feed temperature queries
 
-    /// private constructor, friend class' Enocean4bsHandler::newDevice is the place to call it from
+    /// private constructor, factory method newDevice is the place to call it from
     EnoceanA52006Handler(EnoceanDevice &aDevice);
 
   public:
@@ -274,7 +274,7 @@ namespace p44 {
     DsBehaviourPtr sunEast;
     bool broken; ///< set when broken connector to sensor is detected
 
-    /// private constructor, friend class' Enocean4bsHandler::newDevice is the place to call it from
+    /// private constructor, factory method newDevice is the place to call it from
     EnoceanA5130XHandler(EnoceanDevice &aDevice);
 
   public:

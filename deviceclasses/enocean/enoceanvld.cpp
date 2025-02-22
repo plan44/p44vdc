@@ -256,6 +256,10 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
     // multi function window handle
     newDev = EnoceanD20601Handler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
   }
+  else if (EEP_PURE(aEEProfile)==0xD20620) {
+    // Electric Window Drive Controller
+    newDev = EnoceanD20620Handler::newDevice(aVdcP, aAddress, aSubDeviceIndex, aEEProfile, aEEManufacturer, aSendTeachInResponse);
+  }
   else
   {
     // check table based sensors, might create more than one device
@@ -265,7 +269,7 @@ EnoceanDevicePtr EnoceanVLDDevice::newDevice(
 }
 
 
-// MARK: - EnoceanD201XXHandler - Electronic Switches and Dimmers with local control
+// MARK: - EnoceanD201XXHandler+Device - Electronic Switches and Dimmers with local control
 
 enum {
   switching = (1<<0),
@@ -334,6 +338,7 @@ static const D201Descriptor D201descriptors[numD201Descriptors] = {
 };
 
 
+// MARK: EnoceanD201XXHandler
 
 EnoceanD201XXHandler::EnoceanD201XXHandler(EnoceanDevice &aDevice) :
   inherited(aDevice),
@@ -360,7 +365,7 @@ EnoceanDevicePtr EnoceanD201XXHandler::newDevice(
     const D201Descriptor &d201desc = D201descriptors[d201type];
     // each channel corresponds to a subdevice
     if (aSubDeviceIndex<d201desc.numChannels) {
-      // create EnoceanVLDDevice
+      // create EnoceanD201XXDevice
       newDev = EnoceanDevicePtr(new EnoceanD201XXDevice(aVdcP));
       // assign channel and address
       newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
@@ -464,6 +469,7 @@ string EnoceanD201XXHandler::getOpStateText()
 }
 
 
+// MARK: EnoceanD201XXDevice
 
 EnoceanD201XXDevice::EnoceanD201XXDevice(EnoceanVdc *aVdcP) :
   inherited(aVdcP)
@@ -482,11 +488,11 @@ void EnoceanD201XXDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryR
 
 void EnoceanD201XXDevice::configureD201XX()
 {
-  OLOG(LOG_INFO, "D2-01-xx: configuring using Actuator Set Local command");
+  OLOG(LOG_INFO, "Configuring using Actuator Set Local command");
   Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
   packet->initForRorg(rorg_VLD, 4);
   packet->setRadioDestination(getAddress());
-  packet->radioUserData()[0] = 0x02; // CMD 0x1 - Actuator Set Local
+  packet->radioUserData()[0] = 0x02; // CMD 0x2 - Actuator Set Local
   packet->radioUserData()[1] =
   (getSubDevice() & 0x1F) | // Bits 0..4: output channel number (1E & 1F reserved)
   (1<<7) | // Bit7: OC: Overcurrent shut down automatically restarts
@@ -561,7 +567,7 @@ void EnoceanD201XXDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 
 void EnoceanD201XXDevice::updateOutput(uint8_t aPercentOn, uint8_t aDimTimeSelector)
 {
-  OLOG(LOG_INFO, "D2-01-xx: sending Actuator Set Output command: new value = %d%%", aPercentOn);
+  OLOG(LOG_INFO, "Sending Actuator Set Output command: new value = %d%%", aPercentOn);
   Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
   packet->initForRorg(rorg_VLD, 3);
   packet->setRadioDestination(getAddress());
@@ -581,7 +587,7 @@ void EnoceanD201XXDevice::syncChannelValues(SimpleCB aDoneCB)
   if (c) {
     c->mSyncChannelCB = aDoneCB;
     // trigger device report
-    OLOG(LOG_INFO, "D2-01-xx: sending Actuator Status Query");
+    OLOG(LOG_INFO, "Sending Actuator Status Query");
     Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
     packet->initForRorg(rorg_VLD, 2);
     packet->setRadioDestination(getAddress());
@@ -593,6 +599,230 @@ void EnoceanD201XXDevice::syncChannelValues(SimpleCB aDoneCB)
   inherited::syncChannelValues(aDoneCB);
 }
 
+
+// MARK: - EnoceanD20620Handler+Device - Electric window Drive controller
+
+// MARK: EnoceanD20620Handler
+
+EnoceanD20620Handler::EnoceanD20620Handler(EnoceanDevice &aDevice) :
+  inherited(aDevice),
+  mFailureCode(no_failure)
+{
+}
+
+
+// static factory method
+EnoceanDevicePtr EnoceanD20620Handler::newDevice(
+  EnoceanVdc *aVdcP,
+  EnoceanAddress aAddress,
+  EnoceanSubDevice &aSubDeviceIndex, // current subdeviceindex, factory returns NULL when no device can be created for this subdevice index
+  EnoceanProfile aEEProfile, EnoceanManufacturer aEEManufacturer,
+  bool aSendTeachInResponse
+) {
+  // D2-06-20 - electric window drive
+  // - e.g. Roto E-Tec Drive
+  // create device
+  EnoceanDevicePtr newDev; // none so far
+  if (aSubDeviceIndex<1) {
+    // create EnoceanD20620Device
+    newDev = EnoceanDevicePtr(new EnoceanD20620Device(aVdcP));
+    // assign channel and address
+    newDev->setAddressingInfo(aAddress, aSubDeviceIndex);
+    // is always updateable (no need to wait for incoming data)
+    newDev->setAlwaysUpdateable();
+    // assign EPP information
+    newDev->setEEPInfo(aEEProfile, aEEManufacturer);
+    // climate
+    newDev->setColorClass(class_blue_climate);
+    // ...with scenes
+    newDev->installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*newDev)));
+    OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*newDev.get()));
+    o->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_undefined, false, -1);
+    o->setHardwareName("window tilt");
+    o->setGroupMembership(group_blue_windows, true);
+    o->addChannel(ChannelBehaviourPtr(new PercentageLevelChannel(*o, "tilt")));
+    newDev->addBehaviour(o);
+    // add a channel handler with output behaviour
+    EnoceanChannelHandlerPtr d20620handler = EnoceanChannelHandlerPtr(new EnoceanD20620Handler(*newDev.get()));
+    d20620handler->mBehaviour = o;
+    newDev->addChannelHandler(d20620handler);
+    // count it
+    aSubDeviceIndex++;
+  }
+  // return device (or empty if none created)
+  return newDev;
+}
+
+
+
+// handle incoming data from device and extract data for this channel
+void EnoceanD20620Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
+{
+  if (!aEsp3PacketPtr->radioHasTeachInfo()) {
+    // only look at non-teach-in packets
+    uint8_t *dataP = aEsp3PacketPtr->radioUserData();
+    int datasize = (int)aEsp3PacketPtr->radioUserDataLength();
+    if (datasize<1) return; // need data
+    // check message type
+    if (dataP[0]==0x02) {
+      // Status message
+      if (datasize!=5) return; // status message with DB0..4 expected
+      // - Position Status (PS):
+      uint8_t ps = ENOBYTE(3, dataP, datasize);
+      // - Tilt Position (TP):
+      uint8_t tilt = ENOBYTE(2, dataP, datasize);
+      // update position if not unknown
+      if (ps!=0x08 && ps!=0x09 && tilt<=100) {
+        OutputBehaviourPtr o = dynamic_pointer_cast<OutputBehaviour>(mBehaviour);
+        if (o) {
+          ChannelBehaviourPtr c = o->getChannelByIndex(0);
+          if (c) c->syncChannelValue(tilt);
+        }
+      }
+      if (mSyncChannelCB) {
+        SimpleCB cb = mSyncChannelCB;
+        mSyncChannelCB = NoOP;
+        cb();
+      }
+    }
+    else if (dataP[0]==0x03) {
+      // Service message
+      if (datasize!=4) return; // service message with DB0..3 expected
+      // - Failure Code (FC)
+      mFailureCode = static_cast<FailureCode>(ENOBYTE(2, dataP, datasize));
+      switch (mFailureCode) {
+        // all ok
+        case no_failure:
+          mBehaviour->setHardwareError(hardwareError_none);
+          break;
+        // errors
+        case drive_failure:
+        case close_failure:
+        case tilt_failure:
+        case timeout:
+          mBehaviour->setHardwareError(hardwareError_deviceError);
+          break;
+        case connection_failure:
+          mBehaviour->setHardwareError(hardwareError_busConnection);
+          break;
+        case overcurrent:
+          mBehaviour->setHardwareError(hardwareError_overload);
+          break;
+      }
+    }
+  }
+}
+
+
+string EnoceanD20620Handler::shortDesc()
+{
+  return "Electric Window Drive";
+}
+
+
+int EnoceanD20620Handler::opStateLevel()
+{
+  if (mFailureCode==overcurrent || mFailureCode==drive_failure) return 0; // complete failure
+  if (mFailureCode==no_failure) return 20; // warning
+  return inherited::opStateLevel();
+}
+
+string EnoceanD20620Handler::getOpStateText()
+{
+  switch (mFailureCode) {
+    case close_failure: return "lock failure";
+    case tilt_failure: return "tilt failure";
+    case connection_failure: return "connection failure";
+    case overcurrent: return "overcurrent";
+    case timeout: return "timeout";
+    case drive_failure: return "drive failure";
+    default: break;
+  }
+  return inherited::getOpStateText();
+}
+
+
+
+
+
+// MARK: EnoceanD20620Device
+
+EnoceanD20620Device::EnoceanD20620Device(EnoceanVdc *aVdcP) :
+  inherited(aVdcP),
+  mAutoLockAt0(true)
+{
+}
+
+
+void EnoceanD20620Device::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
+{
+  // send a little later to not interfere with teach-ins
+  mStatusTicket.executeOnce(boost::bind(&EnoceanD20620Device::requestD20620status, this), 1*Second);
+  // let inherited complete initialisation
+  inherited::initializeDevice(aCompletedCB, aFactoryReset);
+}
+
+
+void EnoceanD20620Device::requestD20620status()
+{
+  OLOG(LOG_INFO, "Requesting current drive status and service info");
+  Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
+  packet->initForRorg(rorg_VLD, 2);
+  packet->setRadioDestination(getAddress());
+  packet->radioUserData()[0] = 0x01; // Message ID 0x01 - Query
+  packet->radioUserData()[1] = 0x00; // Operational Status
+  sendCommand(packet, NoOP);
+  packet = Esp3PacketPtr(new Esp3Packet());
+  packet->initForRorg(rorg_VLD, 2);
+  packet->setRadioDestination(getAddress());
+  packet->radioUserData()[0] = 0x01; // Message ID 0x01 - Query
+  packet->radioUserData()[1] = 0x01; // Service Status
+  sendCommand(packet, NoOP);
+}
+
+
+void EnoceanD20620Device::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
+{
+  // standard output behaviour
+  if (getOutput()) {
+    OutputBehaviourPtr o = getOutput();
+    if (o) {
+      ChannelBehaviourPtr c = o->getChannelByIndex(0);
+      if (c && c->needsApplying()) {
+        uint8_t percentTilt = c->getChannelValue();
+        if (percentTilt>100) percentTilt = 100;
+        if (mAutoLockAt0 && percentTilt==0) {
+          OLOG(LOG_INFO, "Autolock: tilt==0 -> close & lock");
+          percentTilt = 0xFF; // close & Lock
+        }
+        OLOG(LOG_INFO, "Sending Set Message: new tilt value (0xFF=lock) = %u%% (0x%02u)", percentTilt, percentTilt);
+        Esp3PacketPtr packet = Esp3PacketPtr(new Esp3Packet());
+        packet->initForRorg(rorg_VLD, 4);
+        packet->setRadioDestination(getAddress());
+        packet->radioUserData()[0] = 0x00; // Message ID 0x00 - Set
+        packet->radioUserData()[1] = percentTilt; // new target value
+        packet->radioUserData()[2] = 0xFF; // Aeration timer = 0xFFFE -> no change
+        packet->radioUserData()[3] = 0xFE; // Aeration timer = 0xFFFE -> no change
+        sendCommand(packet, NoOP);
+      }
+    }
+  }
+  inherited::applyChannelValues(aDoneCB, aForDimming);
+}
+
+
+/// synchronize channel values by reading them back from the device's hardware (if possible)
+void EnoceanD20620Device::syncChannelValues(SimpleCB aDoneCB)
+{
+  EnoceanD20620HandlerPtr c = boost::dynamic_pointer_cast<EnoceanD20620Handler>(channelForBehaviour(getOutput().get()));
+  if (c) {
+    c->mSyncChannelCB = aDoneCB;
+    // trigger device report
+    requestD20620status();
+    return;
+  }
+  inherited::syncChannelValues(aDoneCB);
+}
 
 
 // MARK: - EnoceanD20601Handler - SODA Window Handle
@@ -805,7 +1035,6 @@ string EnoceanD20601Handler::shortDesc()
 {
   return "Multisensor Window Handle";
 }
-
 
 
 // MARK: - EnoceanD20601ButtonHandler
