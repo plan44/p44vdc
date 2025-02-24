@@ -574,7 +574,10 @@ namespace p44 {
     virtual string vendorName() P44_OVERRIDE { return "plan44.ch"; };
 
     /// @return Vendor ID in URN format to identify vendor as uniquely as possible
-    string getDeviceHardwareId() { return mDeviceHardwareId; };
+    string getDeviceHardwareId() const { return mDeviceHardwareId; };
+
+    /// @return id identifying the context object (augmented with device hardware ID)
+    virtual string contextId() const P44_OVERRIDE { return mDSUID.getString() + "/#" + getDeviceHardwareId(); }
 
     /// @return text describing the vdc host device, suitable for publishing via Avahi etc.
     string publishedDescription();
