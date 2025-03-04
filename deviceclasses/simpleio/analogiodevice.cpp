@@ -186,7 +186,7 @@ AnalogIODevice::AnalogIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
       definedOutRange // when we set output min,max explicitly, we want actual value be clamped to that range
     );
     addBehaviour(sb);
-    // install polling for it
+    // install polling for it, poll first time right now
     mTimerTicket.executeOnce(boost::bind(&AnalogIODevice::analogInputPoll, this, _1, _2));
   }
 	deriveDsUid();

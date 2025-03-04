@@ -103,6 +103,8 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
     b->setHardwareName("digitalin");
     addBehaviour(b);
+    // make sure we sample the actual input state right at the beginning
+    b->updateInputState(mDigitalInput->isSet());
   }
   else if (mDigitalIoType==digitalio_light) {
     // Digital output as light on/off switch
