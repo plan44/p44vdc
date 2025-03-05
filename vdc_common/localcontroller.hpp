@@ -516,8 +516,9 @@ namespace p44 {
     /// called when sensor value is pushed
     /// @param aSensorBehaviour the sensor behaviour that has pushed a change
     /// @param aCurrentValue the current sensor value
+    /// @param aPreviousValue the previous sensor value (sometimes relevant for user dial sync)
     /// @return true if acted on the change locally
-    bool processSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue);
+    bool processSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue);
 
 
     /// device was added

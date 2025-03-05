@@ -44,6 +44,7 @@ SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   #if !REDUCED_FOOTPRINT
   mSensorFunc(sensorFunc_standard),
   mSensorChannel(channeltype_default),
+  mDialSyncMode(syncMode_jump),
   #endif
   #if ENABLE_JSONBRIDGEAPI
   mBridgeExclusive(false),
@@ -344,8 +345,9 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
     changedValue = true;
   };
   // update value
+  double prevValue = mCurrentValue;
   if (aMinChange<0) aMinChange = mResolution/2;
-  if (fabs(aValue - mCurrentValue) > aMinChange) changedValue = true;
+  if (fabs(aValue - prevValue) > aMinChange) changedValue = true;
   OLOG(changedValue ? LOG_NOTICE : LOG_INFO, "reports %s value = %0.3f %s", changedValue ? "NEW" : "same", aValue, getSensorUnitText().c_str());
   if (mContextId>=0 || !mContextMsg.empty()) {
     OLOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", mContextId, mContextMsg.c_str());
@@ -361,7 +363,7 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
       mFilter->addValue(aValue, now);
       double v = mFilter->evaluate();
       // re-evaluate changed flag after filtering
-      if (fabs(v - mCurrentValue) > mResolution/2) changedValue = true;
+      if (fabs(v - prevValue) > mResolution/2) changedValue = true;
       OLOG(changedValue ? LOG_NOTICE : LOG_INFO, "calculates %s filtered value = %0.3f %s", changedValue ? "NEW" : "same", v, getSensorUnitText().c_str());
       mCurrentValue = v;
     }
@@ -375,7 +377,7 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   // also let vdchost know for local dimmer dial handling etc., but only changes!
   // TODO: maybe more elegant solution for this
   if (!isBridgeExclusive() && changedValue) {
-    mDevice.getVdcHost().checkForLocalSensorHandling(*this, mCurrentValue);
+    mDevice.getVdcHost().checkForLocalSensorHandling(*this, mCurrentValue, prevValue);
   }
   #endif
   // possibly push
@@ -834,7 +836,7 @@ const char *SensorBehaviour::tableName()
 #endif
 #if !REDUCED_FOOTPRINT
   #undef NON_RED_FP_FIELDS
-  #define NON_RED_FP_FIELDS 2
+  #define NON_RED_FP_FIELDS 3
 #endif
 
 static const size_t numFields = 3+RRDB_FIELDS+NON_RED_FP_FIELDS;
@@ -858,6 +860,7 @@ const FieldDefinition *SensorBehaviour::getFieldDef(size_t aIndex)
     #if !REDUCED_FOOTPRINT
     { "sensorFunc", SQLITE_INTEGER },
     { "sensorChannel", SQLITE_INTEGER },
+    { "dialSync", SQLITE_INTEGER },
     #endif
   };
   if (aIndex<inherited::numFieldDefs())
@@ -886,6 +889,7 @@ void SensorBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
   #if !REDUCED_FOOTPRINT
   aRow->getCastedIfNotNull<VdcSensorFunc, int>(aIndex++, mSensorFunc);
   aRow->getCastedIfNotNull<DsChannelType, int>(aIndex++, mSensorChannel);
+  aRow->getCastedIfNotNull<VdcDialSyncMode, int>(aIndex++, mDialSyncMode);
   #endif
 }
 
@@ -905,6 +909,7 @@ void SensorBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIn
   #if !REDUCED_FOOTPRINT
   aStatement.bind(aIndex++, mSensorFunc);
   aStatement.bind(aIndex++, mSensorChannel);
+  aStatement.bind(aIndex++, mDialSyncMode);
   #endif
 }
 
@@ -963,6 +968,7 @@ enum {
   #if !REDUCED_FOOTPRINT
   function_key,
   channel_key,
+  sync_key,
   #endif
   minPushInterval_key,
   changesOnlyInterval_key,
@@ -986,6 +992,7 @@ const PropertyDescriptorPtr SensorBehaviour::getSettingsDescriptorByIndex(int aP
     #if !REDUCED_FOOTPRINT
     { "function", apivalue_uint64, function_key+settings_key_offset, OKEY(sensor_key) },
     { "channel", apivalue_uint64, channel_key+settings_key_offset, OKEY(sensor_key) },
+    { "sync", apivalue_uint64, sync_key+settings_key_offset, OKEY(sensor_key) },
     #endif
     { "minPushInterval", apivalue_double, minPushInterval_key+settings_key_offset, OKEY(sensor_key) },
     { "changesOnlyInterval", apivalue_double, changesOnlyInterval_key+settings_key_offset, OKEY(sensor_key) },
@@ -1084,6 +1091,9 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case channel_key+settings_key_offset:
           aPropValue->setUint16Value(mSensorChannel);
           return true;
+        case sync_key+settings_key_offset:
+          aPropValue->setUint16Value(mDialSyncMode);
+          return true;
         #endif
         case minPushInterval_key+settings_key_offset:
           aPropValue->setDoubleValue((double)mMinPushInterval/Second);
@@ -1148,6 +1158,9 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           return true;
         case channel_key+settings_key_offset:
           setPVar(mSensorChannel, (DsChannelType)aPropValue->int32Value());
+          return true;
+        case sync_key+settings_key_offset:
+          setPVar(mDialSyncMode, (VdcDialSyncMode)aPropValue->int32Value());
           return true;
         #endif
         case minPushInterval_key+settings_key_offset:

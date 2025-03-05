@@ -1518,7 +1518,7 @@ void LocalController::processGlobalEvent(VdchostEvent aActivity)
 }
 
 
-bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue)
+bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue)
 {
   DsZoneID zoneID = aSensorBehaviour.mDevice.getZoneID();
   int area = 0;
@@ -1551,6 +1551,7 @@ bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, dou
   params->add("zone_id", params->newUint64(zoneID));
   params->add("group", params->newUint64(group));
   string method = "setOutputChannelValue";
+  double scaling = 1;
   if (aSensorBehaviour.mSensorType==sensorType_percent_speed) {
     // set dimming speed
     int dir = 0;
@@ -1563,13 +1564,19 @@ bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, dou
     // limit value range to percentage
     if (aCurrentValue>100) aCurrentValue = 100;
     else if (aCurrentValue<0) aCurrentValue = 0;
+    // scale up to 360 for those channel types known to represent angle in degrees
     if (channelType==channeltype_hue || channelType==channeltype_p44_rotation) {
-      aCurrentValue *= 3.6; // expande it to 0..360
+      scaling = 3.6;
     }
-    params->add("value", params->newDouble(aCurrentValue));
+    params->add("value", params->newDouble(aCurrentValue*scaling));
     double tt = (double)aSensorBehaviour.mMinPushInterval/Second;
     if (tt>0.5) tt = 0.5; // not too slow
     params->add("transitionTime", params->newDouble(tt));
+  }
+  if (aSensorBehaviour.mDialSyncMode!=syncMode_jump) {
+    // advanced control vs output value sync strategies
+    params->add("sync", params->newInt64(aSensorBehaviour.mDialSyncMode));
+    params->add("previous", params->newDouble(aPreviousValue*scaling)); // previous value is needed for sync mechanisms
   }
   params->add("channel", params->newUint64(channelType));
   params->add("area", params->newUint64(area));

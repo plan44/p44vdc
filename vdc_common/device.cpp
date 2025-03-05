@@ -914,8 +914,51 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
       }
       else if (Error::isOK(err = checkParam(aParams, "value", o))) {
         // move to specific value
-        double value = o->doubleValue();
+        double newValue = o->doubleValue();
         double mindim = channel->getMinDim();
+        // check input -> output value sync modes
+        VdcDialSyncMode syncmode = syncMode_jump; // default,
+        o = aParams->get("sync");
+        if (o) syncmode = (VdcDialSyncMode)(o->int8Value());
+        if (syncmode!=syncMode_jump) {
+          double currentValue = channel->getChannelValue();
+          double previousValue = currentValue;
+          double syncDiff = (channel->getMax()-channel->getMin())/50; // 1/50th of full range
+          o = aParams->get("previous");
+          if (o) previousValue = o->doubleValue();
+          // consider in-sync if previous value is near current output
+          if (fabs(previousValue-currentValue)>syncDiff) {
+            // not in sync
+            switch (syncmode) {
+              case syncMode_pickup:
+                // must cross current value to pick up
+                if ((previousValue-currentValue)*(newValue-currentValue)>=0) {
+                  suppress = true; // not crossed
+                }
+                break;
+              case syncMode_scaling:
+                // map ranges above and below current input and output
+                if (newValue>previousValue) {
+                  // moving towards max
+                  double distToMax = channel->getMax()-previousValue;
+                  if (distToMax>0) {
+                    double scaling = (channel->getMax()-currentValue)/distToMax;
+                    newValue = currentValue + (newValue-previousValue)*scaling;
+                  }
+                }
+                else {
+                  // moving towards min
+                  double distToMin = previousValue-channel->getMin();
+                  if (distToMin>0) {
+                    double scaling = (currentValue-channel->getMin())/distToMin;
+                    newValue = currentValue - (previousValue-newValue)*scaling;
+                  }
+                }
+                break;
+              default: break; // use the value as-is
+            }
+          }
+        }
         if (mindim>0) {
           // channel has mindim, means that 0 has off semantics -> check onoff
           bool onoff = true;
@@ -924,14 +967,14 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
           if (!onoff) {
             // prevent transition between on and off
             if (channel->getChannelValue()<mindim) suppress = true; // do not activate
-            else if (value<mindim) value = mindim; // cannot go lower than mindim
+            else if (newValue<mindim) newValue = mindim; // cannot go lower than mindim
           }
         }
         if (!suppress) {
           MLMicroSeconds transitionTime = getOutput()->mTransitionTime;
           o = aParams->get("transitionTime");
           if (o) transitionTime = o->doubleValue()*Second;
-          channel->setChannelValue(value, transitionTime, true); // always apply precise value
+          channel->setChannelValue(newValue, transitionTime, true); // always apply precise value
         }
       }
       if (!suppress && Error::isOK(err)) {

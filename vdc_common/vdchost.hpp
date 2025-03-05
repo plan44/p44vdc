@@ -492,8 +492,9 @@ namespace p44 {
     /// have sensor changes checked for local handling
     /// @param aSensorBehaviour the sensor behaviour that has pushed a change
     /// @param aCurrentValue the current sensor value
+    /// @param aPreviousValue the previous sensor value (sometimes relevant for user dial sync)
     /// @return true if acted on the change locally
-    bool checkForLocalSensorHandling(SensorBehaviour &aSensorBehaviour, double aCurrentValue);
+    bool checkForLocalSensorHandling(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue);
     #endif
 
     /// description of object, mainly for debug and logging

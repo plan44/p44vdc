@@ -523,6 +523,14 @@ typedef enum {
 } VdcSensorFunc;
 
 
+/// P44-only dial sync modes
+typedef enum {
+  syncMode_jump = 0, ///< just take over value as sent
+  syncMode_pickup = 1, ///< new value is picked up as soon as it matches or crosses existing value
+  syncMode_scaling = 2, ///< scale ranges below and above of current value matching ranges below and above input value
+} VdcDialSyncMode;
+
+
 /// technical value types
 /// @note these are used to describe single device properties and parameter values, along with VdcSiUnit
 typedef enum {
