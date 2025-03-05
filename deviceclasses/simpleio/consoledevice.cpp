@@ -54,6 +54,8 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
       mConsoleIoType = consoleio_input;
     else if (mode=="sensor")
       mConsoleIoType = consoleio_sensor;
+    else if (mode=="dial100")
+      mConsoleIoType = consoleio_dial100;
     else if (mode=="dimmer")
       mConsoleIoType = consoleio_dimmer;
     else if (mode=="colordimmer")
@@ -121,7 +123,7 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     b->setHardwareInputConfig(binInpType_none, usage_undefined, true, Never, Never);
     addBehaviour(b);
   }
-  else if (mConsoleIoType==consoleio_sensor) {
+  else if (mConsoleIoType==consoleio_sensor || mConsoleIoType==consoleio_dial100) {
     // Standard device settings without scene table
     mColorClass = class_black_joker;
     installSettings();
@@ -132,9 +134,15 @@ ConsoleDevice::ConsoleDevice(StaticVdc *aVdcP, const string &aDeviceConfig) :
     mConsoleKey2->setConsoleKeyHandler(boost::bind(&ConsoleDevice::sensorHandler, this, 1, _1, _2)); // up
     // - create one sensor input
     SensorBehaviourPtr s = SensorBehaviourPtr(new SensorBehaviour(*this,"")); // automatic id
-    //s->setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 50, 1, 30*Second, 300*Second);
-    s->setHardwareSensorConfig(sensorType_temperature, usage_room, 0, 50, 1, 30*Second, 300*Second);
-    s->setHardwareName("Console simulated Sensor 0..50");
+    if (mConsoleIoType==consoleio_dial100) {
+      s->setHardwareSensorConfig(sensorType_percent, usage_user, 0, 100, 1, 0.25*Second, 300*Second);
+      s->setHardwareName("Console simulated user dial 0..100%");
+    }
+    else {
+      //s->setHardwareSensorConfig(sensorType_none, usage_undefined, 0, 50, 1, 30*Second, 300*Second);
+      s->setHardwareSensorConfig(sensorType_temperature, usage_room, 0, 50, 1, 30*Second, 300*Second);
+      s->setHardwareName("Console simulated Temperature Sensor 0..50°");
+    }
     addBehaviour(s);
   }
   else if (mConsoleIoType==consoleio_valve) {
@@ -202,7 +210,9 @@ string ConsoleDevice::modelName()
     case consoleio_button: string_format_append(m, "button key:'%c'", mConsoleKey1->getKeyCode()); break;
     case consoleio_rocker: string_format_append(m, "rocker keys:'%c'/'%c'", mConsoleKey1->getKeyCode(), mConsoleKey2->getKeyCode()); break;
     case consoleio_input: string_format_append(m, "binary input key:'%c'", mConsoleKey1->getKeyCode()); break;
-    case consoleio_sensor: string_format_append(m, "sensor tunable with keys:'%c'/'%c'", mConsoleKey1->getKeyCode(), mConsoleKey2->getKeyCode()); break;
+    case consoleio_sensor:
+    case consoleio_dial100:
+      string_format_append(m, "sensor tunable with keys:'%c'/'%c'", mConsoleKey1->getKeyCode(), mConsoleKey2->getKeyCode()); break;
     case consoleio_valve: m += "valve"; break;
     case consoleio_dimmer: m += "dimmer"; break;
     case consoleio_colordimmer: m += "color dimmer"; break;
@@ -343,7 +353,7 @@ string ConsoleDevice::description()
     string_format_append(s, "\n- has 2-way-rocker which can be switched via console keypresses");
   if (mConsoleIoType==consoleio_input)
     string_format_append(s, "\n- has binary input can be switched via console keypresses");
-  if (mConsoleIoType==consoleio_sensor)
+  if (mConsoleIoType==consoleio_sensor || mConsoleIoType==consoleio_dial100)
     string_format_append(s, "\n- has sensor input that can be tuned up/down via console keypresses");
   if (mConsoleIoType==consoleio_valve)
     string_format_append(s, "\n- has valve actuator shown on console, pseudo temperature, battery low via console keypress");

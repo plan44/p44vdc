@@ -50,6 +50,7 @@ namespace p44 {
       consoleio_dimmer,
       consoleio_colordimmer,
       consoleio_valve,
+      consoleio_dial100,
     } ConsoleIoType;
 
     ConsoleIoType mConsoleIoType;
