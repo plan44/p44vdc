@@ -519,7 +519,7 @@ namespace p44 {
 
     #if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
     void configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError, JsonObjectPtr aJsonObject);
-    ErrorPtr processVdcRequest(VdcApiConnectionPtr aApi, JsonCommPtr aJsonComm, JsonObjectPtr aRequest, string &aReqId);
+    ErrorPtr processVdcRequest(VdcApiConnectionPtr aApi, JsonCommPtr aJsonComm, JsonObjectPtr aRequest, string &aReqId, bool aConfirmNotifications);
     #endif
 
     #if ENABLE_JSONCFGAPI

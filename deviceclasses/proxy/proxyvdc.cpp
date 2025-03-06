@@ -279,7 +279,7 @@ void ProxyVdc::bridgeApiNotificationHandler(ErrorPtr aError, JsonObjectPtr aJson
         handleBridgeLevelNotification(notification, aJsonMsg);
       }
       else {
-        OLOG(LOG_ERR, "unknown global request: %s", JsonObject::text(aJsonMsg));
+        OLOG(LOG_ERR, "unexpected bridge API message: %s", JsonObject::text(aJsonMsg));
       }
     }
   }

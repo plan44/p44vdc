@@ -506,7 +506,8 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
         // Notes:
         // - if dSUID is specified invalid or empty, the vdc host itself is addressed.
         // - use x-p44-vdcs and x-p44-devices properties to find dsuids
-        aError = processVdcRequest(mConfigApi, aJsonComm, request, reqid);
+        // - make sure we get a ErrorOK for processed notification, web requests ALWAYS need an answer
+        aError = processVdcRequest(mConfigApi, aJsonComm, request, reqid, true);
       }
       #if ENABLE_LEGACY_P44CFGAPI
       else if (apiselector=="p44") {
@@ -678,8 +679,8 @@ void P44VdcHost::sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResul
 }
 
 
-// access to vdc API methods and notifications via web requests
-ErrorPtr P44VdcHost::processVdcRequest(VdcApiConnectionPtr aApi, JsonCommPtr aJsonComm, JsonObjectPtr aRequest, string &aReqId)
+// access to vdc API methods and notifications via web requests or bridge API
+ErrorPtr P44VdcHost::processVdcRequest(VdcApiConnectionPtr aApi, JsonCommPtr aJsonComm, JsonObjectPtr aRequest, string &aReqId, bool aConfirmNotifications)
 {
   ErrorPtr err;
   string cmd;
@@ -732,8 +733,10 @@ ErrorPtr P44VdcHost::processVdcRequest(VdcApiConnectionPtr aApi, JsonCommPtr aJs
     else {
       // handle notification
       err = handleNotificationForParams(request->connection(), cmd, params);
-      // Notifications are always immediately confirmed, so make sure there's an explicit ErrorOK
-      if (!err) {
+      if (!err && aConfirmNotifications) {
+        // WebUIs always need an answer, even for notifications, to complete the request
+        // - as returning nullptr would indicate to caller there's no need to generate a response now,
+        //   we need to return an explicit Error::OK to have caller return an answer
         err = ErrorPtr(new Error(Error::OK));
       }
     }
@@ -876,7 +879,8 @@ void P44VdcHost::bridgeApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
   if (Error::isOK(aError)) {
     // not JSON level error, try to process
     LOG(LOG_DEBUG, "bridge -> vdcd (JSON) request received: %s", aJsonRequest->c_strValue());
-    aError = processVdcRequest(mBridgeApi, aJsonComm, aJsonRequest, reqid);
+    // - make sure we do not get an ErrorOK back from processed notifications, sender does NOT expect an answer
+    aError = processVdcRequest(mBridgeApi, aJsonComm, aJsonRequest, reqid, false);
   }
   // if error or explicit OK, send response now. Otherwise, request processing will create and send the response
   if (aError) {
