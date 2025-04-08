@@ -1,0 +1,4 @@
+[submodule "thirdparty/ds485-stack"]
+	path = thirdparty/ds485-stack
+	url = ../ds485-stack.git
+	branch = main
