@@ -85,7 +85,7 @@ namespace p44 {
 
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
-    virtual string vdcModelSuffix() const P44_OVERRIDE { return "Proxy"; }
+    virtual string vdcModelSuffix() const P44_OVERRIDE { return "ds485"; }
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
