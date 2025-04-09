@@ -25,6 +25,9 @@
 
 #include "p44vdc_common.hpp"
 
+#if ENABLE_DS485DEVICES
+#include "dsuid.h"
+#endif
 
 // Name spaces for UUID based dSUIDs
 // - EnOcean device namespace
@@ -54,6 +57,9 @@
 using namespace std;
 
 namespace p44 {
+
+  class DsUid;
+  typedef boost::intrusive_ptr<DsUid> DsUidPtr;
 
   /// Implements the dSUID, methods to generate it from SGTIN, UUID or hex string and to
   /// represent it as as hex string
@@ -200,9 +206,38 @@ namespace p44 {
     ///   among subdevices. Should be set when mix may contain multiple subdevices of the same device.
     void xorDsUidIntoMix(string &aMix, bool aHashSubDeviceIndex);
 
+    /// get text for dSUID, nullptr allowed
+    static string text(DsUidPtr aDsUid);
+
     /// @}
+
+    #if ENABLE_DS485DEVICES
+
+    /// @name ds485 interaction
+    /// @{
+
+    /// create dSUID from ds485 dsuid_t
+    /// @param aDsUid a dSUID
+    DsUid(const dsuid_t &aDsUid);
+
+    /// set dSUID from ds485 dsuid_t
+    /// @param aDsUid a dSUID
+    void setAsDs485DsUid(const dsuid_t &aDsUid);
+
+
+    /// get pointer to dsuid_t
+    /// @return pointer to dsuid bytes, valid only as long as this object lives
+    const dsuid_t* getDs485DsUid();
+
+    /// copy into a dsuid_t
+    /// @param aDsUid where to copy the dSUID bytes
+    void copyAsDs485DsUid(dsuid_t &aDsUid);
+
+    /// @}
+
+    #endif // ENABLE_DS485DEVICES
+
   };
-  typedef boost::intrusive_ptr<DsUid> DsUidPtr;
 
 
 } // namespace p44

@@ -404,8 +404,43 @@ void DsUid::xorDsUidIntoMix(string &aMix, bool aHashSubDeviceIndex)
 }
 
 
+string DsUid::text(DsUidPtr aDsUid)
+{
+  if (aDsUid) return aDsUid->getString();
+  return "<none>";
+}
 
 
+#if ENABLE_DS485DEVICES
+
+// MARK: - ds485 interaction
+
+DsUid::DsUid(const dsuid_t &aDsUid)
+{
+  setAsDs485DsUid(aDsUid);
+}
+
+
+void DsUid::setAsDs485DsUid(const dsuid_t &aDsUid)
+{
+  memcpy(mRaw, &aDsUid.id, DSUID_SIZE);
+  mIdBytes = DSUID_SIZE;
+  detectSubType();
+}
+
+
+const dsuid_t* DsUid::getDs485DsUid()
+{
+  return (dsuid_t*)(&mRaw);
+}
+
+
+void DsUid::copyAsDs485DsUid(dsuid_t &aDsUid)
+{
+  memcpy(&aDsUid.id, &mRaw, DSUID_SIZE);
+}
+
+#endif // ENABLE_DS485DEVICES
 
 
 
