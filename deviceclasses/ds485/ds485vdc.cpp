@@ -32,10 +32,13 @@
 
 #if ENABLE_DS485DEVICES
 
+#include "dsuid.h"
+//#include "dsm-api.h"
+#include "dsm-api-const.h"
+
 using namespace p44;
 
-// MARK: - initialisation
-
+// MARK: - Ds485Vdc
 
 Ds485Vdc::Ds485Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag)
@@ -49,28 +52,24 @@ Ds485Vdc::~Ds485Vdc()
 }
 
 
-#define INITIALISATION_TIMEOUT (10*Second)
-
+// MARK: - ds485 client interaction
 
 static int link_cb(void *_data, bool _state)
 {
   Ds485Vdc* vdc = static_cast<Ds485Vdc*>(_data);
-  FOCUSPOLOG(vdc,"link callback received, state=%d", _state);
-  return 0;
+  return vdc->linkStateChanged(_state);
 }
 
 static int bus_change_cb(void *data, dsuid_t *id, int flags)
 {
   Ds485Vdc* vdc = static_cast<Ds485Vdc*>(data);
-  FOCUSPOLOG(vdc,"bus change callback received");
-  return 0;
+  return vdc->busMemberChanged(new DsUid(*id), !flags);
 }
 
 static int container_cb(void *data, const ds485_container_t *container)
 {
   Ds485Vdc* vdc = static_cast<Ds485Vdc*>(data);
-  FOCUSPOLOG(vdc,"container callback received");
-  return 0;
+  return vdc->containerReceived(container);
 }
 
 static int netlib_packet_cb(void *data, const ds485n_packet_t *packet)
@@ -86,6 +85,42 @@ static void blocking_cb(void *data)
   FOCUSPOLOG(vdc,"blocking callback received");
 }
 
+
+int Ds485Vdc::linkStateChanged(bool aActive)
+{
+  FOCUSLOG("link state: %s", aActive ? "ACTIVE" : "ISOLATED");
+  return 0;
+}
+
+
+int Ds485Vdc::busMemberChanged(DsUidPtr aDsUid, bool aJoined)
+{
+  FOCUSLOG("bus: %s %s", DsUid::text(aDsUid).c_str(), aJoined ? "JOINED" : "LEFT");
+  return 0;
+}
+
+
+int Ds485Vdc::containerReceived(const ds485_container_t *container)
+{
+  DsUidPtr source = new DsUid(container->sourceId);
+  DsUidPtr destination = new DsUid(container->destinationId);
+
+  FOCUSLOG(
+    "container: %s%s (%d): %s -> %s, t=0x%02x: [%02d] %s",
+    container->containerFlags & DS485_FLAG_BROADCAST ? "BROADCAST " : "",
+    container->containerType==DS485_CONTAINER_EVENT ? "EVENT" : (container->containerType==DS485_CONTAINER_REQUEST ? "REQUEST" : "RESPONSE"), container->containerType,
+    source->getString().c_str(),
+    destination->getString().c_str(),
+    container->transactionId,
+    container->length,
+    dataToHexString(container->data, container->length, ' ').c_str()
+  );
+  return 0;
+}
+
+
+
+// MARK: - initialisation
 
 void Ds485Vdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
@@ -112,6 +147,7 @@ void Ds485Vdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     0 | PROMISCUOUS_MODE,
     &mDs485Callbacks
   );
+
   if (aCompletedCB) {
     aCompletedCB(ErrorPtr());
   }

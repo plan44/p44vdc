@@ -97,6 +97,12 @@ namespace p44 {
 
     /// deliver (forward) notifications to devices in one call instead of forwarding on device level
     virtual void deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
+
+
+    int linkStateChanged(bool aActive);
+    int busMemberChanged(DsUidPtr aDsUid, bool aJoined);
+    int containerReceived(const ds485_container_t *container);
+
   };
 
 } // namespace p44
