@@ -377,98 +377,209 @@ void Ds485Comm::ds485ClientThread(ChildThreadWrapper &aThread)
     // - the bus devices
     const int maxbusdevices = 64;
     dsuid_t busdevices[maxbusdevices];
-    int num = ds485_client_query_devices(mDs485Client, busdevices, maxbusdevices);
-    DsUidPtr dsmToInspect;
-    for (int i=0; i<num; i++) {
-      DsUidPtr dsuid = new DsUid(busdevices[i]);
-      OLOG(LOG_NOTICE, "device #%d: %s", i, dsuid->getString().c_str());
-      if (*dsuid!=*mMyDsuid && !dsmToInspect) {
-        dsmToInspect = dsuid;
-      }
-    }
-    // - the zone count
-    string resp;
-    executeQuery(resp, 0, dsmToInspect, ZONE_COUNT);
-    size_t pli = 3;
-    uint8_t zoneCount;
-    pli = payload_get8(resp, pli, zoneCount);
-    // - the zones
-    for (int i=0; i<zoneCount; i++) {
-      string req;
-      payload_append8(req, i);
-      executeQuery(resp, 0, dsmToInspect, ZONE_INFO, ZONE_INFO_BY_INDEX, req);
-      size_t pli;
-      pli = 3;
-      uint16_t zoneId;
-      pli = payload_get16(resp, pli, zoneId);
-      uint8_t vzoneId;
-      pli = payload_get8(resp, pli, vzoneId);
-      uint8_t numGroups;
-      pli = payload_get8(resp, pli, numGroups);
-      string zonename;
-      pli = payload_getString(resp, pli, 21, zonename);
-      OLOG(LOG_NOTICE, "zone #%d: id=%d, virtid=%d, numgroups=%d, name='%s'", i, zoneId, vzoneId, numGroups, zonename.c_str());
-      // - the devices in the zone
-      req.clear();
-      payload_append16(req, zoneId);
-      executeQuery(resp, 0, dsmToInspect, ZONE_DEVICE_COUNT, ZONE_DEVICE_COUNT_ALL, req);
-      uint16_t numZoneDevices;
-      pli = 3;
-      pli = payload_get16(resp, pli, numZoneDevices);
-      OLOG(LOG_NOTICE, "zone #%d: number of devices = %d", i, numZoneDevices);
-      for (int j=0; j<numZoneDevices; j++) {
-        string req;
-        payload_append16(req, zoneId);
-        payload_append16(req, j);
-        executeQuery(resp, 0, dsmToInspect, DEVICE_INFO, DEVICE_INFO_BY_INDEX, req);
+    int numDsms = ds485_client_query_devices(mDs485Client, busdevices, maxbusdevices);
+    // iterate dSMs
+    for (int di=0; di<numDsms; di++) {
+      DsUidPtr dsmDsuid = new DsUid(busdevices[di]);
+      OLOG(LOG_NOTICE, "dSM #%d: %s", di, dsmDsuid->getString().c_str());
+      // prevent asking myself
+      if (*dsmDsuid!=*mMyDsuid) {
+        string resp;
+        size_t pli;
+        // - get the dSM info
+        executeQuery(resp, 0, dsmDsuid, DSM_INFO);
         pli = 3;
-        uint16_t devId;
-        pli = payload_get16(resp, pli, devId);
-        uint16_t vendId;
-        pli = payload_get16(resp, pli, vendId);
-        uint16_t prodId;
-        pli = payload_get16(resp, pli, prodId);
-        uint16_t funcId;
-        pli = payload_get16(resp, pli, funcId);
-        uint16_t vers;
-        pli = payload_get16(resp, pli, vers);
-        uint16_t zoneId;
-        pli = payload_get16(resp, pli, zoneId);
-        uint8_t active;
-        pli = payload_get8(resp, pli, active);
-        uint8_t locked;
-        pli = payload_get8(resp, pli, locked);
-        uint8_t outMode;
-        pli = payload_get8(resp, pli, outMode);
-        uint8_t ltMode;
-        pli = payload_get8(resp, pli, ltMode);
-        uint64_t groups;
-        pli = payload_get64(resp, pli, groups);
-        string devName;
-        pli = payload_getString(resp, pli, 21, devName);
-        DsUidPtr dSUID = new DsUid;
-        dSUID->setAsBinary(resp.substr(pli, 17)); pli += 17;
-        uint8_t activeGroup;
-        pli = payload_get8(resp, pli, activeGroup);
-        uint8_t defaultGroup;
-        pli = payload_get8(resp, pli, defaultGroup);
-        OLOG(LOG_NOTICE,
-          "device #%d: %s [0x%04x] - '%s'\n"
-          "- vendId=0x%04x, prodId=0x%04x, funcId=0x%04x, vers=0x%04x\n"
-          "- zoneID=%d/0x%04x, active=%d, locked=%d\n"
-          "- outMode=0x%04x, ltMode=0x%04x\n"
-          "- groups=0x%016llx, activeGroup=%d, defaultGroup=%d",
-          j, dSUID->getString().c_str(), devId, devName.c_str(),
-          vendId, prodId, funcId, vers,
-          zoneId, zoneId, active, locked,
-          outMode, ltMode,
-          groups, activeGroup, defaultGroup
-        );
+        uint32_t dsmHwVersion;
+        pli = payload_get32(resp, pli, dsmHwVersion);
+        uint32_t dsmArmVersion;
+        pli = payload_get32(resp, pli, dsmArmVersion);
+        uint32_t dsmDSPVersion;
+        pli = payload_get32(resp, pli, dsmDSPVersion);
+        uint16_t dsmAPIVersion;
+        pli = payload_get16(resp, pli, dsmAPIVersion);
+        pli += 12; // skip "dSID"
+        string dsmName;
+        pli = payload_getString(resp, pli, 21, dsmName);
+        OLOG(LOG_NOTICE, "dSM #%d: '%s', hwV=0x%08x, armV=0x%08x, dspV=0x%08x, apiV=0x%04x", di, dsmName.c_str(), dsmHwVersion, dsmArmVersion, dsmDSPVersion, dsmAPIVersion);
+        // - get the zone count
+        executeQuery(resp, 0, dsmDsuid, ZONE_COUNT);
+        pli = 3;
+        uint8_t zoneCount;
+        pli = payload_get8(resp, pli, zoneCount);
+        OLOG(LOG_NOTICE, "dSM #%d: has %d zones", di, zoneCount);
+        // - the zones
+        for (int i=0; i<zoneCount; i++) {
+          string req;
+          payload_append8(req, i);
+          executeQuery(resp, 0, dsmDsuid, ZONE_INFO, ZONE_INFO_BY_INDEX, req);
+          size_t pli;
+          pli = 3;
+          uint16_t zoneId;
+          pli = payload_get16(resp, pli, zoneId);
+          uint8_t vzoneId;
+          pli = payload_get8(resp, pli, vzoneId);
+          uint8_t numGroups;
+          pli = payload_get8(resp, pli, numGroups);
+          string zonename;
+          pli = payload_getString(resp, pli, 21, zonename);
+          OLOG(LOG_NOTICE, "zone #%d: id=%d, virtid=%d, numgroups=%d, name='%s'", i, zoneId, vzoneId, numGroups, zonename.c_str());
+          // - the devices in the zone
+          req.clear();
+          payload_append16(req, zoneId);
+          executeQuery(resp, 0, dsmDsuid, ZONE_DEVICE_COUNT, ZONE_DEVICE_COUNT_ALL, req);
+          uint16_t numZoneDevices;
+          pli = 3;
+          pli = payload_get16(resp, pli, numZoneDevices);
+          OLOG(LOG_NOTICE, "zone #%d: number of devices = %d", i, numZoneDevices);
+          for (int j=0; j<numZoneDevices; j++) {
+            string req;
+            payload_append16(req, zoneId);
+            payload_append16(req, j);
+            executeQuery(resp, 0, dsmDsuid, DEVICE_INFO, DEVICE_INFO_BY_INDEX, req);
+            pli = 3;
+            uint16_t devId;
+            pli = payload_get16(resp, pli, devId);
+            uint16_t vendId;
+            pli = payload_get16(resp, pli, vendId);
+            uint16_t prodId;
+            pli = payload_get16(resp, pli, prodId);
+            uint16_t funcId;
+            pli = payload_get16(resp, pli, funcId);
+            uint16_t vers;
+            pli = payload_get16(resp, pli, vers);
+            uint16_t zoneId;
+            pli = payload_get16(resp, pli, zoneId);
+            uint8_t active;
+            pli = payload_get8(resp, pli, active);
+            uint8_t locked;
+            pli = payload_get8(resp, pli, locked);
+            uint8_t outMode;
+            pli = payload_get8(resp, pli, outMode);
+            uint8_t ltMode;
+            pli = payload_get8(resp, pli, ltMode);
+            uint64_t groups;
+            pli = payload_get64(resp, pli, groups);
+            string devName;
+            pli = payload_getString(resp, pli, 21, devName);
+            DsUidPtr dSUID = new DsUid;
+            dSUID->setAsBinary(resp.substr(pli, 17)); pli += 17;
+            uint8_t activeGroup;
+            pli = payload_get8(resp, pli, activeGroup);
+            uint8_t defaultGroup;
+            pli = payload_get8(resp, pli, defaultGroup);
+            OLOG(LOG_NOTICE,
+              "device #%d: %s [0x%04x] - '%s'\n"
+              "- vendId=0x%04x, prodId=0x%04x, funcId=0x%04x, vers=0x%04x\n"
+              "- zoneID=%d/0x%04x, active=%d, locked=%d\n"
+              "- outMode=0x%04x, ltMode=0x%04x\n"
+              "- groups=0x%016llx, activeGroup=%d, defaultGroup=%d",
+              j, dSUID->getString().c_str(), devId, devName.c_str(),
+              vendId, prodId, funcId, vers,
+              zoneId, zoneId, active, locked,
+              outMode, ltMode,
+              groups, activeGroup, defaultGroup
+            );
+            // - button info
+            req.clear();
+            payload_append16(req, devId);
+            executeQuery(resp, 0, dsmDsuid, DEVICE_BUTTON_INFO, DEVICE_BUTTON_INFO_BY_DEVICE, req);
+            pli = 3;
+            uint8_t buttonId;
+            pli = payload_get8(resp, pli, buttonId);
+            pli++; // skip "DeprecatedGroupIfUpTo15"
+            uint8_t buttongroup;
+            pli = payload_get8(resp, pli, buttongroup);
+            uint8_t buttonflags;
+            pli = payload_get8(resp, pli, buttonflags);
+            uint8_t buttonchannel;
+            pli = payload_get8(resp, pli, buttonchannel);
+            pli++; // skip "unused"
+            OLOG(LOG_NOTICE,
+              "device #%d '%s': button: id/LTNUMGRP0=0x%02x, group=%d, flags=0x%02x, channel=%d",
+              j, devName.c_str(),
+              buttonId, buttongroup, buttonflags, buttonchannel
+            );
+            // - binary input info
+            req.clear();
+            payload_append16(req, devId);
+            executeQuery(resp, 0, dsmDsuid, DEVICE_BINARY_INPUT, DEVICE_BINARY_INPUT_GET_COUNT, req);
+            pli = 3;
+            uint8_t numBinInps;
+            pli = payload_get8(resp, pli, numBinInps);
+            OLOG(LOG_NOTICE, "device #%d: number of binary inputs = %d", j, numBinInps);
+            for (int bi=0; bi<numBinInps; bi++) {
+              // - binary input info
+              req.clear();
+              payload_append16(req, devId);
+              payload_append8(req, bi);
+              executeQuery(resp, 0, dsmDsuid, DEVICE_BINARY_INPUT, DEVICE_BINARY_INPUT_GET_BY_INDEX, req);
+              pli = 3;
+              uint8_t inpTargetGroupType;
+              pli = payload_get8(resp, pli, inpTargetGroupType);
+              uint8_t inpTargetGroup;
+              pli = payload_get8(resp, pli, inpTargetGroup);
+              uint8_t inpType;
+              pli = payload_get8(resp, pli, inpType);
+              uint8_t inpButtonId;
+              pli = payload_get8(resp, pli, inpButtonId);
+              uint8_t inpIndependent;
+              pli = payload_get8(resp, pli, inpIndependent);
+              OLOG(LOG_NOTICE,
+                "- device #%d: binary input #%d: targetGroupType=%d, targetGroup=%d, type=%d, buttonId=0x%02x, independent=%d",
+                j, bi, inpTargetGroupType, inpTargetGroup, inpType, inpButtonId, inpIndependent
+              );
+            }
+            // - output channel info
+            req.clear();
+            payload_append16(req, devId);
+            executeQuery(resp, 0, dsmDsuid, DEVICE_O_P_C_TABLE, DEVICE_O_P_C_TABLE_GET_COUNT, req);
+            pli = 3;
+            uint8_t numChannels;
+            pli = payload_get8(resp, pli, numChannels);
+            OLOG(LOG_NOTICE, "device #%d: number of OPC channels = %d", j, numChannels);
+            for (int oi=0; oi<numBinInps; oi++) {
+              // - OPC channel info
+              req.clear();
+              payload_append16(req, devId);
+              payload_append8(req, oi);
+              executeQuery(resp, 0, dsmDsuid, DEVICE_O_P_C_TABLE, DEVICE_O_P_C_TABLE_GET_BY_INDEX, req);
+              pli = 3;
+              uint8_t channelId;
+              pli = payload_get8(resp, pli, channelId);
+              OLOG(LOG_NOTICE, "device #%d: channel #%d: channelId=%d", j, oi, channelId);
+            }
+            // - sensor info
+            req.clear();
+            payload_append16(req, devId);
+            executeQuery(resp, 0, dsmDsuid, DEVICE_SENSOR, DEVICE_SENSOR_GET_COUNT, req);
+            pli = 3;
+            uint8_t numSensors;
+            pli = payload_get8(resp, pli, numSensors);
+            OLOG(LOG_NOTICE, "device #%d: number of sensors = %d", j, numSensors);
+            for (int si=0; si<numSensors; si++) {
+              // - sensor info
+              req.clear();
+              payload_append16(req, devId);
+              payload_append8(req, si);
+              executeQuery(resp, 0, dsmDsuid, DEVICE_SENSOR, DEVICE_SENSOR_GET_BY_INDEX, req);
+              pli = 3;
+              uint8_t sensorType;
+              pli = payload_get8(resp, pli, sensorType);
+              uint32_t sensorPollinterval;
+              pli = payload_get32(resp, pli, sensorPollinterval);
+              uint8_t sensorZone;
+              pli = payload_get8(resp, pli, sensorZone);
+              uint8_t sensorPushConvert;
+              pli = payload_get8(resp, pli, sensorPushConvert);
+              OLOG(LOG_NOTICE,
+                "device #%d: sensor #%d: type=%d, pollinterval=%d, globalZone=%d, pushConvert=%d",
+                j, si, sensorType, sensorPollinterval, sensorZone, sensorPushConvert
+              );
+            }
+          }
+        }
       }
     }
-
-
-
 
     while(!aThread.shouldTerminate()) {
       // TODO: process main thread requests
