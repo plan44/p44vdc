@@ -34,6 +34,24 @@ using namespace std;
 
 namespace p44 {
 
+  class Ds485CommError : public Error
+  {
+  public:
+    typedef int ErrorCodes;
+
+    static const char *domain() { return "Ds485Comm"; }
+    virtual const char *getErrorDomain() const P44_OVERRIDE { return Ds485CommError::domain(); };
+    Ds485CommError(ErrorCodes aError) : Error(ErrorCode(aError)) {};
+    #if ENABLE_NAMED_ERRORS
+  protected:
+    virtual const char* errorName() const P44_OVERRIDE;
+    #endif // ENABLE_NAMED_ERRORS
+  };
+
+
+
+
+
   class Ds485Comm;
 
   typedef boost::intrusive_ptr<Ds485Comm> Ds485CommPtr;
@@ -41,10 +59,15 @@ namespace p44 {
   {
     typedef P44LoggingObj inherited;
 
+    ChildThreadWrapperPtr mDs485ClientThread;
+    MLTicket mDs485ThreadRestarter;
+
     ds485ClientHandle_t mDs485Client;
     ds485c_callbacks mDs485Callbacks;
 
     string mConnSpec; ///< ds485 connection spec
+
+    DsUidPtr mMyDsuid; ///< the dSUID of my role as a client
 
   public:
 
@@ -67,12 +90,22 @@ namespace p44 {
 
   private:
 
+    void logContainer(int aLevel, const ds485_container_t& container, const char *aLabel);
+
+    void setupRequestContainer(ds485_container& aContainer, DsUidPtr aDestination, DsUidPtr aSource, const string aPayload);
+    void setupRequestCommand(ds485_container& aContainer, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
+
+    ErrorPtr executeQuery(string& aResponse, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier = 0, const string& aPayload = "");
+
     /// @name ds485 interaction
     /// @{
 
     //ErrorPtr sendMessage
 
     /// @}
+
+    void ds485ClientThread(ChildThreadWrapper &aThread);
+    void ds485ClientThreadSignal(ChildThreadWrapper &aChildThread, ThreadSignals aSignalCode);
 
   };
 

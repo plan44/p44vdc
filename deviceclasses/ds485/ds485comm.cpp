@@ -25,7 +25,7 @@
 #define ALWAYS_DEBUG 0
 // - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
 //   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
-#define FOCUSLOGLEVEL 5
+#define FOCUSLOGLEVEL 6
 
 #include "ds485comm.hpp"
 
@@ -36,6 +36,15 @@
 #include "dsm-api-const.h"
 
 using namespace p44;
+
+// MARK: - Ds485CommError
+
+#if ENABLE_NAMED_ERRORS
+const char* Ds485CommError::errorName() const
+{
+  return ds485c_strerror((int)getErrorCode());
+}
+#endif // ENABLE_NAMED_ERRORS
 
 // MARK: - Ds485Comm
 
@@ -54,71 +63,233 @@ Ds485Comm::~Ds485Comm()
 
 static int link_cb(void *_data, bool _state)
 {
-  Ds485Comm* vdc = static_cast<Ds485Comm*>(_data);
-  return vdc->linkStateChanged(_state);
+  Ds485Comm* dscomm = static_cast<Ds485Comm*>(_data);
+  return dscomm->linkStateChanged(_state);
 }
 
 static int bus_change_cb(void *data, dsuid_t *id, int flags)
 {
-  Ds485Comm* vdc = static_cast<Ds485Comm*>(data);
-  return vdc->busMemberChanged(new DsUid(*id), !flags);
+  Ds485Comm* dscomm = static_cast<Ds485Comm*>(data);
+  return dscomm->busMemberChanged(new DsUid(*id), !flags);
 }
 
 static int container_cb(void *data, const ds485_container_t *container)
 {
-  Ds485Comm* vdc = static_cast<Ds485Comm*>(data);
-  return vdc->containerReceived(container);
+  Ds485Comm* dscomm = static_cast<Ds485Comm*>(data);
+  return dscomm->containerReceived(container);
 }
 
 static int netlib_packet_cb(void *data, const ds485n_packet_t *packet)
 {
-  Ds485Comm* vdc = static_cast<Ds485Comm*>(data);
+  Ds485Comm* dscomm = static_cast<Ds485Comm*>(data);
   // we do not expect those when being connected to classic DS only
-  POLOG(vdc, LOG_WARNING, "netlib callback received!");
+  POLOG(dscomm, LOG_WARNING, "netlib callback received!");
   return 0;
 }
 
 static void blocking_cb(void *data)
 {
-  Ds485Comm* vdc = static_cast<Ds485Comm*>(data);
-  FOCUSPOLOG(vdc,"blocking callback received");
+  Ds485Comm* dscomm = static_cast<Ds485Comm*>(data);
+  FOCUSPOLOG(dscomm,"blocking callback received");
 }
 
 
 int Ds485Comm::linkStateChanged(bool aActive)
 {
-  FOCUSLOG("link state: %s", aActive ? "ACTIVE" : "ISOLATED");
+  FOCUSOLOG("link state: %s", aActive ? "ACTIVE" : "ISOLATED");
   return 0;
 }
 
 
 int Ds485Comm::busMemberChanged(DsUidPtr aDsUid, bool aJoined)
 {
-  FOCUSLOG("bus: %s %s", DsUid::text(aDsUid).c_str(), aJoined ? "JOINED" : "LEFT");
+  FOCUSOLOG("bus: %s %s", DsUid::text(aDsUid).c_str(), aJoined ? "JOINED" : "LEFT");
   return 0;
 }
 
 
 int Ds485Comm::containerReceived(const ds485_container_t *container)
 {
-  DsUidPtr source = new DsUid(container->sourceId);
-  DsUidPtr destination = new DsUid(container->destinationId);
-
-  FOCUSLOG(
-    "container: %s%s (%d): %s -> %s, t=0x%02x: [%02d] %s",
-    container->containerFlags & DS485_FLAG_BROADCAST ? "BROADCAST " : "",
-    container->containerType==DS485_CONTAINER_EVENT ? "EVENT" : (container->containerType==DS485_CONTAINER_REQUEST ? "REQUEST" : "RESPONSE"), container->containerType,
-    source->getString().c_str(),
-    destination->getString().c_str(),
-    container->transactionId,
-    container->length,
-    dataToHexString(container->data, container->length, ' ').c_str()
-  );
+  // FIXME: do not show noisy metering
+  if (!container || container->data[0]==0x34 && container->data[1]==0x04) return 0;
+  if (FOCUSLOGENABLED) {
+    logContainer(FOCUSLOGLEVEL, *container, "received");
+  }
   return 0;
+}
+
+// MARK: - utilities
+
+void Ds485Comm::logContainer(int aLevel, const ds485_container_t& container, const char *aLabel)
+{
+  if (LOGENABLED(aLevel)) {
+    DsUidPtr source = new DsUid(container.sourceId);
+    DsUidPtr destination = new DsUid(container.destinationId);
+    OLOG(aLevel,
+      "%s: %s%s (%d): %s -> %s, t=0x%02x: [%02d] %s",
+      aLabel,
+      container.containerFlags & DS485_FLAG_BROADCAST ? "BROADCAST " : "",
+      container.containerType==DS485_CONTAINER_EVENT ? "EVENT   " : (container.containerType==DS485_CONTAINER_REQUEST ? "REQUEST " : "RESPONSE"), container.containerType,
+      source->getString().c_str(),
+      destination->getString().c_str(),
+      container.transactionId,
+      container.length,
+      dataToHexString(container.data, container.length, ' ').c_str()
+    );
+  }
+}
+
+
+void payload_append8(string &aPayload, uint8_t aByte)
+{
+  aPayload.append(1, aByte);
+}
+
+void payload_append16(string &aPayload, uint16_t aWord)
+{
+  aPayload.append(1, ((aWord>>8) & 0xFF));
+  aPayload.append(1, ((aWord>>0) & 0xFF));
+}
+
+void payload_append32(string &aPayload, uint32_t aLongWord)
+{
+  aPayload.append(1, ((aLongWord>>24) & 0xFF));
+  aPayload.append(1, ((aLongWord>>16) & 0xFF));
+  aPayload.append(1, ((aLongWord>>8) & 0xFF));
+  aPayload.append(1, ((aLongWord>>0) & 0xFF));
+}
+
+
+void payload_appendString(string &aPayload, size_t aFieldSize, const string aString)
+{
+  size_t stringsize = aString.size();
+  ssize_t padding = aFieldSize-stringsize;
+  if (padding<1) {
+    stringsize = aFieldSize-1;
+    padding = 1;
+  }
+  aPayload.append(aString.c_str(), stringsize);
+  aPayload.append(padding, 0);
+}
+
+
+size_t payload_get8(string &aPayload, size_t aAtIndex, uint8_t &aByte)
+{
+  if (aAtIndex+1>aPayload.size()) return 0;
+  aByte = (uint8_t)aPayload[aAtIndex++];
+  return aAtIndex;
+}
+
+
+size_t payload_get16(string &aPayload, size_t aAtIndex, uint16_t &aWord)
+{
+  if (aAtIndex+2>aPayload.size()) return 0; // cannot happen except in error case
+  aWord  = (uint16_t)(aPayload[aAtIndex++] & 0xFF)<<8;
+  aWord |= (uint16_t)(aPayload[aAtIndex++] & 0xFF);
+  return aAtIndex;
+}
+
+
+size_t payload_get32(string &aPayload, size_t aAtIndex, uint32_t &aLongWord)
+{
+  if (aAtIndex+4>aPayload.size()) return 0; // cannot happen except in error case
+  aLongWord  = (uint32_t)(aPayload[aAtIndex++] & 0xFF)<<24;
+  aLongWord |= (uint32_t)(aPayload[aAtIndex++] & 0xFF)<<16;
+  aLongWord |= (uint32_t)(aPayload[aAtIndex++] & 0xFF)<<8;
+  aLongWord |= (uint32_t)(aPayload[aAtIndex++] & 0xFF);
+  return aAtIndex;
+}
+
+
+size_t payload_get64(string &aPayload, size_t aAtIndex, uint64_t &aLongLongWord)
+{
+  if (aAtIndex+8>aPayload.size()) return 0; // cannot happen except in error case
+  aLongLongWord  = (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<56;
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<48;
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<40;
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<32;
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<24;
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<16;
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<8;
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF);
+  return aAtIndex;
+}
+
+
+size_t payload_getString(string &aPayload, size_t aAtIndex, size_t aFieldSize, string &aString)
+{
+  if (aAtIndex+aFieldSize>aPayload.size()) return 0; // cannot happen except in error case
+  string f = aPayload.substr(aAtIndex, aFieldSize);
+  aString = f.c_str(); // do not copy any garbage beyond terminator
+  aAtIndex += aFieldSize;
+  return aAtIndex;
 }
 
 
 
+void Ds485Comm::setupRequestContainer(ds485_container& aContainer, DsUidPtr aDestination, DsUidPtr aSource, const string aPayload)
+{
+  // clear everything
+  memset(&aContainer, 0, sizeof(ds485_container));
+  // destination: if passed null, this is a broadcast
+  if (!aDestination) {
+    // broadcast
+    aContainer.destinationId = DSUID_BROADCAST;
+    aContainer.containerFlags = DS485_FLAG_BROADCAST;
+  }
+  else {
+    aDestination->copyAsDs485DsUid(aContainer.destinationId);
+    aContainer.containerFlags = DS485_FLAG_NONE;
+  }
+  // source: if passed null, use my own dSUID
+  if (!aSource) {
+    if (mMyDsuid) mMyDsuid->copyAsDs485DsUid(aContainer.sourceId);
+  }
+  else {
+    aSource->copyAsDs485DsUid(aContainer.sourceId);
+  }
+  // this is a request
+  aContainer.containerType = DS485_CONTAINER_REQUEST;
+  // TODO: figure out what transaction ID we should use
+  // See remarks in ds485-stack/ds485-netlib/src/ds485-socket-server-clients.c line 122ff
+  // - basically, ds485p uses the upper 4 bits, ds485d the lower 4 bits
+  aContainer.transactionId = 0x42; // just arbitrary, fun, hopefully not clashing (we only see 0x10 being used so far)
+  // payload
+  aContainer.length = aPayload.size();
+  memcpy(aContainer.data, aPayload.c_str(), aPayload.size());
+}
+
+
+void Ds485Comm::setupRequestCommand(ds485_container& aContainer, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
+{
+  string payload;
+  payload_append8(payload, aCommand);
+  payload_append8(payload, aModifier);
+  payload.append(aPayload);
+  setupRequestContainer(aContainer, aDestination, DsUidPtr(), payload);
+}
+
+
+#define DEFAULT_QUERY_TIMEOUT (2*Second)
+
+ErrorPtr Ds485Comm::executeQuery(string &aResponse, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
+{
+  if (aTimeout==0) aTimeout = DEFAULT_QUERY_TIMEOUT;
+  ds485_container request;
+  ds485_container response;
+  setupRequestCommand(request, aDestination, aCommand, aModifier, aPayload);
+  if (FOCUSLOGENABLED) {
+    logContainer(FOCUSLOGLEVEL, request, "executeQuery sends:");
+  }
+  ErrorPtr err = Error::errIfNotOk<Ds485CommError>(ds485_client_send_sync_command(mDs485Client, &request, &response, (int)(aTimeout/Second)));
+  if (Error::isOK(err)) {
+    if (FOCUSLOGENABLED) {
+      logContainer(FOCUSLOGLEVEL, response, "executeQuery response:");
+    }
+    aResponse.assign((const char*)response.data, response.length);
+  }
+  return err;
+}
 
 
 
@@ -134,6 +305,49 @@ void Ds485Comm::setConnectionSpecification(const char *aConnectionSpec, uint16_t
 
 
 void Ds485Comm::start(StatusCB aCompletedCB)
+{
+  mDs485ClientThread = MainLoop::currentMainLoop().executeInThread(
+    boost::bind(&Ds485Comm::ds485ClientThread, this, _1),
+    boost::bind(&Ds485Comm::ds485ClientThreadSignal, this, _1, _2)
+  );
+  if (aCompletedCB) {
+    aCompletedCB(ErrorPtr());
+  }
+}
+
+
+void Ds485Comm::stop()
+{
+  if (mDs485ClientThread) {
+    mDs485ClientThread->terminate();
+    mDs485ClientThread.reset();
+  }
+}
+
+#if DEBUG
+  #define DS485_THREAD_RESTART_INTERVAL (2*Second)
+#else
+  #define DS485_THREAD_RESTART_INTERVAL (15*Second)
+#endif
+
+void Ds485Comm::ds485ClientThreadSignal(ChildThreadWrapper &aChildThread, ThreadSignals aSignalCode)
+{
+  FOCUSOLOG("ds485ClientThread signals code=%d", aSignalCode);
+  if (aSignalCode<threadSignalUserSignal) {
+    // some sort of thread termination
+    OLOG(LOG_WARNING, "ds485 client thread terminated, restarting in %lld seconds", DS485_THREAD_RESTART_INTERVAL/Second);
+    mDs485ThreadRestarter.executeOnce(boost::bind(&Ds485Comm::start, this, StatusCB()), DS485_THREAD_RESTART_INTERVAL);
+  }
+}
+
+
+// MARK: - ds485 client thread
+
+
+
+
+
+void Ds485Comm::ds485ClientThread(ChildThreadWrapper &aThread)
 {
   // set up callbacks
   memset(&mDs485Callbacks, 0, sizeof(mDs485Callbacks));
@@ -153,23 +367,117 @@ void Ds485Comm::start(StatusCB aCompletedCB)
     0 | PROMISCUOUS_MODE,
     &mDs485Callbacks
   );
-
-  if (aCompletedCB) {
-    aCompletedCB(ErrorPtr());
-  }
-}
-
-
-void Ds485Comm::stop()
-{
   if (mDs485Client) {
+    // startup, collect info
+    // - my own dSUID
+    dsuid_t libDsuid;
+    ds485_client_get_dsuid(mDs485Client, &libDsuid);
+    mMyDsuid = new DsUid(libDsuid);
+    OLOG(LOG_NOTICE, "library: %s", DsUid::text(mMyDsuid).c_str());
+    // - the bus devices
+    const int maxbusdevices = 64;
+    dsuid_t busdevices[maxbusdevices];
+    int num = ds485_client_query_devices(mDs485Client, busdevices, maxbusdevices);
+    DsUidPtr dsmToInspect;
+    for (int i=0; i<num; i++) {
+      DsUidPtr dsuid = new DsUid(busdevices[i]);
+      OLOG(LOG_NOTICE, "device #%d: %s", i, dsuid->getString().c_str());
+      if (*dsuid!=*mMyDsuid && !dsmToInspect) {
+        dsmToInspect = dsuid;
+      }
+    }
+    // - the zone count
+    string resp;
+    executeQuery(resp, 0, dsmToInspect, ZONE_COUNT);
+    size_t pli = 3;
+    uint8_t zoneCount;
+    pli = payload_get8(resp, pli, zoneCount);
+    // - the zones
+    for (int i=0; i<zoneCount; i++) {
+      string req;
+      payload_append8(req, i);
+      executeQuery(resp, 0, dsmToInspect, ZONE_INFO, ZONE_INFO_BY_INDEX, req);
+      size_t pli;
+      pli = 3;
+      uint16_t zoneId;
+      pli = payload_get16(resp, pli, zoneId);
+      uint8_t vzoneId;
+      pli = payload_get8(resp, pli, vzoneId);
+      uint8_t numGroups;
+      pli = payload_get8(resp, pli, numGroups);
+      string zonename;
+      pli = payload_getString(resp, pli, 21, zonename);
+      OLOG(LOG_NOTICE, "zone #%d: id=%d, virtid=%d, numgroups=%d, name='%s'", i, zoneId, vzoneId, numGroups, zonename.c_str());
+      // - the devices in the zone
+      req.clear();
+      payload_append16(req, zoneId);
+      executeQuery(resp, 0, dsmToInspect, ZONE_DEVICE_COUNT, ZONE_DEVICE_COUNT_ALL, req);
+      uint16_t numZoneDevices;
+      pli = 3;
+      pli = payload_get16(resp, pli, numZoneDevices);
+      OLOG(LOG_NOTICE, "zone #%d: number of devices = %d", i, numZoneDevices);
+      for (int j=0; j<numZoneDevices; j++) {
+        string req;
+        payload_append16(req, zoneId);
+        payload_append16(req, j);
+        executeQuery(resp, 0, dsmToInspect, DEVICE_INFO, DEVICE_INFO_BY_INDEX, req);
+        pli = 3;
+        uint16_t devId;
+        pli = payload_get16(resp, pli, devId);
+        uint16_t vendId;
+        pli = payload_get16(resp, pli, vendId);
+        uint16_t prodId;
+        pli = payload_get16(resp, pli, prodId);
+        uint16_t funcId;
+        pli = payload_get16(resp, pli, funcId);
+        uint16_t vers;
+        pli = payload_get16(resp, pli, vers);
+        uint16_t zoneId;
+        pli = payload_get16(resp, pli, zoneId);
+        uint8_t active;
+        pli = payload_get8(resp, pli, active);
+        uint8_t locked;
+        pli = payload_get8(resp, pli, locked);
+        uint8_t outMode;
+        pli = payload_get8(resp, pli, outMode);
+        uint8_t ltMode;
+        pli = payload_get8(resp, pli, ltMode);
+        uint64_t groups;
+        pli = payload_get64(resp, pli, groups);
+        string devName;
+        pli = payload_getString(resp, pli, 21, devName);
+        DsUidPtr dSUID = new DsUid;
+        dSUID->setAsBinary(resp.substr(pli, 17)); pli += 17;
+        uint8_t activeGroup;
+        pli = payload_get8(resp, pli, activeGroup);
+        uint8_t defaultGroup;
+        pli = payload_get8(resp, pli, defaultGroup);
+        OLOG(LOG_NOTICE,
+          "device #%d: %s [0x%04x] - '%s'\n"
+          "- vendId=0x%04x, prodId=0x%04x, funcId=0x%04x, vers=0x%04x\n"
+          "- zoneID=%d/0x%04x, active=%d, locked=%d\n"
+          "- outMode=0x%04x, ltMode=0x%04x\n"
+          "- groups=0x%016llx, activeGroup=%d, defaultGroup=%d",
+          j, dSUID->getString().c_str(), devId, devName.c_str(),
+          vendId, prodId, funcId, vers,
+          zoneId, zoneId, active, locked,
+          outMode, ltMode,
+          groups, activeGroup, defaultGroup
+        );
+      }
+    }
+
+
+
+
+    while(!aThread.shouldTerminate()) {
+      // TODO: process main thread requests
+      MainLoop::sleep(0.5*Second);
+    }
     ds485_client_close(mDs485Client);
-    mDs485Client = nullptr;
   }
+  mDs485Client = nullptr;
 }
-
-
-
 
 
 #endif // ENABLE_DS485DEVICES
