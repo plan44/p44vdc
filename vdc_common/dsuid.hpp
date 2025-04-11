@@ -145,6 +145,7 @@ namespace p44 {
 
 
     // comparison
+    bool operator!= (const DsUid &aDsUid) const;
     bool operator== (const DsUid &aDsUid) const;
     bool operator< (const DsUid &aDsUid) const;
 

@@ -363,6 +363,12 @@ bool DsUid::operator== (const DsUid &aDsUid) const
 }
 
 
+bool DsUid::operator!= (const DsUid &aDsUid) const
+{
+  return !(*this==aDsUid);
+}
+
+
 bool DsUid::operator< (const DsUid &aDsUid) const
 {
   if (mIdType==aDsUid.mIdType)
@@ -370,6 +376,8 @@ bool DsUid::operator< (const DsUid &aDsUid) const
   else
     return mIdType<aDsUid.mIdType;
 }
+
+
 
 
 // MARK: - utilities
