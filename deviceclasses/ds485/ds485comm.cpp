@@ -1,0 +1,176 @@
+//  SPDX-License-Identifier: GPL-3.0-or-later
+//
+//  Copyright (c) 2025 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//
+//  Author: Lukas Zeller <luz@plan44.ch>
+//
+//  This file is part of p44vdc.
+//
+//  p44vdc is free software: you can redistribute it and/or modify
+//  it under the terms of the GNU General Public License as published by
+//  the Free Software Foundation, either version 3 of the License, or
+//  (at your option) any later version.
+//
+//  p44vdc is distributed in the hope that it will be useful,
+//  but WITHOUT ANY WARRANTY; without even the implied warranty of
+//  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//  GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License
+//  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
+//
+
+// File scope debugging options
+// - Set ALWAYS_DEBUG to 1 to enable DBGLOG output even in non-DEBUG builds of this file
+#define ALWAYS_DEBUG 0
+// - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
+//   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
+#define FOCUSLOGLEVEL 5
+
+#include "ds485comm.hpp"
+
+#if ENABLE_DS485DEVICES
+
+#include "dsuid.h"
+//#include "dsm-api.h"
+#include "dsm-api-const.h"
+
+using namespace p44;
+
+// MARK: - Ds485Comm
+
+Ds485Comm::Ds485Comm() :
+  mDs485Client(nullptr)
+{
+}
+
+
+Ds485Comm::~Ds485Comm()
+{
+  stop();
+}
+
+// MARK: - ds485 client interaction
+
+static int link_cb(void *_data, bool _state)
+{
+  Ds485Comm* vdc = static_cast<Ds485Comm*>(_data);
+  return vdc->linkStateChanged(_state);
+}
+
+static int bus_change_cb(void *data, dsuid_t *id, int flags)
+{
+  Ds485Comm* vdc = static_cast<Ds485Comm*>(data);
+  return vdc->busMemberChanged(new DsUid(*id), !flags);
+}
+
+static int container_cb(void *data, const ds485_container_t *container)
+{
+  Ds485Comm* vdc = static_cast<Ds485Comm*>(data);
+  return vdc->containerReceived(container);
+}
+
+static int netlib_packet_cb(void *data, const ds485n_packet_t *packet)
+{
+  Ds485Comm* vdc = static_cast<Ds485Comm*>(data);
+  // we do not expect those when being connected to classic DS only
+  POLOG(vdc, LOG_WARNING, "netlib callback received!");
+  return 0;
+}
+
+static void blocking_cb(void *data)
+{
+  Ds485Comm* vdc = static_cast<Ds485Comm*>(data);
+  FOCUSPOLOG(vdc,"blocking callback received");
+}
+
+
+int Ds485Comm::linkStateChanged(bool aActive)
+{
+  FOCUSLOG("link state: %s", aActive ? "ACTIVE" : "ISOLATED");
+  return 0;
+}
+
+
+int Ds485Comm::busMemberChanged(DsUidPtr aDsUid, bool aJoined)
+{
+  FOCUSLOG("bus: %s %s", DsUid::text(aDsUid).c_str(), aJoined ? "JOINED" : "LEFT");
+  return 0;
+}
+
+
+int Ds485Comm::containerReceived(const ds485_container_t *container)
+{
+  DsUidPtr source = new DsUid(container->sourceId);
+  DsUidPtr destination = new DsUid(container->destinationId);
+
+  FOCUSLOG(
+    "container: %s%s (%d): %s -> %s, t=0x%02x: [%02d] %s",
+    container->containerFlags & DS485_FLAG_BROADCAST ? "BROADCAST " : "",
+    container->containerType==DS485_CONTAINER_EVENT ? "EVENT" : (container->containerType==DS485_CONTAINER_REQUEST ? "REQUEST" : "RESPONSE"), container->containerType,
+    source->getString().c_str(),
+    destination->getString().c_str(),
+    container->transactionId,
+    container->length,
+    dataToHexString(container->data, container->length, ' ').c_str()
+  );
+  return 0;
+}
+
+
+
+
+
+
+// MARK: - initialisation
+
+void Ds485Comm::setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort)
+{
+  string host;
+  uint16_t port = aDefaultPort;
+  splitHost(aConnectionSpec, &host, &port);
+  mConnSpec = string_format("tcp://%s:%d", host.c_str(), port);
+}
+
+
+void Ds485Comm::start(StatusCB aCompletedCB)
+{
+  // set up callbacks
+  memset(&mDs485Callbacks, 0, sizeof(mDs485Callbacks));
+  mDs485Callbacks.link_cb = link_cb;
+  mDs485Callbacks.link_data = this;
+  mDs485Callbacks.bus_change_cb = bus_change_cb;
+  mDs485Callbacks.bus_change_data = this;
+  mDs485Callbacks.container_pkt_cb = container_cb;
+  mDs485Callbacks.container_pkt_data = this;
+  mDs485Callbacks.netlib_pkt_cb = netlib_packet_cb;
+  mDs485Callbacks.netlib_pkt_data = this;
+  mDs485Callbacks.blocking_cb = blocking_cb;
+  mDs485Callbacks.blocking_data = this;
+  // now start the client
+  mDs485Client = ds485_client_open2(
+    mConnSpec.c_str(),
+    0 | PROMISCUOUS_MODE,
+    &mDs485Callbacks
+  );
+
+  if (aCompletedCB) {
+    aCompletedCB(ErrorPtr());
+  }
+}
+
+
+void Ds485Comm::stop()
+{
+  if (mDs485Client) {
+    ds485_client_close(mDs485Client);
+    mDs485Client = nullptr;
+  }
+}
+
+
+
+
+
+#endif // ENABLE_DS485DEVICES
+

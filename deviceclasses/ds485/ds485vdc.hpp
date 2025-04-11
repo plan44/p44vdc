@@ -30,7 +30,7 @@
 #include "vdc.hpp"
 #include "ds485device.hpp"
 
-#include "ds485-client.h"
+#include "ds485comm.hpp"
 
 using namespace std;
 
@@ -45,10 +45,9 @@ namespace p44 {
     typedef Vdc inherited;
     friend class Ds485Device;
 
-    ds485ClientHandle_t mDs485Client;
-    ds485c_callbacks mDs485Callbacks;
-
   public:
+
+    Ds485Comm mDs485Comm;
 
     Ds485Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
 
@@ -98,15 +97,10 @@ namespace p44 {
     /// deliver (forward) notifications to devices in one call instead of forwarding on device level
     virtual void deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
 
-
-    int linkStateChanged(bool aActive);
-    int busMemberChanged(DsUidPtr aDsUid, bool aJoined);
-    int containerReceived(const ds485_container_t *container);
-
   };
 
 } // namespace p44
 
 
-#endif // ENABLE_PROXYDEVICES
-#endif // __p44vdc__proxyvdc__
+#endif // ENABLE_DS485DEVICES
+#endif // __p44vdc__ds485vdc__
