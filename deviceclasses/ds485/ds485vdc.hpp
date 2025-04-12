@@ -97,6 +97,12 @@ namespace p44 {
     /// deliver (forward) notifications to devices in one call instead of forwarding on device level
     virtual void deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
 
+  protected:
+
+    /// handle global events
+    /// @param aEvent the event to handle
+    virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
+
   };
 
 } // namespace p44

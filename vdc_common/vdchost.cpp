@@ -1225,6 +1225,16 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
 }
 
 
+string VdcHost::vdsmHostIp()
+{
+  const char *ip = "<unknown>";
+  if (mVdsmSessionConnection->socketConnection()) {
+    ip = mVdsmSessionConnection->socketConnection()->getHost();
+  }
+  return ip;
+}
+
+
 ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 {
   ErrorPtr respErr;
@@ -1257,11 +1267,7 @@ ErrorPtr VdcHost::helloHandler(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
           // - remember the session's connection
           mVdsmSessionConnection = aRequest->connection();
           // - log connection
-          const char *ip = "<unknown>";
-          if (mVdsmSessionConnection->socketConnection()) {
-            ip = mVdsmSessionConnection->socketConnection()->getHost();
-          }
-          LOG(LOG_NOTICE, "=== %s %s (%s) starts new session with API Version %d", mVdsmSessionConnection->apiName(), vdsmDsUid.getString().c_str(), ip, version);
+          LOG(LOG_NOTICE, "=== %s %s (%s) starts new session with API Version %d", mVdsmSessionConnection->apiName(), vdsmDsUid.getString().c_str(), vdsmHostIp().c_str(), version);
           // - inform interested objects
           postEvent(vdchost_vdcapi_connected);
           // - create answer

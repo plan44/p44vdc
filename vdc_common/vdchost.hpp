@@ -244,6 +244,9 @@ namespace p44 {
     /// active vDSM session
     VdcApiConnectionPtr getVdsmSessionConnection() { return mVdsmSessionConnection; };
 
+    // the IP address of the current vdSM
+    string vdsmHostIp();
+
     /// get the bridge API (if any)
     virtual VdcApiConnectionPtr getBridgeApi() { return VdcApiConnectionPtr(); /* none in this base class */ }
 
