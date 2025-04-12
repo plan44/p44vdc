@@ -28,6 +28,10 @@
 #if ENABLE_DS485DEVICES
 
 #include "dsuid.hpp"
+
+#include "dsuid.h"
+//#include "dsm-api.h"
+#include "dsm-api-const.h"
 #include "ds485-client.h"
 
 using namespace std;
@@ -53,21 +57,30 @@ namespace p44 {
 
 
   class Ds485Comm;
+  class Ds485Vdc;
 
   typedef boost::intrusive_ptr<Ds485Comm> Ds485CommPtr;
   class Ds485Comm final : public P44LoggingObj
   {
     typedef P44LoggingObj inherited;
+    friend class Ds485Vdc;
 
     ChildThreadWrapperPtr mDs485ClientThread;
     MLTicket mDs485ThreadRestarter;
+    MLTicket mConnectDelay;
 
     ds485ClientHandle_t mDs485Client;
     ds485c_callbacks mDs485Callbacks;
 
-    string mConnSpec; ///< ds485 connection spec
+    string mApiHost; ///< ds485 host IP (or "tunnel")
+    uint16_t mApiPort; ///< ds485 host port
 
     DsUidPtr mMyDsuid; ///< the dSUID of my role as a client
+
+    string mDs485HostIP;
+    string mTunnelCommandTemplate;
+    MLTicket mTunnelRestarter;
+    pid_t mTunnelPid;
 
   public:
 
@@ -76,7 +89,12 @@ namespace p44 {
 
     virtual string contextType() const P44_OVERRIDE { return "DS485"; }
 
-    void setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort);
+    /// @param aConnectionSpec in host[:port] format
+    /// @param aDefaultPort port number that is used when aConnectionSpec does not specify a port
+    /// @param aTunnelCommandTemplate template for shell command to establish tunnel if not empty.
+    ///   %HOST% will be replaced with vDSM IP if known, otherwise with host in aConnectionSpec,
+    ///   %PORT% will be replaced with port in aConnectionSpec.
+    void setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort, const char* aTunnelCommandTemplate);
 
     void start(StatusCB aCompletedCB);
     void stop();
@@ -88,32 +106,35 @@ namespace p44 {
     int containerReceived(const ds485_container_t *container);
     /// @}
 
-
-    /// FIXME: this belongs to vdc later: scan the dS485 bus
-    void scanDs485Bus(StatusCB aStatusCB);
-
-  private:
-
-    void logContainer(int aLevel, const ds485_container_t& container, const char *aLabel);
-
-    void setupRequestContainer(ds485_container& aContainer, DsUidPtr aDestination, DsUidPtr aSource, const string aPayload);
-    void setupRequestCommand(ds485_container& aContainer, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
-
-    ErrorPtr executeQuery(string& aResponse, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier = 0, const string& aPayload = "");
-
-    /// @name methods that must be called in the context of mDs485ClientThread
+    /// @name payload manipulation helpers
     /// @{
-
-    ErrorPtr scanDs485BusSync(ChildThreadWrapper &aThread);
-
+    static void payload_append8(string &aPayload, uint8_t aByte);
+    static void payload_append16(string &aPayload, uint16_t aWord);
+    static void payload_append32(string &aPayload, uint32_t aLongWord);
+    static void payload_appendString(string &aPayload, size_t aFieldSize, const string aString);
+    static size_t payload_get8(string &aPayload, size_t aAtIndex, uint8_t &aByte);
+    static size_t payload_get16(string &aPayload, size_t aAtIndex, uint16_t &aWord);
+    static size_t payload_get32(string &aPayload, size_t aAtIndex, uint32_t &aLongWord);
+    static size_t payload_get64(string &aPayload, size_t aAtIndex, uint64_t &aLongLongWord);
+    static size_t payload_getString(string &aPayload, size_t aAtIndex, size_t aFieldSize, string &aString);
     /// @}
 
 
+  private:
 
-    /// @name ds485 interaction
+    void connect(StatusCB aCompletedCB);
+    void establishTunnel();
+    void tunnelCollapsed(ErrorPtr aError, const string &aOutputString);
+
+
+    void logContainer(int aLevel, const ds485_container_t& container, const char *aLabel);
+    void setupRequestContainer(ds485_container& aContainer, DsUidPtr aDestination, DsUidPtr aSource, const string aPayload);
+    void setupRequestCommand(ds485_container& aContainer, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
+
+    /// @name synchronously executing, blocking calls, only to use from mDs485ClientThread
     /// @{
 
-    //ErrorPtr sendMessage
+    ErrorPtr executeQuerySync(string& aResponse, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier = 0, const string& aPayload = "");
 
     /// @}
 

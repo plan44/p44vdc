@@ -45,6 +45,9 @@ namespace p44 {
     typedef Vdc inherited;
     friend class Ds485Device;
 
+    typedef std::list<Ds485DevicePtr> Ds485DeviceList;
+    Ds485DeviceList mDevPrepList;
+
   public:
 
     Ds485Comm mDs485Comm;
@@ -65,6 +68,9 @@ namespace p44 {
     //   data obtained at initialize() and might override this method to generate a updated dSUID
     //   when called after initialize()
     virtual void deriveDsUid() P44_OVERRIDE;
+
+    // dS485 vdc is NEVER to be shown as virtual device to a connecting vdsm!
+    virtual bool isPublicDS() P44_OVERRIDE { return false; }
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
@@ -102,6 +108,17 @@ namespace p44 {
     /// handle global events
     /// @param aEvent the event to handle
     virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
+
+  private:
+
+    /// @name synchronously executing, blocking calls, only to use from mDs485ClientThread
+    /// @{
+
+    ErrorPtr scanDs485BusSync(ChildThreadWrapper &aThread);
+
+    /// @}
+
+    void ds485BusScanned(ErrorPtr aScanStatus);
 
   };
 

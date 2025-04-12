@@ -27,8 +27,6 @@
 
 #if ENABLE_DS485DEVICES
 
-#include "jsoncomm.hpp"
-
 using namespace std;
 
 namespace p44 {
@@ -56,6 +54,9 @@ namespace p44 {
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
     virtual string deviceTypeIdentifier() const P44_OVERRIDE;
+
+    // dS485 devices are NEVER to be shown as virtual devices to a connecting vdsm!
+    virtual bool isPublicDS() P44_OVERRIDE { return false; }
 
     Ds485Vdc &getDs485Vdc();
 
