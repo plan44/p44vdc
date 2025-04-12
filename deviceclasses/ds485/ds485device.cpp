@@ -41,10 +41,12 @@
 using namespace p44;
 
 
-Ds485Device::Ds485Device(Ds485Vdc *aVdcP, JsonObjectPtr aDeviceJSON) :
-  inherited((Vdc *)aVdcP)
+Ds485Device::Ds485Device(Ds485Vdc *aVdcP, DsUid& aDsmDsUid, uint16_t aDevId) :
+  inherited((Vdc *)aVdcP),
+  mDsmDsUid(aDsmDsUid),
+  mDevId(aDevId)
 {
-  // Note: bridged is set at initializeDevice()
+  mDsmDsUid.isMemberVariable();
 }
 
 

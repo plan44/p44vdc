@@ -109,8 +109,8 @@ void Ds485Vdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // full collect, remove all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
-  // TODO: implement scanning here
-  aCompletedCB(ErrorPtr());
+  // TODO: just listing, device creation tbd.
+  mDs485Comm.scanDs485Bus(aCompletedCB);
 }
 
 // MARK: - operation

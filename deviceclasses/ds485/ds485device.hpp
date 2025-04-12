@@ -41,9 +41,12 @@ namespace p44 {
     typedef Device inherited;
     friend class Ds485Vdc;
 
+    DsUid mDsmDsUid;
+    uint16_t mDevId;
+
   public:
 
-    Ds485Device(Ds485Vdc *aVdcP, JsonObjectPtr aDeviceJSON);
+    Ds485Device(Ds485Vdc *aVdcP, DsUid& aDsmDsUid, uint16_t aDevId);
 
     virtual ~Ds485Device();
 
@@ -88,6 +91,7 @@ namespace p44 {
     /// @note this is called before interaction with dS system starts
     /// @note implementation should call inherited when complete, so superclasses could chain further activity
     virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
+
 
   };
   typedef boost::intrusive_ptr<Ds485Device> Ds485DevicePtr;

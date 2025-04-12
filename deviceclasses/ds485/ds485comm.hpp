@@ -88,6 +88,10 @@ namespace p44 {
     int containerReceived(const ds485_container_t *container);
     /// @}
 
+
+    /// FIXME: this belongs to vdc later: scan the dS485 bus
+    void scanDs485Bus(StatusCB aStatusCB);
+
   private:
 
     void logContainer(int aLevel, const ds485_container_t& container, const char *aLabel);
@@ -96,6 +100,15 @@ namespace p44 {
     void setupRequestCommand(ds485_container& aContainer, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
 
     ErrorPtr executeQuery(string& aResponse, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier = 0, const string& aPayload = "");
+
+    /// @name methods that must be called in the context of mDs485ClientThread
+    /// @{
+
+    ErrorPtr scanDs485BusSync(ChildThreadWrapper &aThread);
+
+    /// @}
+
+
 
     /// @name ds485 interaction
     /// @{

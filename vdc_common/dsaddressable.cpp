@@ -47,6 +47,7 @@ DsAddressable::DsAddressable(VdcHost *aVdcHostP) :
   , mBridged(false) // by default, addressable is not bridged
   #endif
 {
+  mDSUID.isMemberVariable();
 }
 
 
