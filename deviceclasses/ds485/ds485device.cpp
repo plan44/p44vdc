@@ -37,14 +37,18 @@
 #include "buttonbehaviour.hpp"
 #include "binaryinputbehaviour.hpp"
 #include "sensorbehaviour.hpp"
+#include "colorlightbehaviour.hpp"
+#include "shadowbehaviour.hpp"
 
 using namespace p44;
 
 
 Ds485Device::Ds485Device(Ds485Vdc *aVdcP, DsUid& aDsmDsUid, uint16_t aDevId) :
   inherited((Vdc *)aVdcP),
+  mDs485Vdc(*aVdcP),
   mDsmDsUid(aDsmDsUid),
-  mDevId(aDevId)
+  mDevId(aDevId),
+  mNumOPC(0)
 {
   mDsmDsUid.isMemberVariable();
 }
@@ -83,9 +87,54 @@ string Ds485Device::modelName()
 string Ds485Device::description()
 {
   string s = inherited::description();
-  string_format_append(s, "\n- tbd...");
+  string_format_append(s, "\n- dSM: %s, devId=0x%04x, OPC=%d", mDsmDsUid.getString().c_str(), mDevId, mNumOPC);
   return s;
 }
+
+
+// MARK: - output
+
+
+void Ds485Device::identifyToUser(MLMicroSeconds aDuration)
+{
+  issueDeviceRequest(DEVICE_ACTION_REQUEST, DEVICE_ACTION_REQUEST_ACTION_BLINK);
+}
+
+
+void Ds485Device::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
+{
+  LightBehaviourPtr l = getOutput<LightBehaviour>();
+  ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
+  ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
+  MLMicroSeconds transitionTime = 0;
+  if (needsToApplyChannels(&transitionTime)) {
+    if (cl) {
+      // TODO: handle color
+    }
+    else if (l && l->brightnessNeedsApplying()) {
+      string payload;
+      Ds485Comm::payload_append8(payload, l->brightnessForHardware()*255/100);
+      issueDeviceRequest(DEVICE_ACTION_REQUEST, DEVICE_ACTION_REQUEST_ACTION_SET_OUTVAL, payload);
+      l->brightnessApplied();
+    }
+    else if (sb) {
+      // TODO: handle shadow
+    }
+    else {
+      // simple unspecific output
+      OutputBehaviourPtr o = getOutput();
+      ChannelBehaviourPtr ch = o->getChannelByType(channeltype_default);
+      string payload;
+      Ds485Comm::payload_append8(payload, ch->getChannelValue()*255/100);
+      issueDeviceRequest(DEVICE_ACTION_REQUEST, DEVICE_ACTION_REQUEST_ACTION_SET_OUTVAL, payload);
+      ch->channelValueApplied();
+    }
+  }
+  // confirm done
+  if (aDoneCB) aDoneCB();
+}
+
+
 
 
 // MARK: - local method/notification handling
@@ -109,5 +158,31 @@ void Ds485Device::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
   // TODO: no speical handling yet
   inherited::initializeDevice(aCompletedCB, aFactoryReset);
 }
+
+
+// MARK: - ds485 helpers
+
+
+ErrorPtr Ds485Device::issueDeviceRequest(uint8_t aCommand, uint8_t aModifier, const string& aMorePayload)
+{
+  string payload;
+  Ds485Comm::payload_append16(payload, mDevId);
+  payload.append(aMorePayload);
+  return issueDsmRequest(aCommand, aModifier, payload);
+}
+
+
+ErrorPtr Ds485Device::issueDsmRequest(uint8_t aCommand, uint8_t aModifier, const string& aPayload)
+{
+  return mDs485Vdc.mDs485Comm.issueRequest(&mDsmDsUid, aCommand, aModifier, aPayload);
+}
+
+
+void Ds485Device::executeDsmQuery(QueryCB aQueryCB, MLMicroSeconds aTimeout, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
+{
+  mDs485Vdc.mDs485Comm.executeQuery(aQueryCB, aTimeout, &mDsmDsUid, aCommand, aModifier, aPayload);
+}
+
+
 
 #endif // ENABLE_DS485DEVICES

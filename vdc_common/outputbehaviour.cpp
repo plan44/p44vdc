@@ -209,10 +209,10 @@ void OutputBehaviour::setGroupMembership(DsGroup aGroup, bool aIsMember)
 
 
 
-void OutputBehaviour::resetGroupMembership()
+void OutputBehaviour::resetGroupMembership(DsGroupMask aInitialMembers)
 {
   // group_undefined (aka "variable" in old defs) must always be set
-  setPVar(mOutputGroups, (DsGroupMask)(1<<group_undefined));
+  setPVar(mOutputGroups, aInitialMembers);
 }
 
 

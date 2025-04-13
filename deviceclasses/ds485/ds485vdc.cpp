@@ -32,6 +32,12 @@
 
 #if ENABLE_DS485DEVICES
 
+#include "colorlightbehaviour.hpp"
+#include "shadowbehaviour.hpp"
+#include "ventilationbehaviour.hpp"
+#include "buttonbehaviour.hpp"
+#include "binaryinputbehaviour.hpp"
+#include "sensorbehaviour.hpp"
 
 using namespace p44;
 
@@ -121,14 +127,21 @@ void Ds485Vdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
   mDevPrepList.clear();
-  mDs485Comm.mDs485ClientThread->executeOnChildThreadAsync(boost::bind(&Ds485Vdc::scanDs485BusSync, this, _1), boost::bind(&Ds485Vdc::ds485BusScanned, this, _1));
+  mDs485Comm.mDs485ClientThread->executeOnChildThreadAsync(boost::bind(&Ds485Vdc::scanDs485BusSync, this, _1), boost::bind(&Ds485Vdc::ds485BusScanned, this, _1, aCompletedCB));
 }
 
 
-void Ds485Vdc::ds485BusScanned(ErrorPtr aScanStatus)
+void Ds485Vdc::ds485BusScanned(ErrorPtr aScanStatus, StatusCB aCompletedCB)
 {
-  // now add created devices
-  #warning use mDevPrepList
+  if (Error::isOK(aScanStatus)) {
+    // now add created devices
+    for (Ds485DeviceList::iterator pos = mDevPrepList.begin(); pos!=mDevPrepList.end(); ++pos) {
+      if (simpleIdentifyAndAddDevice(*pos)) {
+        // TODO: maybe something
+      }
+    }
+  }
+  if (aCompletedCB) aCompletedCB(aScanStatus);
 }
 
 
@@ -138,9 +151,10 @@ void Ds485Vdc::ds485BusScanned(ErrorPtr aScanStatus)
 
 void Ds485Vdc::deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
-  for (DsAddressablesList::iterator apos = aAudience.begin(); apos!=aAudience.end(); ++apos) {
-    // TODO: implement
-  }
+  inherited::deliverToDevicesAudience(aAudience, aApiConnection, aNotification, aParams);
+//  for (DsAddressablesList::iterator apos = aAudience.begin(); apos!=aAudience.end(); ++apos) {
+//    // TODO: implement
+//  }
 }
 
 
@@ -232,8 +246,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           pli = Ds485Comm::payload_get8(resp, pli, outMode);
           uint8_t ltMode;
           pli = Ds485Comm::payload_get8(resp, pli, ltMode);
-          uint64_t groups;
-          pli = Ds485Comm::payload_get64(resp, pli, groups);
+          DsGroupMask groups;
+          pli = Ds485Comm::payload_getGroups(resp, pli, groups);
           string devName;
           pli = Ds485Comm::payload_getString(resp, pli, 21, devName);
           DsUidPtr dSUID = new DsUid;
@@ -254,26 +268,151 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             outMode, ltMode,
             groups, activeGroup, defaultGroup
           );
-          // - button info
+          Ds485DevicePtr dev = new Ds485Device(this, *dsmDsuid, devId);
+          // make a real dSUID out of it
+          const uint8_t dsprefix[10] = { 0x35, 0x04, 0x17, 0x5f, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00 };
+          string dsuidbin((char*)dsprefix, 10);
+          dsuidbin.append(dSUID->getBinary().substr(10,7));
+          dev->mDSUID.setAsBinary(dsuidbin);
+          dev->initializeName(devName);
+          // - output channel info for determining output function
           req.clear();
           Ds485Comm::payload_append16(req, devId);
-          mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_BUTTON_INFO, DEVICE_BUTTON_INFO_BY_DEVICE, req);
+          mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_O_P_C_TABLE, DEVICE_O_P_C_TABLE_GET_COUNT, req);
           pli = 3;
-          uint8_t buttonId;
-          pli = Ds485Comm::payload_get8(resp, pli, buttonId);
-          pli++; // skip "DeprecatedGroupIfUpTo15"
-          uint8_t buttongroup;
-          pli = Ds485Comm::payload_get8(resp, pli, buttongroup);
-          uint8_t buttonflags;
-          pli = Ds485Comm::payload_get8(resp, pli, buttonflags);
-          uint8_t buttonchannel;
-          pli = Ds485Comm::payload_get8(resp, pli, buttonchannel);
-          pli++; // skip "unused"
-          OLOG(LOG_NOTICE,
-            "device #%d '%s': button: id/LTNUMGRP0=0x%02x, group=%d, flags=0x%02x, channel=%d",
-            j, devName.c_str(),
-            buttonId, buttongroup, buttonflags, buttonchannel
-          );
+          uint8_t numOPC;
+          pli = Ds485Comm::payload_get8(resp, pli, numOPC);
+          OLOG(LOG_NOTICE, "device #%d: number of OPC channels = %d", j, numOPC);
+          dev->mNumOPC = numOPC;
+          // - output mode and function
+          VdcOutputMode mode = outputmode_disabled;
+          if ((outMode>=17 && outMode<=24) || outMode==28 || outMode==30) mode = outputmode_gradual;
+          else if (outMode!=0) mode = outputmode_binary;
+          VdcOutputFunction func = mode==outputmode_binary ? outputFunction_switch : outputFunction_dimmer;
+          VdcUsageHint usage = usage_room;
+          // - OPC channels
+          for (int oi=0; oi<numOPC; oi++) {
+            // - OPC channel info
+            req.clear();
+            Ds485Comm::payload_append16(req, devId);
+            Ds485Comm::payload_append8(req, oi);
+            mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_O_P_C_TABLE, DEVICE_O_P_C_TABLE_GET_BY_INDEX, req);
+            pli = 3;
+            uint8_t channelId;
+            pli = Ds485Comm::payload_get8(resp, pli, channelId);
+            OLOG(LOG_NOTICE, "device #%d: channel #%d: channelId=%d", j, oi, channelId);
+            // check channelid, gives indication for output function
+            if (channelId==channeltype_hue) func = outputFunction_colordimmer;
+            if (channelId==channeltype_colortemp && func!=outputFunction_colordimmer) func = outputFunction_ctdimmer;
+            if (channelId==channeltype_colortemp && func!=outputFunction_colordimmer) func = outputFunction_ctdimmer;
+            if (channelId==channeltype_shade_position_outside || channelId==channeltype_shade_position_inside) func = outputFunction_positional;
+            if (channelId==channeltype_shade_position_outside || channelId==channeltype_shade_angle_outside) usage = usage_outdoors;
+          }
+          // examine the funcid for basic device setup
+          // - color class
+          uint8_t funcClass = (funcId>>12)&0x0F;
+          // default to joker for unsupported or DS special ones (such as 16==server controlled)
+          dev->setColorClass(static_cast<DsClass>(funcClass==0 || funcClass>=numColorClasses ? class_black_joker : funcClass));
+          if (mode!=outputmode_disabled) {
+            // - instantiate output
+            OutputBehaviourPtr ob;
+            if (funcClass==class_yellow_light) {
+              if (func==outputFunction_colordimmer || func==outputFunction_ctdimmer) {
+                // color or CT light
+                dev->installSettings(new ColorLightDeviceSettings(*dev));
+                ob = new ColorLightBehaviour(*dev, func==outputFunction_ctdimmer);
+                ob->setHardwareName(func==outputFunction_ctdimmer ? "CT light" : "color light");
+              }
+              else {
+                // single color light
+                dev->installSettings(new LightDeviceSettings(*dev));
+                ob = new LightBehaviour(*dev);
+                ob->setHardwareName("light");
+              }
+            }
+            else if (funcClass==class_grey_shadow) {
+              // shadow
+              dev->installSettings(new ShadowDeviceSettings(*dev));
+              ShadowBehaviourPtr sb = new ShadowBehaviour(*dev, (DsGroup)defaultGroup);
+              sb->setDeviceParams(shadowdevice_jalousie, false, 0, 0, 0, true); // no move semantics, just set values
+              ob = sb;
+              ob->setHardwareName("light");
+            }
+            else {
+              // just a simple single channel output
+              dev->installSettings(DeviceSettingsPtr(new SceneDeviceSettings(*dev)));
+              ob = new OutputBehaviour(*dev);
+              if (mode==outputmode_gradual) {
+                ob->addChannel(new PercentageLevelChannel(*ob, "dimmer"));
+              }
+              else {
+                ob->addChannel(new DigitalChannel(*ob, "relay"));
+              }
+            }
+            ob->setHardwareOutputConfig(func, mode, usage, false, -1);
+            ob->resetGroupMembership(groups);
+            dev->addBehaviour(ob);
+          }
+          else {
+            dev->installSettings();
+          }
+          // - zoneid (needs instantiated settings)
+          dev->setZoneID(zoneId);
+          // - button info
+          //   Note: DS does have terminal blocks with multiple button inputs, but these are represented as multiple devices on the bus
+          bool hasButton = true; // most dS blocks do
+          if (
+            ((funcId&0xFFC0)==0x1000 && (funcId&0x07)==7) || // dS R100
+            ((funcId&0xFFC0)==0x1100 && (funcId&0x07)==0) // dS R105
+          ) {
+            hasButton = false;
+          }
+          if (hasButton) {
+            req.clear();
+            Ds485Comm::payload_append16(req, devId);
+            mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_BUTTON_INFO, DEVICE_BUTTON_INFO_BY_DEVICE, req);
+            pli = 3;
+            uint8_t ltNumGrp0;
+            pli = Ds485Comm::payload_get8(resp, pli, ltNumGrp0);
+            pli++; // skip "DeprecatedGroupIfUpTo15"
+            uint8_t buttongroup;
+            pli = Ds485Comm::payload_get8(resp, pli, buttongroup);
+            uint8_t buttonflags;
+            pli = Ds485Comm::payload_get8(resp, pli, buttonflags);
+            uint8_t buttonchannel;
+            pli = Ds485Comm::payload_get8(resp, pli, buttonchannel);
+            pli++; // skip "unused"
+            OLOG(LOG_NOTICE,
+              "device #%d '%s': button: id/LTNUMGRP0=0x%02x, group=%d, flags=0x%02x, channel=%d",
+              j, devName.c_str(),
+              ltNumGrp0, buttongroup, buttonflags, buttonchannel
+            );
+            DsButtonMode buttonMode = (DsButtonMode)((ltNumGrp0>>4) & 0x0F);
+            VdcButtonType bty = buttonType_single;
+            VdcButtonElement bel = buttonElement_center;
+            const char* bname = "button";
+            int bcount = 1;
+            if (ltMode>=5 && ltMode<=12) bty = buttonType_2way;
+            else if (ltMode==2 || ltMode==3) bty = buttonType_onOffSwitch;
+            else if (ltMode==13) {
+              bname = "up";
+              bel = buttonElement_up;
+              bcount = 2;
+            }
+            for (int bidx=0; bidx<bcount; bidx++) {
+              ButtonBehaviourPtr bb = new ButtonBehaviour(*dev, bname); // automatic id
+              bb->setHardwareButtonConfig(0, bty, bel, false, 0, 0); // not combinable
+              bb->setGroup((DsGroup)buttongroup);
+              bb->setChannel((DsChannelType)buttonchannel);
+              bb->setFunction((DsButtonFunc)(ltNumGrp0 & 0x0F));
+              bb->setDsMode(buttonMode);
+              bb->setCallsPresent(buttonflags&(1<<1));
+              bb->setSetsLocalPriority(buttonflags&(1<<0));
+              dev->addBehaviour(bb);
+              bname = "down";
+              bel = buttonElement_down;
+            }
+          }
           // - binary input info
           req.clear();
           Ds485Comm::payload_append16(req, devId);
@@ -303,25 +442,11 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
               "- device #%d: binary input #%d: targetGroupType=%d, targetGroup=%d, type=%d, buttonId=0x%02x, independent=%d",
               j, bi, inpTargetGroupType, inpTargetGroup, inpType, inpButtonId, inpIndependent
             );
-          }
-          // - output channel info
-          req.clear();
-          Ds485Comm::payload_append16(req, devId);
-          mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_O_P_C_TABLE, DEVICE_O_P_C_TABLE_GET_COUNT, req);
-          pli = 3;
-          uint8_t numChannels;
-          pli = Ds485Comm::payload_get8(resp, pli, numChannels);
-          OLOG(LOG_NOTICE, "device #%d: number of OPC channels = %d", j, numChannels);
-          for (int oi=0; oi<numBinInps; oi++) {
-            // - OPC channel info
-            req.clear();
-            Ds485Comm::payload_append16(req, devId);
-            Ds485Comm::payload_append8(req, oi);
-            mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_O_P_C_TABLE, DEVICE_O_P_C_TABLE_GET_BY_INDEX, req);
-            pli = 3;
-            uint8_t channelId;
-            pli = Ds485Comm::payload_get8(resp, pli, channelId);
-            OLOG(LOG_NOTICE, "device #%d: channel #%d: channelId=%d", j, oi, channelId);
+            BinaryInputBehaviourPtr ib = new BinaryInputBehaviour(*dev, ""); // automatic ID
+            ib->setHardwareInputConfig((DsBinaryInputType)inpType, usage_undefined, true, Never, Never);
+            // TODO: maybe need to model some inputs as buttons
+            ib->setGroup((DsGroup)inpTargetGroup);
+            dev->addBehaviour(ib);
           }
           // - sensor info
           req.clear();
@@ -350,20 +475,56 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
               "device #%d: sensor #%d: type=%d, pollinterval=%d, globalZone=%d, pushConvert=%d",
               j, si, sensorType, sensorPollinterval, sensorZone, sensorPushConvert
             );
-          }
-        }
-      }
-    }
-  }
+            VdcSensorType st = sensorType_none;
+            VdcUsageHint su = usage_undefined;
+            bool internalSensor = false;
+            switch (sensorType) {
+              // internal power sensors
+              case 3: st = sensorType_power; internalSensor = true; break; // zone power
+              case 4: st = sensorType_power; internalSensor = true; break; // output power
+              case 5: st = sensorType_current; internalSensor = true; break; // output current
+              case 6: st = sensorType_energy; internalSensor = true; break; // energy counter
+              case 61: st = sensorType_temperature; internalSensor = true; break; // chip temperature
+              case 64: st = sensorType_current; internalSensor = true; break; // output current
+              case 65: st = sensorType_power; internalSensor = true; break; // output power
+              // user facing sensors
+              case 9: st = sensorType_temperature; usage = usage_room; break;
+              case 10: st = sensorType_temperature; usage = usage_outdoors; break;
+              case 11: st = sensorType_illumination; usage = usage_room; break;
+              case 12: st = sensorType_illumination; usage = usage_outdoors; break;
+              case 13: st = sensorType_humidity; usage = usage_room; break;
+              case 14: st = sensorType_humidity; usage = usage_outdoors; break;
+              case 15: st = sensorType_air_pressure; usage = usage_outdoors; break;
+              case 16: break; // m3/sec gas
+              case 17: break; // m3/sec liquid, maybe use sensorType_water_flowrate
+              case 18: st = sensorType_wind_speed; usage = usage_outdoors; break;
+              case 19: st = sensorType_wind_direction; usage = usage_outdoors; break;
+              case 20: st = sensorType_precipitation; usage = usage_outdoors; break;
+              case 21: st = sensorType_gas_CO2; usage = usage_outdoors; break;
+              case 22: break; // Messumformer
+              case 23: break; // Messumformer
+              case 24: break; // Sound events
+              case 66: break; // UV-A mw/cm2
+              case 67: break; // UV-B mw/cm2
+              case 68: break; // Infrared mw/cm2
+              default: internalSensor = true; // not really known
+            }
+            if (!internalSensor) {
+              SensorBehaviourPtr sb = new SensorBehaviour(*dev, ""); // automatic ID
+              sb->setHardwareSensorConfig(st, usage, 0, 4096, 1, sensorPollinterval*Second, sensorPollinterval*Second*3);
+              dev->addBehaviour(sb);
+            }
+          } // sensors
+          // save device in list
+          mDevPrepList.push_back(dev);
+        } // device
+      } // zone
+    } // not me
+  } // dsms
 
   return ErrorPtr();
 }
 
 
-
-
-
-
-
-#endif // ENABLE_PROXYDEVICES
+#endif // ENABLE_DS485DEVICES
 

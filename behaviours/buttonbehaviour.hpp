@@ -158,6 +158,16 @@ namespace p44 {
     /// set function
     virtual void setFunction(DsButtonFunc aFunc) { setPVar(mButtonFunc, aFunc); };
 
+    /// set mode
+    void setDsMode(DsButtonMode aMode) { setPVar(mButtonMode, aMode); };
+
+    /// set setLocalPriority flag
+    void setSetsLocalPriority(bool aSetsLocalPriority) { setPVar(mSetsLocalPriority, aSetsLocalPriority); };
+
+    /// set callsPresent flag
+    void setCallsPresent(bool aCallsPresent) { setPVar(mCallsPresent, aCallsPresent); };
+
+
     /// set state machine mode
     void setStateMachineMode(ButtonStateMachineMode aStateMachineMode) { mStateMachineMode = aStateMachineMode; }
 

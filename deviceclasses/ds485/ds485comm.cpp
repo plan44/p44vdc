@@ -45,7 +45,8 @@ const char* Ds485CommError::errorName() const
 // MARK: - Ds485Comm
 
 Ds485Comm::Ds485Comm() :
-  mDs485Client(nullptr)
+  mDs485Client(nullptr),
+  mQueryRunning(false)
 {
 }
 
@@ -178,17 +179,18 @@ size_t Ds485Comm::payload_get32(string &aPayload, size_t aAtIndex, uint32_t &aLo
 }
 
 
-size_t Ds485Comm::payload_get64(string &aPayload, size_t aAtIndex, uint64_t &aLongLongWord)
+size_t Ds485Comm::payload_getGroups(string &aPayload, size_t aAtIndex, uint64_t &aLongLongWord)
 {
+  // DS groups are not a 64bit integer! MSB contains groups 0..7, etc.
   if (aAtIndex+8>aPayload.size()) return 0; // cannot happen except in error case
-  aLongLongWord  = (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<56;
-  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<48;
-  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<40;
-  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<32;
-  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<24;
-  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<16;
+  aLongLongWord  = (uint64_t)(aPayload[aAtIndex++] & 0xFF);
   aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<8;
-  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF);
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<16;
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<24;
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<32;
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<40;
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<48;
+  aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<56;
   return aAtIndex;
 }
 
@@ -343,6 +345,41 @@ void Ds485Comm::ds485ClientThreadSignal(ChildThreadWrapper &aChildThread, Thread
 }
 
 
+// MARK: - API to call from main thread (not blocking)
+
+void Ds485Comm::executeQuery(QueryCB aQueryCB, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
+{
+  if (mQueryRunning) aQueryCB(TextError::err("cannot run executeQuery concurrently"), "");
+  mQueryRunning = true;
+  ds485_container request;
+  setupRequestCommand(request, aDestination, aCommand, aModifier, aPayload);
+  mDs485ClientThread->executeOnChildThreadAsync(
+    boost::bind(&Ds485Comm::rawQuerySync, this, mQueryResponse, aTimeout, request),
+    boost::bind(&Ds485Comm::queryComplete, this, _1, aQueryCB)
+  );
+}
+
+
+void Ds485Comm::queryComplete(ErrorPtr aStatus, QueryCB aQueryCB)
+{
+  mQueryRunning = false;
+  if (aQueryCB) aQueryCB(aStatus, mQueryResponse);
+}
+
+
+ErrorPtr Ds485Comm::issueRequest(DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
+{
+  ds485_container request;
+  setupRequestCommand(request, aDestination, aCommand, aModifier, aPayload);
+  if (FOCUSLOGENABLED) {
+    logContainer(FOCUSLOGLEVEL, request, "issueRequest sends:");
+  }
+  // Note: ds485_client_send_command does not block, only performs sockwrite()
+  return Error::errIfNotOk<Ds485CommError>(ds485_client_send_command(mDs485Client, &request));
+}
+
+
+
 // MARK: - blocking calls, only to use in ds485 client thread
 
 
@@ -352,15 +389,21 @@ ErrorPtr Ds485Comm::executeQuerySync(string &aResponse, MLMicroSeconds aTimeout,
 {
   if (aTimeout==0) aTimeout = DEFAULT_QUERY_TIMEOUT;
   ds485_container request;
-  ds485_container response;
   setupRequestCommand(request, aDestination, aCommand, aModifier, aPayload);
+  return rawQuerySync(aResponse, aTimeout, request);
+}
+
+
+ErrorPtr Ds485Comm::rawQuerySync(string& aResponse, MLMicroSeconds aTimeout, ds485_container aRequest)
+{
   if (FOCUSLOGENABLED) {
-    logContainer(FOCUSLOGLEVEL, request, "executeQuery sends:");
+    logContainer(FOCUSLOGLEVEL, aRequest, "executeQuerySync sends:");
   }
-  ErrorPtr err = Error::errIfNotOk<Ds485CommError>(ds485_client_send_sync_command(mDs485Client, &request, &response, (int)(aTimeout/Second)));
+  ds485_container response;
+  ErrorPtr err = Error::errIfNotOk<Ds485CommError>(ds485_client_send_sync_command(mDs485Client, &aRequest, &response, (int)(aTimeout/Second)));
   if (Error::isOK(err)) {
     if (FOCUSLOGENABLED) {
-      logContainer(FOCUSLOGLEVEL, response, "executeQuery response:");
+      logContainer(FOCUSLOGLEVEL, response, "executeQuerySync response:");
     }
     aResponse.assign((const char*)response.data, response.length);
   }

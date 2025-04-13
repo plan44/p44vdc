@@ -1264,10 +1264,10 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           setChannel((DsChannelType)aPropValue->int32Value());
           return true;
         case setsLocalPriority_key+settings_key_offset:
-          setPVar(mSetsLocalPriority, aPropValue->boolValue());
+          setSetsLocalPriority(aPropValue->boolValue());
           return true;
         case callsPresent_key+settings_key_offset:
-          setPVar(mCallsPresent, aPropValue->boolValue());
+          setCallsPresent(aPropValue->boolValue());
           return true;
         case buttonActionMode_key+settings_key_offset:
           setPVar(mButtonActionMode, (VdcButtonActionMode)aPropValue->uint8Value());

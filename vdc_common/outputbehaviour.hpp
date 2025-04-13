@@ -205,8 +205,9 @@ namespace p44 {
     /// @param aIsMember true to make device member of this group
     void setGroupMembership(DsGroup aGroup, bool aIsMember);
 
-    /// remove all group memberships
-    void resetGroupMembership();
+    /// reset group membership to default
+    /// @param aInitialMembers initial membership, defaults to group_undefined
+    void resetGroupMembership(DsGroupMask aInitialMembers=(DsGroupMask)(1<<group_undefined));
 
     /// check for presence of model feature (flag in dSS visibility matrix)
     /// @param aFeatureIndex the feature to check for

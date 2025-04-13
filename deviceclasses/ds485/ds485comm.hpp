@@ -29,6 +29,7 @@
 
 #include "dsuid.hpp"
 
+#include "dsdefs.h"
 #include "dsuid.h"
 //#include "dsm-api.h"
 #include "dsm-api-const.h"
@@ -59,6 +60,8 @@ namespace p44 {
   class Ds485Comm;
   class Ds485Vdc;
 
+  typedef boost::function<void (ErrorPtr aError, const string &aOutputString)> QueryCB;
+
   typedef boost::intrusive_ptr<Ds485Comm> Ds485CommPtr;
   class Ds485Comm final : public P44LoggingObj
   {
@@ -81,6 +84,9 @@ namespace p44 {
     string mTunnelCommandTemplate;
     MLTicket mTunnelRestarter;
     pid_t mTunnelPid;
+
+    bool mQueryRunning;
+    string mQueryResponse;
 
   public:
 
@@ -115,8 +121,17 @@ namespace p44 {
     static size_t payload_get8(string &aPayload, size_t aAtIndex, uint8_t &aByte);
     static size_t payload_get16(string &aPayload, size_t aAtIndex, uint16_t &aWord);
     static size_t payload_get32(string &aPayload, size_t aAtIndex, uint32_t &aLongWord);
-    static size_t payload_get64(string &aPayload, size_t aAtIndex, uint64_t &aLongLongWord);
+    static size_t payload_getGroups(string &aPayload, size_t aAtIndex, DsGroupMask &aGroupMask);
     static size_t payload_getString(string &aPayload, size_t aAtIndex, size_t aFieldSize, string &aString);
+    /// @}
+
+    /// @name API to call from main thread (not blocking)
+    /// @{
+
+    ErrorPtr issueRequest(DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload);
+
+    void executeQuery(QueryCB aQueryCB, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload);
+
     /// @}
 
 
@@ -134,12 +149,15 @@ namespace p44 {
     /// @name synchronously executing, blocking calls, only to use from mDs485ClientThread
     /// @{
 
+    ErrorPtr rawQuerySync(string& aResponse, MLMicroSeconds aTimeout, ds485_container aContainer);
     ErrorPtr executeQuerySync(string& aResponse, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier = 0, const string& aPayload = "");
 
     /// @}
 
     void ds485ClientThread(ChildThreadWrapper &aThread);
     void ds485ClientThreadSignal(ChildThreadWrapper &aChildThread, ThreadSignals aSignalCode);
+
+    void queryComplete(ErrorPtr aStatus, QueryCB aQueryCB);
 
   };
 

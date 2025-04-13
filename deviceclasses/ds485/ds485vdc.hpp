@@ -118,7 +118,7 @@ namespace p44 {
 
     /// @}
 
-    void ds485BusScanned(ErrorPtr aScanStatus);
+    void ds485BusScanned(ErrorPtr aScanStatus, StatusCB aCompletedCB);
 
   };
 

@@ -24,6 +24,7 @@
 #define __p44vdc__ds485device__
 
 #include "device.hpp"
+#include "ds485comm.hpp"
 
 #if ENABLE_DS485DEVICES
 
@@ -41,6 +42,8 @@ namespace p44 {
 
     DsUid mDsmDsUid;
     uint16_t mDevId;
+    int mNumOPC;
+    Ds485Vdc& mDs485Vdc;
 
   public:
 
@@ -81,10 +84,23 @@ namespace p44 {
     /// @}
 
 
-    /// overridden to handle or proxy method calls, depending on what it is
+    /// overridden to handle method calls, depending on what it is
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
-    /// overridden to handle (i.e. forward) notifications TO the device
+    /// identify the device to the user
+    /// @param aDuration if !=Never, this is how long the identification should be recognizable. If this is \<0, the identification should stop
+    virtual void identifyToUser(MLMicroSeconds aDuration) P44_OVERRIDE;
+
+    /// apply all pending channel value updates to the device's hardware
+    /// @note this is the only routine that should trigger actual changes in output values. It must consult all of the device's
+    ///   ChannelBehaviours and check isChannelUpdatePending(), and send new values to the device hardware. After successfully
+    ///   updating the device hardware, channelValueApplied() must be called on the channels that had isChannelUpdatePending().
+    /// @param aDoneCB if not NULL, must be called when values are applied
+    /// @param aForDimming hint for implementations to optimize dimming, indicating that change is only an increment/decrement
+    ///   in a single channel (and not switching between color modes etc.)
+    virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_FINAL;
+
+    /// overridden to handle notifications
     virtual void handleNotification(const string &aNotification, ApiValuePtr aParams, StatusCB aExaminedCB) P44_OVERRIDE;
 
     /// initializes the physical device for being used
@@ -92,6 +108,13 @@ namespace p44 {
     /// @note this is called before interaction with dS system starts
     /// @note implementation should call inherited when complete, so superclasses could chain further activity
     virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
+
+  private:
+
+    ErrorPtr issueDeviceRequest(uint8_t aCommand, uint8_t aModifier, const string& aMorePayload = "");
+    ErrorPtr issueDsmRequest(uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
+
+    void executeDsmQuery(QueryCB aQueryCB, MLMicroSeconds aTimeout, uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
 
 
   };
