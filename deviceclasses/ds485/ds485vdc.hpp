@@ -45,8 +45,8 @@ namespace p44 {
     typedef Vdc inherited;
     friend class Ds485Device;
 
-    typedef std::list<Ds485DevicePtr> Ds485DeviceList;
-    Ds485DeviceList mDevPrepList;
+    typedef std::map<string, Ds485DevicePtr> Ds485DeviceMap;
+    Ds485DeviceMap mDs485Devices;
 
   public:
 
@@ -62,20 +62,10 @@ namespace p44 {
     ///   already registered vdc to its new dSUID.
     virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
-    // derive dSUID
-    // Note: base class implementation derives dSUID from vdcInstanceIdentifier()
-    //   This is what most vDCs actually use, but some vDCs might want/need to derived their ID from
-    //   data obtained at initialize() and might override this method to generate a updated dSUID
-    //   when called after initialize()
-    virtual void deriveDsUid() P44_OVERRIDE;
-
     // dS485 vdc is NEVER to be shown as virtual device to a connecting vdsm!
     virtual bool isPublicDS() P44_OVERRIDE { return false; }
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
-
-    /// @return hardware GUID in URN format to identify the hardware INSTANCE as uniquely as possible
-    virtual string hardwareGUID() P44_OVERRIDE;
 
     /// @return URL for Web-UI (for access from local LAN)
     virtual string webuiURLString() P44_OVERRIDE;
@@ -109,6 +99,10 @@ namespace p44 {
     /// @param aEvent the event to handle
     virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
 
+
+    /// @return device matching dSM's dSUID and local deviceId
+    Ds485DevicePtr deviceFor(DsUidPtr aDsmDsUid, uint16_t aDevId);
+
   private:
 
     /// @name synchronously executing, blocking calls, only to use from mDs485ClientThread
@@ -119,6 +113,7 @@ namespace p44 {
     /// @}
 
     void ds485BusScanned(ErrorPtr aScanStatus, StatusCB aCompletedCB);
+    void ds485MessageHandler(DsUidPtr aSource, DsUidPtr aTarget, const string aPayload);
 
   };
 

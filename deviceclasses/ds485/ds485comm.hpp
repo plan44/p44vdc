@@ -60,7 +60,12 @@ namespace p44 {
   class Ds485Comm;
   class Ds485Vdc;
 
-  typedef boost::function<void (ErrorPtr aError, const string &aOutputString)> QueryCB;
+
+  /// callback for dS485 events and non-associated bus traffic messages
+  typedef boost::function<void (DsUidPtr aSource, DsUidPtr aTarget, const string aPayload)> Ds485MessageCB;
+
+  /// callback for Query response
+  typedef boost::function<void (ErrorPtr aError, const string &aResponsePayload)> QueryCB;
 
   typedef boost::intrusive_ptr<Ds485Comm> Ds485CommPtr;
   class Ds485Comm final : public P44LoggingObj
@@ -78,6 +83,8 @@ namespace p44 {
     string mApiHost; ///< ds485 host IP (or "tunnel")
     uint16_t mApiPort; ///< ds485 host port
 
+    Ds485MessageCB mDs485MessageHandler; ///< the message handler
+
     DsUidPtr mMyDsuid; ///< the dSUID of my role as a client
 
     string mDs485HostIP;
@@ -93,7 +100,7 @@ namespace p44 {
     Ds485Comm();
     virtual ~Ds485Comm();
 
-    virtual string contextType() const P44_OVERRIDE { return "DS485"; }
+    virtual string contextType() const P44_OVERRIDE { return "dS485"; }
 
     /// @param aConnectionSpec in host[:port] format
     /// @param aDefaultPort port number that is used when aConnectionSpec does not specify a port
@@ -118,11 +125,13 @@ namespace p44 {
     static void payload_append16(string &aPayload, uint16_t aWord);
     static void payload_append32(string &aPayload, uint32_t aLongWord);
     static void payload_appendString(string &aPayload, size_t aFieldSize, const string aString);
-    static size_t payload_get8(string &aPayload, size_t aAtIndex, uint8_t &aByte);
-    static size_t payload_get16(string &aPayload, size_t aAtIndex, uint16_t &aWord);
-    static size_t payload_get32(string &aPayload, size_t aAtIndex, uint32_t &aLongWord);
-    static size_t payload_getGroups(string &aPayload, size_t aAtIndex, DsGroupMask &aGroupMask);
-    static size_t payload_getString(string &aPayload, size_t aAtIndex, size_t aFieldSize, string &aString);
+
+    static string getPayload(const ds485_container& aContainer);
+    static size_t payload_get8(const string &aPayload, size_t aAtIndex, uint8_t &aByte);
+    static size_t payload_get16(const string &aPayload, size_t aAtIndex, uint16_t &aWord);
+    static size_t payload_get32(const string &aPayload, size_t aAtIndex, uint32_t &aLongWord);
+    static size_t payload_getGroups(const string &aPayload, size_t aAtIndex, DsGroupMask &aGroupMask);
+    static size_t payload_getString(const string &aPayload, size_t aAtIndex, size_t aFieldSize, string &aString);
     /// @}
 
     /// @name API to call from main thread (not blocking)
@@ -131,6 +140,10 @@ namespace p44 {
     ErrorPtr issueRequest(DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload);
 
     void executeQuery(QueryCB aQueryCB, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload);
+
+    /// set message handler
+    /// @param aMessageHandler will be called when a (relevant, some pre-filtering may apply) dS485 bus message occurs
+    void setDs485MessageHandler(Ds485MessageCB aMessageHandler) { mDs485MessageHandler = aMessageHandler; };
 
     /// @}
 
@@ -158,6 +171,8 @@ namespace p44 {
     void ds485ClientThreadSignal(ChildThreadWrapper &aChildThread, ThreadSignals aSignalCode);
 
     void queryComplete(ErrorPtr aStatus, QueryCB aQueryCB);
+
+    ErrorPtr processContainer(ds485_container aContainer);
 
   };
 

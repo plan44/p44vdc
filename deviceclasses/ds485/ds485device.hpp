@@ -42,8 +42,12 @@ namespace p44 {
 
     DsUid mDsmDsUid;
     uint16_t mDevId;
+    bool mIsPresent;
     int mNumOPC;
     Ds485Vdc& mDs485Vdc;
+
+    bool mUpdatingCache; ///< if this is set, channels must not be applied to dS, because we are only updating the cache FROM dS-side change
+    MLTicket mTracingTimer;
 
   public:
 
@@ -81,8 +85,18 @@ namespace p44 {
     /// @return human readable model name/short description
     virtual string modelName() P44_OVERRIDE;
 
+    /// @return hardware GUID in URN format to identify the hardware INSTANCE as uniquely as possible
+    virtual string hardwareGUID() P44_OVERRIDE;
+
+    /// @return vendor name
+    virtual string vendorName() P44_OVERRIDE;
+
+    /// @return URL for Web-UI (for access from local LAN)
+    virtual string webuiURLString() P44_OVERRIDE;
+
     /// @}
 
+    virtual void addedAndInitialized() P44_OVERRIDE;
 
     /// overridden to handle method calls, depending on what it is
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
@@ -90,6 +104,14 @@ namespace p44 {
     /// identify the device to the user
     /// @param aDuration if !=Never, this is how long the identification should be recognizable. If this is \<0, the identification should stop
     virtual void identifyToUser(MLMicroSeconds aDuration) P44_OVERRIDE;
+
+    /// prepare for applying a scene or scene undo on the device level
+    /// @param aScene the scene that is to be applied (or restored channel values from an undoScene, see below)
+    /// @return true if channel values should be applied, false if not
+    /// @note for a scene call, this is called AFTER scene values are already loaded and prepareSceneCall() has already been called,
+    ///   but before channels are applied (or not, if method returns false). For a undoScene call, prepareSceneCall() is NOT
+    ///   called (it's not a scene call), but prepareSceneApply() is called with a pseudo-scene having sceneCmd==scene_cmd_undo.
+    virtual bool prepareSceneApply(DsScenePtr aScene) P44_OVERRIDE;
 
     /// apply all pending channel value updates to the device's hardware
     /// @note this is the only routine that should trigger actual changes in output values. It must consult all of the device's
@@ -109,13 +131,22 @@ namespace p44 {
     /// @note implementation should call inherited when complete, so superclasses could chain further activity
     virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
+    /// handle message from dS485 bus related to this device
+    void handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, DsClickType aClickType);
+
+    /// trace scene call to figure out how the device's current state now is
+    void traceSceneCall(SceneNo aSceneNo);
+    void traceChannelChange(DsChannelType aChannelType, uint8_t a8BitChannelValue);
+
+
   private:
+
+    void startTracingFor(SceneNo aSceneNo);
 
     ErrorPtr issueDeviceRequest(uint8_t aCommand, uint8_t aModifier, const string& aMorePayload = "");
     ErrorPtr issueDsmRequest(uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
 
     void executeDsmQuery(QueryCB aQueryCB, MLMicroSeconds aTimeout, uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
-
 
   };
   typedef boost::intrusive_ptr<Ds485Device> Ds485DevicePtr;

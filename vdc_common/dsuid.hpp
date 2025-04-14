@@ -225,7 +225,6 @@ namespace p44 {
     /// @param aDsUid a dSUID
     void setAsDs485DsUid(const dsuid_t &aDsUid);
 
-
     /// get pointer to dsuid_t
     /// @return pointer to dsuid bytes, valid only as long as this object lives
     const dsuid_t* getDs485DsUid();
@@ -233,6 +232,15 @@ namespace p44 {
     /// copy into a dsuid_t
     /// @param aDsUid where to copy the dSUID bytes
     void copyAsDs485DsUid(dsuid_t &aDsUid);
+
+    /// get the classic DS terminal block ID if this actually is a terminal block
+    /// @return the 8 hex digit terminal block ID
+    string getDSIdString() const;
+
+    /// set as a classic DS terminal block ID from 4 byte dSID
+    /// @note will be expanded into a full dSUID using standard prefix
+    /// @param the 4 byte terminal block ID (binary string)
+    void setAsDSId(const string aDSIdBinString);
 
     /// @}
 

@@ -345,11 +345,7 @@ bool DsUid::setAsString(const string &aString)
 
 string DsUid::getString() const
 {
-  string s;
-  for (int i=0; i<mIdBytes; i++) {
-    string_format_append(s, "%02X", mRaw[i]);
-  }
-  return s;
+  return dataToHexString(mRaw, mIdBytes);
 }
 
 
@@ -447,6 +443,26 @@ void DsUid::copyAsDs485DsUid(dsuid_t &aDsUid)
 {
   memcpy(&aDsUid.id, &mRaw, DSUID_SIZE);
 }
+
+
+string DsUid::getDSIdString() const
+{
+  if (mIdType!=idtype_gid) return "";
+  return dataToHexString(mRaw+12, 4); // last 4 bytes (but not the index) are the ID
+}
+
+
+void DsUid::setAsDSId(const string aDSIdBinString)
+{
+  if (aDSIdBinString.size()==4) {
+    mIdType = idtype_gid;
+    static const uint8_t dsprefix[12] = { 0x35, 0x04, 0x17, 0x5f, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+    memcpy(mRaw, dsprefix, 12);
+    memcpy(mRaw+12, aDSIdBinString.c_str(), 4);
+    setSubdeviceIndex(0);
+  }
+}
+
 
 #endif // ENABLE_DS485DEVICES
 

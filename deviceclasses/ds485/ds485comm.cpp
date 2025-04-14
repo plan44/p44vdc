@@ -107,12 +107,34 @@ int Ds485Comm::busMemberChanged(DsUidPtr aDsUid, bool aJoined)
 
 int Ds485Comm::containerReceived(const ds485_container_t *container)
 {
+  if (!container) return 0; // nothing to process
+  uint8_t command = container->data[0];
+  uint8_t modifier = container->data[1];
   // FIXME: do not show noisy metering
-  if (!container || (container->data[0]==0x34 && container->data[1]==0x04)) return 0;
-  if (FOCUSLOGENABLED) {
+  if (FOCUSLOGENABLED && !(command==CIRCUIT_ENERGY_METER_VALUE && modifier==CIRCUIT_ENERGY_METER_VALUE_WS_GET)) {
     logContainer(FOCUSLOGLEVEL, *container, "received");
   }
+  if (mDs485ClientThread->readyForExecuteOnParent()) {
+    // TODO: maybe later filter more stuff we are not interested in
+    // FIXME: do not forward circuit energy metering for now
+    // Note: We do not forward responses, when these concern us, these will be collected as part of a query
+    if (container->containerType!=DS485_CONTAINER_RESPONSE && !(command==CIRCUIT_ENERGY_METER_VALUE && modifier==CIRCUIT_ENERGY_METER_VALUE_WS_GET)) {
+      mDs485ClientThread->executeOnParentThread(boost::bind(&Ds485Comm::processContainer, this, *container));
+    }
+  }
   return 0;
+}
+
+
+ErrorPtr Ds485Comm::processContainer(ds485_container aContainer)
+{
+  if (mDs485MessageHandler) {
+    DsUidPtr source = new DsUid(aContainer.sourceId);
+    DsUidPtr destination;
+    if (!dsuid_is_broadcast(&aContainer.destinationId)) destination= new DsUid(aContainer.destinationId);
+    mDs485MessageHandler(source, destination, getPayload(aContainer));
+  }
+  return ErrorPtr();
 }
 
 
@@ -151,7 +173,15 @@ void Ds485Comm::payload_appendString(string &aPayload, size_t aFieldSize, const 
 }
 
 
-size_t Ds485Comm::payload_get8(string &aPayload, size_t aAtIndex, uint8_t &aByte)
+string Ds485Comm::getPayload(const ds485_container& aContainer)
+{
+  string payload;
+  payload.assign((const char*)aContainer.data, aContainer.length);
+  return payload;
+}
+
+
+size_t Ds485Comm::payload_get8(const string &aPayload, size_t aAtIndex, uint8_t &aByte)
 {
   if (aAtIndex+1>aPayload.size()) return 0;
   aByte = (uint8_t)aPayload[aAtIndex++];
@@ -159,7 +189,7 @@ size_t Ds485Comm::payload_get8(string &aPayload, size_t aAtIndex, uint8_t &aByte
 }
 
 
-size_t Ds485Comm::payload_get16(string &aPayload, size_t aAtIndex, uint16_t &aWord)
+size_t Ds485Comm::payload_get16(const string &aPayload, size_t aAtIndex, uint16_t &aWord)
 {
   if (aAtIndex+2>aPayload.size()) return 0; // cannot happen except in error case
   aWord  = (uint16_t)(aPayload[aAtIndex++] & 0xFF)<<8;
@@ -168,7 +198,7 @@ size_t Ds485Comm::payload_get16(string &aPayload, size_t aAtIndex, uint16_t &aWo
 }
 
 
-size_t Ds485Comm::payload_get32(string &aPayload, size_t aAtIndex, uint32_t &aLongWord)
+size_t Ds485Comm::payload_get32(const string &aPayload, size_t aAtIndex, uint32_t &aLongWord)
 {
   if (aAtIndex+4>aPayload.size()) return 0; // cannot happen except in error case
   aLongWord  = (uint32_t)(aPayload[aAtIndex++] & 0xFF)<<24;
@@ -179,7 +209,7 @@ size_t Ds485Comm::payload_get32(string &aPayload, size_t aAtIndex, uint32_t &aLo
 }
 
 
-size_t Ds485Comm::payload_getGroups(string &aPayload, size_t aAtIndex, uint64_t &aLongLongWord)
+size_t Ds485Comm::payload_getGroups(const string &aPayload, size_t aAtIndex, uint64_t &aLongLongWord)
 {
   // DS groups are not a 64bit integer! MSB contains groups 0..7, etc.
   if (aAtIndex+8>aPayload.size()) return 0; // cannot happen except in error case
@@ -195,7 +225,7 @@ size_t Ds485Comm::payload_getGroups(string &aPayload, size_t aAtIndex, uint64_t 
 }
 
 
-size_t Ds485Comm::payload_getString(string &aPayload, size_t aAtIndex, size_t aFieldSize, string &aString)
+size_t Ds485Comm::payload_getString(const string &aPayload, size_t aAtIndex, size_t aFieldSize, string &aString)
 {
   if (aAtIndex+aFieldSize>aPayload.size()) return 0; // cannot happen except in error case
   string f = aPayload.substr(aAtIndex, aFieldSize);
@@ -405,7 +435,7 @@ ErrorPtr Ds485Comm::rawQuerySync(string& aResponse, MLMicroSeconds aTimeout, ds4
     if (FOCUSLOGENABLED) {
       logContainer(FOCUSLOGLEVEL, response, "executeQuerySync response:");
     }
-    aResponse.assign((const char*)response.data, response.length);
+    aResponse = getPayload(response);
   }
   return err;
 }

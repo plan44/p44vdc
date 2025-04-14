@@ -71,35 +71,24 @@ void Ds485Vdc::handleGlobalEvent(VdchostEvent aEvent)
 
 void Ds485Vdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
+  // install handler
+  mDs485Comm.setDs485MessageHandler(boost::bind(&Ds485Vdc::ds485MessageHandler, this, _1, _2, _3));
   // start
   mDs485Comm.start(aCompletedCB);
-}
-
-
-string Ds485Vdc::hardwareGUID()
-{
-  // TODO: assume we just return the dSUID
-  return mDSUID.getString();
-}
-
-
-void Ds485Vdc::deriveDsUid()
-{
-  // TODO: for now: use standard static method
-  inherited::deriveDsUid();
 }
 
 
 const char *Ds485Vdc::vdcClassIdentifier() const
 {
   // The class identifier is only for addressing by specifier
-  return "DS485_Device_Container";
+  return "dS485_Device_Container";
 }
 
 
 string Ds485Vdc::webuiURLString()
 {
-  return inherited::webuiURLString();
+  if (mDs485Comm.mDs485HostIP.empty()) return inherited::webuiURLString();
+  return string_format("http://%s", mDs485Comm.mDs485HostIP.c_str());
 }
 
 
@@ -126,17 +115,38 @@ void Ds485Vdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // full collect, remove all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
-  mDevPrepList.clear();
+  mDs485Devices.clear();
   mDs485Comm.mDs485ClientThread->executeOnChildThreadAsync(boost::bind(&Ds485Vdc::scanDs485BusSync, this, _1), boost::bind(&Ds485Vdc::ds485BusScanned, this, _1, aCompletedCB));
+}
+
+
+string fullDevId(const DsUid& aDsuid, const uint16_t aDevId)
+{
+  string fullid(aDsuid.getBinary());
+  fullid.append(1, (uint8_t)(aDevId>>8));
+  fullid.append(1, (uint8_t)(aDevId&0xFF));
+  return fullid;
+}
+
+
+Ds485DevicePtr Ds485Vdc::deviceFor(DsUidPtr aDsmDsUid, uint16_t aDevId)
+{
+  Ds485DevicePtr dev;
+  if (aDsmDsUid) {
+    Ds485DeviceMap::iterator pos = mDs485Devices.find(fullDevId(*aDsmDsUid, aDevId));
+    if (pos!=mDs485Devices.end()) return pos->second;
+  }
+  return dev;
 }
 
 
 void Ds485Vdc::ds485BusScanned(ErrorPtr aScanStatus, StatusCB aCompletedCB)
 {
   if (Error::isOK(aScanStatus)) {
-    // now add created devices
-    for (Ds485DeviceList::iterator pos = mDevPrepList.begin(); pos!=mDevPrepList.end(); ++pos) {
-      if (simpleIdentifyAndAddDevice(*pos)) {
+    // now add my devices
+    for (Ds485DeviceMap::iterator pos = mDs485Devices.begin(); pos!=mDs485Devices.end(); ++pos) {
+      Ds485DevicePtr dev = pos->second;
+      if (simpleIdentifyAndAddDevice(dev)) {
         // TODO: maybe something
       }
     }
@@ -148,10 +158,99 @@ void Ds485Vdc::ds485BusScanned(ErrorPtr aScanStatus, StatusCB aCompletedCB)
 
 // MARK: - operation
 
+void Ds485Vdc::ds485MessageHandler(DsUidPtr aSource, DsUidPtr aTarget, const string aPayload)
+{
+  OLOG(LOG_NOTICE,"dS485 Message: %s -> %s: [%zu] %s", DsUid::text(aSource).c_str(), DsUid::text(aTarget).c_str(), aPayload.size(), binaryToHexString(aPayload, ' ').c_str());
+  size_t pli = 0;
+  uint8_t command;
+  if ((pli = Ds485Comm::payload_get8(aPayload, pli, command))==0) goto error;
+  uint8_t modifier;
+  if ((pli = Ds485Comm::payload_get8(aPayload, pli, modifier))==0) goto error;
+  switch (command) {
+    case EVENT_COMMUNICATION_LOG: {
+      switch (modifier) {
+        case EVENT_COMMUNICATION_LOG_UPSTREAM_SHORT: {
+          pli++; // skip that 3rd byte dsm events seem to have
+          uint16_t devId;
+          if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) goto error;
+          pli++; // skip CircuitId
+          pli++; // skip Resend // TODO: maybe evaluate this
+          uint8_t isSensor;
+          if ((pli = Ds485Comm::payload_get8(aPayload, pli, isSensor))==0) goto error;
+          uint8_t keyNo;
+          if ((pli = Ds485Comm::payload_get8(aPayload, pli, keyNo))==0) goto error;
+          uint8_t click;
+          if ((pli = Ds485Comm::payload_get8(aPayload, pli, click))==0) goto error;
+          Ds485DevicePtr dev = deviceFor(aSource, devId);
+          if (dev) dev->handleDeviceUpstreamMessage(isSensor, keyNo, (DsClickType)click);
+          break;
+        }
+      }
+      break;
+    }
+    case DEVICE_ACTION_REQUEST: {
+      uint16_t devId;
+      if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) goto error;
+      Ds485DevicePtr dev = deviceFor(aTarget, devId);
+      if (dev) {
+        switch (modifier) {
+          // 302ED89F43F0000000002BA000011C8800 -> 302ED89F43F0000000000E400000E9D700: [05] 51 01 02 98 0E
+          case DEVICE_ACTION_REQUEST_ACTION_CALL_SCENE: {
+            SceneNo scene;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, scene))==0) goto error;
+            dev->traceSceneCall(scene);
+            break;
+          }
+          // 302ED89F43F0000000002BA000011C8800 -> 302ED89F43F0000000000E400000E9D700: [5] 51 07 03 ED B8
+          case DEVICE_ACTION_REQUEST_ACTION_SET_OUTVAL: {
+            uint8_t outval;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, outval))==0) goto error;
+            dev->traceChannelChange(channeltype_default, outval);
+          }
+        }
+      }
+      break;
+    }
+    case EVENT_DEVICE_CONFIG: {
+      // this is the response for requesting a bank/offset type DEVICE_CONFIG request
+      // 302ED89F43F0000000000E400000E9D700 -> FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, t=0xff: [08] 74 00 00 03 ED 40 00 FF
+      // 302ED89F43F0000000000E400000E9D700 -> FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, t=0xff: [08] 74 00 00 03 ED 40 01 00
+      pli++; // skip that 3rd byte dsm events seem to have
+      uint16_t devId;
+      if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) goto error;
+      Ds485DevicePtr dev = deviceFor(aSource, devId);
+      if (dev) {
+        // this is a device config readout from this device
+        uint8_t bank;
+        if ((pli = Ds485Comm::payload_get8(aPayload, pli, bank))==0) goto error;
+        uint8_t offs;
+        if ((pli = Ds485Comm::payload_get8(aPayload, pli, offs))==0) goto error;
+        uint8_t byte;
+        if ((pli = Ds485Comm::payload_get8(aPayload, pli, byte))==0) goto error;
+        switch (bank) {
+          case 64:// RAM
+            switch (offs) {
+              case 0: // standard output value
+                dev->traceChannelChange(channeltype_default, byte);
+                break;
+              // TODO: gray, blue and green blocks have the relevant values in other offsets
+            }
+            break;
+        }
+      }
+    }
+  }
+  return;
+error:
+  LOG(LOG_WARNING, "payload too short (%zu) to access data at %zu", aPayload.size(), pli);
+}
+
 
 void Ds485Vdc::deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
   inherited::deliverToDevicesAudience(aAudience, aApiConnection, aNotification, aParams);
+  // TODO: implement optimisations to call native scenes instead of device adjustment
+
 //  for (DsAddressablesList::iterator apos = aAudience.begin(); apos!=aAudience.end(); ++apos) {
 //    // TODO: implement
 //  }
@@ -164,6 +263,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
 {
   // startup, collect info
   // - the bus devices
+  ErrorPtr err;
   const int maxbusdevices = 64;
   dsuid_t busdevices[maxbusdevices];
   int numDsms = ds485_client_query_devices(mDs485Comm.mDs485Client, busdevices, maxbusdevices);
@@ -176,7 +276,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
       string resp;
       size_t pli;
       // - get the dSM info
-      mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DSM_INFO);
+      err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DSM_INFO);
+      if (Error::notOK(err)) return err;
       pli = 3;
       uint32_t dsmHwVersion;
       pli = Ds485Comm::payload_get32(resp, pli, dsmHwVersion);
@@ -191,7 +292,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
       pli = Ds485Comm::payload_getString(resp, pli, 21, dsmName);
       OLOG(LOG_NOTICE, "dSM #%d: '%s', hwV=0x%08x, armV=0x%08x, dspV=0x%08x, apiV=0x%04x", di, dsmName.c_str(), dsmHwVersion, dsmArmVersion, dsmDSPVersion, dsmAPIVersion);
       // - get the zone count
-      mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, ZONE_COUNT);
+      err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, ZONE_COUNT);
+      if (Error::notOK(err)) return err;
       pli = 3;
       uint8_t zoneCount;
       pli = Ds485Comm::payload_get8(resp, pli, zoneCount);
@@ -200,7 +302,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
       for (int i=0; i<zoneCount; i++) {
         string req;
         Ds485Comm::payload_append8(req, i);
-        mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, ZONE_INFO, ZONE_INFO_BY_INDEX, req);
+        err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, ZONE_INFO, ZONE_INFO_BY_INDEX, req);
+        if (Error::notOK(err)) return err;
         size_t pli;
         pli = 3;
         uint16_t zoneId;
@@ -215,7 +318,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
         // - the devices in the zone
         req.clear();
         Ds485Comm::payload_append16(req, zoneId);
-        mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, ZONE_DEVICE_COUNT, ZONE_DEVICE_COUNT_ALL, req);
+        err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, ZONE_DEVICE_COUNT, ZONE_DEVICE_COUNT_ALL, req);
+        if (Error::notOK(err)) return err;
         uint16_t numZoneDevices;
         pli = 3;
         pli = Ds485Comm::payload_get16(resp, pli, numZoneDevices);
@@ -224,7 +328,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           string req;
           Ds485Comm::payload_append16(req, zoneId);
           Ds485Comm::payload_append16(req, j);
-          mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_INFO, DEVICE_INFO_BY_INDEX, req);
+          err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_INFO, DEVICE_INFO_BY_INDEX, req);
+          if (Error::notOK(err)) return err;
           pli = 3;
           uint16_t devId;
           pli = Ds485Comm::payload_get16(resp, pli, devId);
@@ -269,16 +374,15 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             groups, activeGroup, defaultGroup
           );
           Ds485DevicePtr dev = new Ds485Device(this, *dsmDsuid, devId);
+          dev->mIsPresent = active;
           // make a real dSUID out of it
-          const uint8_t dsprefix[10] = { 0x35, 0x04, 0x17, 0x5f, 0xe0, 0x00, 0x00, 0x00, 0x00, 0x00 };
-          string dsuidbin((char*)dsprefix, 10);
-          dsuidbin.append(dSUID->getBinary().substr(10,7));
-          dev->mDSUID.setAsBinary(dsuidbin);
+          dev->mDSUID.setAsDSId(dSUID->getBinary().substr(12, 4));
           dev->initializeName(devName);
           // - output channel info for determining output function
           req.clear();
           Ds485Comm::payload_append16(req, devId);
-          mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_O_P_C_TABLE, DEVICE_O_P_C_TABLE_GET_COUNT, req);
+          err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_O_P_C_TABLE, DEVICE_O_P_C_TABLE_GET_COUNT, req);
+          if (Error::notOK(err)) return err;
           pli = 3;
           uint8_t numOPC;
           pli = Ds485Comm::payload_get8(resp, pli, numOPC);
@@ -296,7 +400,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             req.clear();
             Ds485Comm::payload_append16(req, devId);
             Ds485Comm::payload_append8(req, oi);
-            mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_O_P_C_TABLE, DEVICE_O_P_C_TABLE_GET_BY_INDEX, req);
+            err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_O_P_C_TABLE, DEVICE_O_P_C_TABLE_GET_BY_INDEX, req);
+            if (Error::notOK(err)) return err;
             pli = 3;
             uint8_t channelId;
             pli = Ds485Comm::payload_get8(resp, pli, channelId);
@@ -370,7 +475,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           if (hasButton) {
             req.clear();
             Ds485Comm::payload_append16(req, devId);
-            mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_BUTTON_INFO, DEVICE_BUTTON_INFO_BY_DEVICE, req);
+            err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_BUTTON_INFO, DEVICE_BUTTON_INFO_BY_DEVICE, req);
+            if (Error::notOK(err)) return err;
             pli = 3;
             uint8_t ltNumGrp0;
             pli = Ds485Comm::payload_get8(resp, pli, ltNumGrp0);
@@ -416,7 +522,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           // - binary input info
           req.clear();
           Ds485Comm::payload_append16(req, devId);
-          mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_BINARY_INPUT, DEVICE_BINARY_INPUT_GET_COUNT, req);
+          err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_BINARY_INPUT, DEVICE_BINARY_INPUT_GET_COUNT, req);
+          if (Error::notOK(err)) return err;
           pli = 3;
           uint8_t numBinInps;
           pli = Ds485Comm::payload_get8(resp, pli, numBinInps);
@@ -426,7 +533,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             req.clear();
             Ds485Comm::payload_append16(req, devId);
             Ds485Comm::payload_append8(req, bi);
-            mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_BINARY_INPUT, DEVICE_BINARY_INPUT_GET_BY_INDEX, req);
+            err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_BINARY_INPUT, DEVICE_BINARY_INPUT_GET_BY_INDEX, req);
+            if (Error::notOK(err)) return err;
             pli = 3;
             uint8_t inpTargetGroupType;
             pli = Ds485Comm::payload_get8(resp, pli, inpTargetGroupType);
@@ -451,7 +559,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           // - sensor info
           req.clear();
           Ds485Comm::payload_append16(req, devId);
-          mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_SENSOR, DEVICE_SENSOR_GET_COUNT, req);
+          err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_SENSOR, DEVICE_SENSOR_GET_COUNT, req);
+          if (Error::notOK(err)) return err;
           pli = 3;
           uint8_t numSensors;
           pli = Ds485Comm::payload_get8(resp, pli, numSensors);
@@ -461,7 +570,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             req.clear();
             Ds485Comm::payload_append16(req, devId);
             Ds485Comm::payload_append8(req, si);
-            mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_SENSOR, DEVICE_SENSOR_GET_BY_INDEX, req);
+            err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, DEVICE_SENSOR, DEVICE_SENSOR_GET_BY_INDEX, req);
+            if (Error::notOK(err)) return err;
             pli = 3;
             uint8_t sensorType;
             pli = Ds485Comm::payload_get8(resp, pli, sensorType);
@@ -516,7 +626,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             }
           } // sensors
           // save device in list
-          mDevPrepList.push_back(dev);
+          mDs485Devices[fullDevId(dev->mDsmDsUid, dev->mDevId)] = dev;
         } // device
       } // zone
     } // not me

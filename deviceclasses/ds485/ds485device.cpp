@@ -48,7 +48,9 @@ Ds485Device::Ds485Device(Ds485Vdc *aVdcP, DsUid& aDsmDsUid, uint16_t aDevId) :
   mDs485Vdc(*aVdcP),
   mDsmDsUid(aDsmDsUid),
   mDevId(aDevId),
-  mNumOPC(0)
+  mIsPresent(false),
+  mNumOPC(0),
+  mUpdatingCache(false)
 {
   mDsmDsUid.isMemberVariable();
 }
@@ -80,7 +82,25 @@ string Ds485Device::deviceTypeIdentifier() const
 
 string Ds485Device::modelName()
 {
-  return "digitalSTROM device";
+  return "dS terminal block"; // intentionally, old way to write dS
+}
+
+
+string Ds485Device::hardwareGUID()
+{
+  return "dsid:"+mDSUID.getDSIdString();
+}
+
+
+string Ds485Device::webuiURLString()
+{
+  return getVdc().webuiURLString();
+}
+
+
+string Ds485Device::vendorName()
+{
+  return "digitalSTROM"; // intentionally, old way to write dS
 }
 
 
@@ -92,12 +112,113 @@ string Ds485Device::description()
 }
 
 
-// MARK: - output
 
+void Ds485Device::addedAndInitialized()
+{
+  updatePresenceState(mIsPresent);
+}
+
+
+// MARK: - message processing
+
+void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, DsClickType aClickType)
+{
+  if (aIsSensor) {
+    // TODO: sensor
+  }
+  else {
+    // button
+    switch (aClickType) {
+      case ct_local_off:
+      case ct_local_on: {
+        // device has been operated locally
+        OutputBehaviourPtr o = getOutput();
+        if (o) {
+          OLOG(LOG_NOTICE, "dS device output locally switched, update output state");
+          ChannelBehaviourPtr ch = o->getChannelByType(channeltype_default);
+          if (ch) ch->syncChannelValueBool(aClickType==ct_local_on);
+        }
+      }
+      default: {
+        // forward to button, if any
+        ButtonBehaviourPtr b = getButton(0);
+        if (b) {
+          OLOG(LOG_NOTICE, "dS device button click received");
+          b->injectClick(aClickType);
+        }
+        break;
+      }
+    }
+  }
+}
+
+
+void Ds485Device::traceChannelChange(DsChannelType aChannelType, uint8_t a8BitChannelValue)
+{
+  OutputBehaviourPtr o = getOutput();
+  if (o) {
+    OLOG(LOG_INFO, "channel type=%d got updated value 0x%02x / %d", aChannelType, a8BitChannelValue, a8BitChannelValue);
+    ChannelBehaviourPtr ch = o->getChannelByType(aChannelType);
+    if (ch) {
+      ch->syncChannelValue((double)a8BitChannelValue*100/255);
+    }
+  }
+}
+
+
+#define SCENE_APPLY_RESULT_SAMPLE_DELAY (0.5*Second)
+
+void Ds485Device::traceSceneCall(SceneNo aSceneNo)
+{
+  // only after a while, read back current value
+  // TODO: later, we can optimize and omit this, when we know we have the correct scene value already
+  mTracingTimer.executeOnce(boost::bind(&Ds485Device::startTracingFor, this, aSceneNo), SCENE_APPLY_RESULT_SAMPLE_DELAY);
+}
+
+
+void Ds485Device::startTracingFor(SceneNo aSceneNo)
+{
+  // trigger requesting
+  string payload;
+  Ds485Comm::payload_append8(payload, 64); // bank RAM
+  Ds485Comm::payload_append8(payload, 0); // offset outputvalue
+  issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+  // - traceChannelChange will get the actual scene value
+
+  // TODO: -> update the local scene value
+  // - need a pending scene value update flag for that!
+  // - also think of OPCs and shadow
+
+  // TODO: refresh scene values first
+  // dSS gets output value this way by DEVICE_CONFIG / DEVICE_CONFIG_GET / EVENT_DEVICE_CONFIG
+  //                                                                                              DevId Bk Of
+  // 302ED89F43F0000000002BA000011C8800 -> 302ED89F43F0000000000E400000E9D700, t=0x10: [06] 53 01 03 ED 40 00
+  //                                                                                                 DevId Bk Of Val
+  // 302ED89F43F0000000000E400000E9D700 -> FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, t=0xff: [08] 74 00 00 03 ED 40 00 FF
+  // 302ED89F43F0000000000E400000E9D700 -> FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, t=0xff: [08] 74 00 00 03 ED 40 01 00
+
+
+//  mUpdatingCache = true;
+//  callScene(aSceneNo, true);
+//  mUpdatingCache = false;
+}
+
+
+// MARK: - output
 
 void Ds485Device::identifyToUser(MLMicroSeconds aDuration)
 {
   issueDeviceRequest(DEVICE_ACTION_REQUEST, DEVICE_ACTION_REQUEST_ACTION_BLINK);
+}
+
+
+bool Ds485Device::prepareSceneApply(DsScenePtr aScene)
+{
+  // prevent applying when just updating cache
+  if (mUpdatingCache) {
+    OLOG(LOG_INFO, "NOT applying scene values - just updating cache");
+  }
+  return !mUpdatingCache;
 }
 
 
