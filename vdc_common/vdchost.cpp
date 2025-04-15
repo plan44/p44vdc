@@ -1228,7 +1228,7 @@ void VdcHost::vdcApiRequestHandler(VdcApiConnectionPtr aApiConnection, VdcApiReq
 string VdcHost::vdsmHostIp()
 {
   const char *ip = "<unknown>";
-  if (mVdsmSessionConnection->socketConnection()) {
+  if (mVdsmSessionConnection && mVdsmSessionConnection->socketConnection()) {
     ip = mVdsmSessionConnection->socketConnection()->getHost();
   }
   return ip;
