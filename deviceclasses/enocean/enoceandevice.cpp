@@ -81,6 +81,7 @@ string EnoceanChannelHandler::logContextPrefix()
 
 EnoceanDevice::EnoceanDevice(EnoceanVdc *aVdcP) :
   Device(aVdcP),
+  mEnoceanAddress(0),
   mEeProfile(eep_profile_unknown),
   mEeManufacturer(manufacturer_unknown),
   mAlwaysUpdateable(false),

@@ -59,7 +59,7 @@ Ds485Vdc::~Ds485Vdc()
 void Ds485Vdc::handleGlobalEvent(VdchostEvent aEvent)
 {
   if (aEvent==vdchost_vdcapi_connected) {
-    mDs485Comm.mDs485HostIP = VdcHost().vdsmHostIp();
+    mDs485Comm.mDs485HostIP = getVdcHost().vdsmHostIp();
     // re-connecting vdsm should re-scan ds485 devices
     collectDevices(NoOP, rescanmode_normal);
   }
