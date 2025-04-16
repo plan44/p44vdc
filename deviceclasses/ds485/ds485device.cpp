@@ -136,6 +136,7 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
           OLOG(LOG_NOTICE, "dS device output locally switched, update output state");
           ChannelBehaviourPtr ch = o->getChannelByType(channeltype_default);
           if (ch) ch->syncChannelValueBool(aClickType==ct_local_on);
+          o->reportOutputState();
         }
       }
       default: {
@@ -160,6 +161,7 @@ void Ds485Device::traceChannelChange(DsChannelType aChannelType, uint8_t a8BitCh
     ChannelBehaviourPtr ch = o->getChannelByType(aChannelType);
     if (ch) {
       ch->syncChannelValue((double)a8BitChannelValue*100/255);
+      o->reportOutputState();
     }
   }
 }
