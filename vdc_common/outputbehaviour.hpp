@@ -125,6 +125,7 @@ namespace p44 {
     /// push current output state (outputState and channelStates)
     /// @param aDS push to Digital Strom (probably will never be used, because they do not bother to support it)
     /// @param aBridges push to bridge API clients
+    /// @note actual pushing to DS can also be suppressed by !isPublicDS()
     /// @return true if requested pushes could be done (or none are requested at all)
     bool pushOutputState(bool aDS, bool aBridges);
 

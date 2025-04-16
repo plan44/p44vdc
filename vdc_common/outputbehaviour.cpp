@@ -314,7 +314,7 @@ bool OutputBehaviour::pushOutputState(bool aDS, bool aBridges)
 {
   bool requestedPushDone = true;
 
-  if (aDS) {
+  if (aDS && mDevice.isPublicDS()) {
     // TODO: remove and re-enable dead code below, should dS-vDC-API ever evolve to allow this
     requestedPushDone = false;
     OLOG(LOG_ERR, "pushing to dS is not yet implemented");

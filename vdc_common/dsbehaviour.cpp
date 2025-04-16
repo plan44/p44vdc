@@ -75,7 +75,7 @@ bool DsBehaviour::pushBehaviourState(bool aDS, bool aBridges)
 {
   bool requestedPushDone = true;
 
-  if (aDS) {
+  if (aDS && mDevice.isPublicDS()) {
     // push to vDC API
     VdcApiConnectionPtr api = mDevice.getVdcHost().getVdsmSessionConnection();
     if (api) {
