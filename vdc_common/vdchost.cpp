@@ -292,16 +292,16 @@ void VdcHost::setName(const string &aName)
 
 
 
-void VdcHost::setIdMode(DsUidPtr aExternalDsUid, const string aIfNameForMAC, int aInstance)
+void VdcHost::setIdMode(DsUid& aExternalDsUid, const string aIfNameForMAC, int aInstance)
 {
   mVdcHostInstance = aInstance;
   if (!aIfNameForMAC.empty()) {
     // use MAC from specific interface
     mac = macAddress(aIfNameForMAC.c_str());
   }
-  if (aExternalDsUid) {
+  if (!aExternalDsUid.empty()) {
     mExternalDsuid = true;
-    mDSUID = *aExternalDsUid;
+    mDSUID = aExternalDsUid;
   }
 }
 

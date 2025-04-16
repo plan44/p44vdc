@@ -59,12 +59,11 @@ using namespace std;
 namespace p44 {
 
   class DsUid;
-  typedef boost::intrusive_ptr<DsUid> DsUidPtr;
 
   /// Implements the dSUID, methods to generate it from SGTIN, UUID or hex string and to
   /// represent it as as hex string
   /// Currently, it also contains support for the old dsid, but this will be removed later
-  class DsUid : public P44Obj
+  class DsUid
   {
   public:
     /// type of ID
@@ -207,8 +206,8 @@ namespace p44 {
     ///   among subdevices. Should be set when mix may contain multiple subdevices of the same device.
     void xorDsUidIntoMix(string &aMix, bool aHashSubDeviceIndex);
 
-    /// get text for dSUID, nullptr allowed
-    static string text(DsUidPtr aDsUid);
+    /// get text for dSUID
+    string text() const;
 
     /// @}
 

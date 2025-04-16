@@ -52,7 +52,6 @@ Ds485Device::Ds485Device(Ds485Vdc *aVdcP, DsUid& aDsmDsUid, uint16_t aDevId) :
   mNumOPC(0),
   mUpdatingCache(false)
 {
-  mDsmDsUid.isMemberVariable();
 }
 
 
@@ -295,13 +294,13 @@ ErrorPtr Ds485Device::issueDeviceRequest(uint8_t aCommand, uint8_t aModifier, co
 
 ErrorPtr Ds485Device::issueDsmRequest(uint8_t aCommand, uint8_t aModifier, const string& aPayload)
 {
-  return mDs485Vdc.mDs485Comm.issueRequest(&mDsmDsUid, aCommand, aModifier, aPayload);
+  return mDs485Vdc.mDs485Comm.issueRequest(mDsmDsUid, aCommand, aModifier, aPayload);
 }
 
 
 void Ds485Device::executeDsmQuery(QueryCB aQueryCB, MLMicroSeconds aTimeout, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
 {
-  mDs485Vdc.mDs485Comm.executeQuery(aQueryCB, aTimeout, &mDsmDsUid, aCommand, aModifier, aPayload);
+  mDs485Vdc.mDs485Comm.executeQuery(aQueryCB, aTimeout, mDsmDsUid, aCommand, aModifier, aPayload);
 }
 
 

@@ -408,10 +408,10 @@ void DsUid::xorDsUidIntoMix(string &aMix, bool aHashSubDeviceIndex)
 }
 
 
-string DsUid::text(DsUidPtr aDsUid)
+string DsUid::text() const
 {
-  if (aDsUid) return aDsUid->getString();
-  return "<none>";
+  if (empty()) return "<none>";
+  return getString();
 }
 
 

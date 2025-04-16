@@ -129,11 +129,11 @@ string fullDevId(const DsUid& aDsuid, const uint16_t aDevId)
 }
 
 
-Ds485DevicePtr Ds485Vdc::deviceFor(DsUidPtr aDsmDsUid, uint16_t aDevId)
+Ds485DevicePtr Ds485Vdc::deviceFor(const DsUid& aDsmDsUid, uint16_t aDevId)
 {
   Ds485DevicePtr dev;
-  if (aDsmDsUid) {
-    Ds485DeviceMap::iterator pos = mDs485Devices.find(fullDevId(*aDsmDsUid, aDevId));
+  if (!aDsmDsUid.empty()) {
+    Ds485DeviceMap::iterator pos = mDs485Devices.find(fullDevId(aDsmDsUid, aDevId));
     if (pos!=mDs485Devices.end()) return pos->second;
   }
   return dev;
@@ -158,9 +158,9 @@ void Ds485Vdc::ds485BusScanned(ErrorPtr aScanStatus, StatusCB aCompletedCB)
 
 // MARK: - operation
 
-void Ds485Vdc::ds485MessageHandler(DsUidPtr aSource, DsUidPtr aTarget, const string aPayload)
+void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, const string aPayload)
 {
-  OLOG(LOG_NOTICE,"dS485 Message: %s -> %s: [%zu] %s", DsUid::text(aSource).c_str(), DsUid::text(aTarget).c_str(), aPayload.size(), binaryToHexString(aPayload, ' ').c_str());
+  OLOG(LOG_NOTICE,"dS485 Message: %s -> %s: [%zu] %s", aSource.text().c_str(), aTarget.text().c_str(), aPayload.size(), binaryToHexString(aPayload, ' ').c_str());
   size_t pli = 0;
   uint8_t command;
   if ((pli = Ds485Comm::payload_get8(aPayload, pli, command))==0) goto error;
@@ -269,10 +269,10 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
   int numDsms = ds485_client_query_devices(mDs485Comm.mDs485Client, busdevices, maxbusdevices);
   // iterate dSMs
   for (int di=0; di<numDsms; di++) {
-    DsUidPtr dsmDsuid = new DsUid(busdevices[di]);
-    OLOG(LOG_NOTICE, "dSM #%d: %s", di, dsmDsuid->getString().c_str());
+    DsUid dsmDsuid(busdevices[di]);
+    OLOG(LOG_NOTICE, "dSM #%d: %s", di, dsmDsuid.text().c_str());
     // prevent asking myself
-    if (*dsmDsuid!=*mDs485Comm.mMyDsuid) {
+    if (dsmDsuid!=mDs485Comm.mMyDsuid) {
       string resp;
       size_t pli;
       // - get the dSM info
@@ -355,8 +355,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           pli = Ds485Comm::payload_getGroups(resp, pli, groups);
           string devName;
           pli = Ds485Comm::payload_getString(resp, pli, 21, devName);
-          DsUidPtr dSUID = new DsUid;
-          dSUID->setAsBinary(resp.substr(pli, 17)); pli += 17;
+          DsUid dSUID;
+          dSUID.setAsBinary(resp.substr(pli, 17)); pli += 17;
           uint8_t activeGroup;
           pli = Ds485Comm::payload_get8(resp, pli, activeGroup);
           uint8_t defaultGroup;
@@ -367,16 +367,16 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             "- zoneID=%d/0x%04x, active=%d, locked=%d\n"
             "- outMode=0x%04x, ltMode=0x%04x\n"
             "- groups=0x%016llx, activeGroup=%d, defaultGroup=%d",
-            j, dSUID->getString().c_str(), devId, devName.c_str(),
+            j, dSUID.text().c_str(), devId, devName.c_str(),
             vendId, prodId, funcId, vers,
             zoneId, zoneId, active, locked,
             outMode, ltMode,
             groups, activeGroup, defaultGroup
           );
-          Ds485DevicePtr dev = new Ds485Device(this, *dsmDsuid, devId);
+          Ds485DevicePtr dev = new Ds485Device(this, dsmDsuid, devId);
           dev->mIsPresent = active;
           // make a real dSUID out of it
-          dev->mDSUID.setAsDSId(dSUID->getBinary().substr(12, 4));
+          dev->mDSUID.setAsDSId(dSUID.getBinary().substr(12, 4));
           dev->initializeName(devName);
           // - output channel info for determining output function
           req.clear();
@@ -621,7 +621,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             }
             if (!internalSensor) {
               SensorBehaviourPtr sb = new SensorBehaviour(*dev, ""); // automatic ID
-              sb->setHardwareSensorConfig(st, usage, 0, 4096, 1, sensorPollinterval*Second, sensorPollinterval*Second*3);
+              sb->setHardwareSensorConfig(st, su, 0, 4096, 1, sensorPollinterval*Second, sensorPollinterval*Second*3);
               dev->addBehaviour(sb);
             }
           } // sensors

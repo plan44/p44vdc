@@ -62,7 +62,7 @@ namespace p44 {
 
 
   /// callback for dS485 events and non-associated bus traffic messages
-  typedef boost::function<void (DsUidPtr aSource, DsUidPtr aTarget, const string aPayload)> Ds485MessageCB;
+  typedef boost::function<void (DsUid aSource, DsUid aTarget, const string aPayload)> Ds485MessageCB;
 
   /// callback for Query response
   typedef boost::function<void (ErrorPtr aError, const string &aResponsePayload)> QueryCB;
@@ -85,7 +85,7 @@ namespace p44 {
 
     Ds485MessageCB mDs485MessageHandler; ///< the message handler
 
-    DsUidPtr mMyDsuid; ///< the dSUID of my role as a client
+    DsUid mMyDsuid; ///< the dSUID of my role as a client
 
     string mDs485HostIP;
     string mTunnelCommandTemplate;
@@ -115,7 +115,7 @@ namespace p44 {
     /// @name callback receivers
     /// @{
     int linkStateChanged(bool aActive);
-    int busMemberChanged(DsUidPtr aDsUid, bool aJoined);
+    int busMemberChanged(DsUid aDsUid, bool aJoined);
     int containerReceived(const ds485_container_t *container);
     /// @}
 
@@ -137,9 +137,9 @@ namespace p44 {
     /// @name API to call from main thread (not blocking)
     /// @{
 
-    ErrorPtr issueRequest(DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload);
+    ErrorPtr issueRequest(DsUid aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload);
 
-    void executeQuery(QueryCB aQueryCB, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload);
+    void executeQuery(QueryCB aQueryCB, MLMicroSeconds aTimeout, DsUid aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload);
 
     /// set message handler
     /// @param aMessageHandler will be called when a (relevant, some pre-filtering may apply) dS485 bus message occurs
@@ -156,14 +156,14 @@ namespace p44 {
 
 
     void logContainer(int aLevel, const ds485_container_t& container, const char *aLabel);
-    void setupRequestContainer(ds485_container& aContainer, DsUidPtr aDestination, DsUidPtr aSource, const string aPayload);
-    void setupRequestCommand(ds485_container& aContainer, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
+    void setupRequestContainer(ds485_container& aContainer, DsUid aDestination, DsUid aSource, const string aPayload);
+    void setupRequestCommand(ds485_container& aContainer, DsUid aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
 
     /// @name synchronously executing, blocking calls, only to use from mDs485ClientThread
     /// @{
 
     ErrorPtr rawQuerySync(string& aResponse, MLMicroSeconds aTimeout, ds485_container aContainer);
-    ErrorPtr executeQuerySync(string& aResponse, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier = 0, const string& aPayload = "");
+    ErrorPtr executeQuerySync(string& aResponse, MLMicroSeconds aTimeout, DsUid aDestination, uint8_t aCommand, uint8_t aModifier = 0, const string& aPayload = "");
 
     /// @}
 

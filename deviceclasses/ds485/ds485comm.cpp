@@ -67,7 +67,7 @@ static int link_cb(void *_data, bool _state)
 static int bus_change_cb(void *data, dsuid_t *id, int flags)
 {
   Ds485Comm* dscomm = static_cast<Ds485Comm*>(data);
-  return dscomm->busMemberChanged(new DsUid(*id), !flags);
+  return dscomm->busMemberChanged(DsUid(*id), !flags);
 }
 
 static int container_cb(void *data, const ds485_container_t *container)
@@ -98,9 +98,9 @@ int Ds485Comm::linkStateChanged(bool aActive)
 }
 
 
-int Ds485Comm::busMemberChanged(DsUidPtr aDsUid, bool aJoined)
+int Ds485Comm::busMemberChanged(DsUid aDsUid, bool aJoined)
 {
-  FOCUSOLOG("bus: %s %s", DsUid::text(aDsUid).c_str(), aJoined ? "JOINED" : "LEFT");
+  FOCUSOLOG("bus: %s %s", aDsUid.getString().c_str(), aJoined ? "JOINED" : "LEFT");
   return 0;
 }
 
@@ -129,9 +129,9 @@ int Ds485Comm::containerReceived(const ds485_container_t *container)
 ErrorPtr Ds485Comm::processContainer(ds485_container aContainer)
 {
   if (mDs485MessageHandler) {
-    DsUidPtr source = new DsUid(aContainer.sourceId);
-    DsUidPtr destination;
-    if (!dsuid_is_broadcast(&aContainer.destinationId)) destination= new DsUid(aContainer.destinationId);
+    DsUid source(aContainer.sourceId);
+    DsUid destination;
+    if (!dsuid_is_broadcast(&aContainer.destinationId)) destination.setAsDs485DsUid(aContainer.destinationId);
     mDs485MessageHandler(source, destination, getPayload(aContainer));
   }
   return ErrorPtr();
@@ -240,15 +240,15 @@ size_t Ds485Comm::payload_getString(const string &aPayload, size_t aAtIndex, siz
 void Ds485Comm::logContainer(int aLevel, const ds485_container_t& container, const char *aLabel)
 {
   if (LOGENABLED(aLevel)) {
-    DsUidPtr source = new DsUid(container.sourceId);
-    DsUidPtr destination = new DsUid(container.destinationId);
+    DsUid source(container.sourceId);
+    DsUid destination(container.destinationId);
     OLOG(aLevel,
       "%s: %s%s (%d): %s -> %s, t=0x%02x: [%02d] %s",
       aLabel,
       container.containerFlags & DS485_FLAG_BROADCAST ? "BROADCAST " : "",
       container.containerType==DS485_CONTAINER_EVENT ? "EVENT   " : (container.containerType==DS485_CONTAINER_REQUEST ? "REQUEST " : "RESPONSE"), container.containerType,
-      source->getString().c_str(),
-      destination->getString().c_str(),
+      source.getString().c_str(),
+      destination.getString().c_str(),
       container.transactionId,
       container.length,
       dataToHexString(container.data, container.length, ' ').c_str()
@@ -257,26 +257,26 @@ void Ds485Comm::logContainer(int aLevel, const ds485_container_t& container, con
 }
 
 
-void Ds485Comm::setupRequestContainer(ds485_container& aContainer, DsUidPtr aDestination, DsUidPtr aSource, const string aPayload)
+void Ds485Comm::setupRequestContainer(ds485_container& aContainer, DsUid aDestination, DsUid aSource, const string aPayload)
 {
   // clear everything
   memset(&aContainer, 0, sizeof(ds485_container));
   // destination: if passed null, this is a broadcast
-  if (!aDestination) {
+  if (aDestination.empty()) {
     // broadcast
     aContainer.destinationId = DSUID_BROADCAST;
     aContainer.containerFlags = DS485_FLAG_BROADCAST;
   }
   else {
-    aDestination->copyAsDs485DsUid(aContainer.destinationId);
+    aDestination.copyAsDs485DsUid(aContainer.destinationId);
     aContainer.containerFlags = DS485_FLAG_NONE;
   }
   // source: if passed null, use my own dSUID
-  if (!aSource) {
-    if (mMyDsuid) mMyDsuid->copyAsDs485DsUid(aContainer.sourceId);
+  if (aSource.empty()) {
+    mMyDsuid.copyAsDs485DsUid(aContainer.sourceId);
   }
   else {
-    aSource->copyAsDs485DsUid(aContainer.sourceId);
+    aSource.copyAsDs485DsUid(aContainer.sourceId);
   }
   // this is a request
   aContainer.containerType = DS485_CONTAINER_REQUEST;
@@ -290,13 +290,13 @@ void Ds485Comm::setupRequestContainer(ds485_container& aContainer, DsUidPtr aDes
 }
 
 
-void Ds485Comm::setupRequestCommand(ds485_container& aContainer, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
+void Ds485Comm::setupRequestCommand(ds485_container& aContainer, DsUid aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
 {
   string payload;
   payload_append8(payload, aCommand);
   payload_append8(payload, aModifier);
   payload.append(aPayload);
-  setupRequestContainer(aContainer, aDestination, DsUidPtr(), payload);
+  setupRequestContainer(aContainer, aDestination, DsUid(), payload);
 }
 
 
@@ -377,7 +377,7 @@ void Ds485Comm::ds485ClientThreadSignal(ChildThreadWrapper &aChildThread, Thread
 
 // MARK: - API to call from main thread (not blocking)
 
-void Ds485Comm::executeQuery(QueryCB aQueryCB, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
+void Ds485Comm::executeQuery(QueryCB aQueryCB, MLMicroSeconds aTimeout, DsUid aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
 {
   if (mQueryRunning) aQueryCB(TextError::err("cannot run executeQuery concurrently"), "");
   mQueryRunning = true;
@@ -397,7 +397,7 @@ void Ds485Comm::queryComplete(ErrorPtr aStatus, QueryCB aQueryCB)
 }
 
 
-ErrorPtr Ds485Comm::issueRequest(DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
+ErrorPtr Ds485Comm::issueRequest(DsUid aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
 {
   ds485_container request;
   setupRequestCommand(request, aDestination, aCommand, aModifier, aPayload);
@@ -415,7 +415,7 @@ ErrorPtr Ds485Comm::issueRequest(DsUidPtr aDestination, uint8_t aCommand, uint8_
 
 #define DEFAULT_QUERY_TIMEOUT (2*Second)
 
-ErrorPtr Ds485Comm::executeQuerySync(string &aResponse, MLMicroSeconds aTimeout, DsUidPtr aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
+ErrorPtr Ds485Comm::executeQuerySync(string &aResponse, MLMicroSeconds aTimeout, DsUid aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
 {
   if (aTimeout==0) aTimeout = DEFAULT_QUERY_TIMEOUT;
   ds485_container request;
@@ -474,8 +474,8 @@ void Ds485Comm::ds485ClientThread(ChildThreadWrapper &aThread)
   // - get my own dSUID
   dsuid_t libDsuid;
   ds485_client_get_dsuid(mDs485Client, &libDsuid);
-  mMyDsuid = new DsUid(libDsuid);
-  OLOG(LOG_NOTICE, "library dSUID: %s", DsUid::text(mMyDsuid).c_str());
+  mMyDsuid.setAsDs485DsUid(libDsuid);
+  OLOG(LOG_NOTICE, "library dSUID: %s", mMyDsuid.getString().c_str());
   // wait for calls from main thread
   aThread.crossThreadCallProcessor();
   // done, close the client

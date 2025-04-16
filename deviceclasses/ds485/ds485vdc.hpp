@@ -99,9 +99,8 @@ namespace p44 {
     /// @param aEvent the event to handle
     virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
 
-
     /// @return device matching dSM's dSUID and local deviceId
-    Ds485DevicePtr deviceFor(DsUidPtr aDsmDsUid, uint16_t aDevId);
+    Ds485DevicePtr deviceFor(const DsUid& aDsmDsUid, uint16_t aDevId);
 
   private:
 
@@ -113,7 +112,7 @@ namespace p44 {
     /// @}
 
     void ds485BusScanned(ErrorPtr aScanStatus, StatusCB aCompletedCB);
-    void ds485MessageHandler(DsUidPtr aSource, DsUidPtr aTarget, const string aPayload);
+    void ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, const string aPayload);
 
   };
 
