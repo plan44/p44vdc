@@ -306,8 +306,9 @@ void Ds485Comm::setupRequestCommand(ds485_container& aContainer, DsUid aDestinat
 void Ds485Comm::establishTunnel()
 {
   string cmd = string_substitute(string_substitute(mTunnelCommandTemplate, "%PORT%", string_format("%d", mApiPort)), "%HOST%", mDs485HostIP);
-  OLOG(LOG_INFO, "starting ssh tunnel: %s", cmd.c_str());
+  OLOG(LOG_INFO, "starting tunnel: %s", cmd.c_str());
   mTunnelPid = MainLoop::currentMainLoop().fork_and_system(boost::bind(&Ds485Comm::tunnelCollapsed, this, _1, _2), cmd.c_str());
+  OLOG(LOG_INFO, "tunnel command pid = %d", mTunnelPid);
 }
 
 

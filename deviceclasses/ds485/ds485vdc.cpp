@@ -160,7 +160,7 @@ void Ds485Vdc::ds485BusScanned(ErrorPtr aScanStatus, StatusCB aCompletedCB)
 
 void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, const string aPayload)
 {
-  OLOG(LOG_NOTICE,"dS485 Message: %s -> %s: [%zu] %s", aSource.text().c_str(), aTarget.text().c_str(), aPayload.size(), binaryToHexString(aPayload, ' ').c_str());
+  OLOG(LOG_INFO,"dS485 Message: %s -> %s: [%zu] %s", aSource.text().c_str(), aTarget.text().c_str(), aPayload.size(), binaryToHexString(aPayload, ' ').c_str());
   size_t pli = 0;
   uint8_t command;
   if ((pli = Ds485Comm::payload_get8(aPayload, pli, command))==0) goto error;
@@ -270,7 +270,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
   // iterate dSMs
   for (int di=0; di<numDsms; di++) {
     DsUid dsmDsuid(busdevices[di]);
-    OLOG(LOG_NOTICE, "dSM #%d: %s", di, dsmDsuid.text().c_str());
+    OLOG(LOG_NOTICE, "scanning dSM #%d: %s", di, dsmDsuid.text().c_str());
     // prevent asking myself
     if (dsmDsuid!=mDs485Comm.mMyDsuid) {
       string resp;
@@ -290,14 +290,14 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
       pli += 12; // skip "dSID"
       string dsmName;
       pli = Ds485Comm::payload_getString(resp, pli, 21, dsmName);
-      OLOG(LOG_NOTICE, "dSM #%d: '%s', hwV=0x%08x, armV=0x%08x, dspV=0x%08x, apiV=0x%04x", di, dsmName.c_str(), dsmHwVersion, dsmArmVersion, dsmDSPVersion, dsmAPIVersion);
+      OLOG(LOG_INFO, "dSM #%d: '%s', hwV=0x%08x, armV=0x%08x, dspV=0x%08x, apiV=0x%04x", di, dsmName.c_str(), dsmHwVersion, dsmArmVersion, dsmDSPVersion, dsmAPIVersion);
       // - get the zone count
       err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, ZONE_COUNT);
       if (Error::notOK(err)) return err;
       pli = 3;
       uint8_t zoneCount;
       pli = Ds485Comm::payload_get8(resp, pli, zoneCount);
-      OLOG(LOG_NOTICE, "dSM #%d: has %d zones", di, zoneCount);
+      OLOG(LOG_INFO, "dSM #%d: has %d zones", di, zoneCount);
       // - the zones
       for (int i=0; i<zoneCount; i++) {
         string req;
@@ -314,7 +314,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
         pli = Ds485Comm::payload_get8(resp, pli, numGroups);
         string zonename;
         pli = Ds485Comm::payload_getString(resp, pli, 21, zonename);
-        OLOG(LOG_NOTICE, "zone #%d: id=%d, virtid=%d, numgroups=%d, name='%s'", i, zoneId, vzoneId, numGroups, zonename.c_str());
+        OLOG(LOG_NOTICE, "scanning zone #%d: id=%d, virtid=%d, numgroups=%d, name='%s'", i, zoneId, vzoneId, numGroups, zonename.c_str());
         // - the devices in the zone
         req.clear();
         Ds485Comm::payload_append16(req, zoneId);
@@ -323,7 +323,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
         uint16_t numZoneDevices;
         pli = 3;
         pli = Ds485Comm::payload_get16(resp, pli, numZoneDevices);
-        OLOG(LOG_NOTICE, "zone #%d: number of devices = %d", i, numZoneDevices);
+        OLOG(LOG_INFO, "zone #%d: number of devices = %d", i, numZoneDevices);
         for (int j=0; j<numZoneDevices; j++) {
           string req;
           Ds485Comm::payload_append16(req, zoneId);
@@ -361,7 +361,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           pli = Ds485Comm::payload_get8(resp, pli, activeGroup);
           uint8_t defaultGroup;
           pli = Ds485Comm::payload_get8(resp, pli, defaultGroup);
-          OLOG(LOG_NOTICE,
+          OLOG(LOG_INFO,
             "device #%d: %s [0x%04x] - '%s'\n"
             "- vendId=0x%04x, prodId=0x%04x, funcId=0x%04x, vers=0x%04x\n"
             "- zoneID=%d/0x%04x, active=%d, locked=%d\n"
@@ -386,7 +386,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           pli = 3;
           uint8_t numOPC;
           pli = Ds485Comm::payload_get8(resp, pli, numOPC);
-          OLOG(LOG_NOTICE, "device #%d: number of OPC channels = %d", j, numOPC);
+          OLOG(LOG_INFO, "device #%d: number of OPC channels = %d", j, numOPC);
           dev->mNumOPC = numOPC;
           // - output mode and function
           VdcOutputMode mode = outputmode_disabled;
@@ -405,7 +405,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             pli = 3;
             uint8_t channelId;
             pli = Ds485Comm::payload_get8(resp, pli, channelId);
-            OLOG(LOG_NOTICE, "device #%d: channel #%d: channelId=%d", j, oi, channelId);
+            OLOG(LOG_INFO, "device #%d: channel #%d: channelId=%d", j, oi, channelId);
             // check channelid, gives indication for output function
             if (channelId==channeltype_hue) func = outputFunction_colordimmer;
             if (channelId==channeltype_colortemp && func!=outputFunction_colordimmer) func = outputFunction_ctdimmer;
@@ -488,7 +488,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             uint8_t buttonchannel;
             pli = Ds485Comm::payload_get8(resp, pli, buttonchannel);
             pli++; // skip "unused"
-            OLOG(LOG_NOTICE,
+            OLOG(LOG_INFO,
               "device #%d '%s': button: id/LTNUMGRP0=0x%02x, group=%d, flags=0x%02x, channel=%d",
               j, devName.c_str(),
               ltNumGrp0, buttongroup, buttonflags, buttonchannel
@@ -527,7 +527,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           pli = 3;
           uint8_t numBinInps;
           pli = Ds485Comm::payload_get8(resp, pli, numBinInps);
-          OLOG(LOG_NOTICE, "device #%d: number of binary inputs = %d", j, numBinInps);
+          OLOG(LOG_INFO, "device #%d: number of binary inputs = %d", j, numBinInps);
           for (int bi=0; bi<numBinInps; bi++) {
             // - binary input info
             req.clear();
@@ -546,7 +546,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             pli = Ds485Comm::payload_get8(resp, pli, inpButtonId);
             uint8_t inpIndependent;
             pli = Ds485Comm::payload_get8(resp, pli, inpIndependent);
-            OLOG(LOG_NOTICE,
+            OLOG(LOG_INFO,
               "- device #%d: binary input #%d: targetGroupType=%d, targetGroup=%d, type=%d, buttonId=0x%02x, independent=%d",
               j, bi, inpTargetGroupType, inpTargetGroup, inpType, inpButtonId, inpIndependent
             );
@@ -564,7 +564,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           pli = 3;
           uint8_t numSensors;
           pli = Ds485Comm::payload_get8(resp, pli, numSensors);
-          OLOG(LOG_NOTICE, "device #%d: number of sensors = %d", j, numSensors);
+          OLOG(LOG_INFO, "device #%d: number of sensors = %d", j, numSensors);
           for (int si=0; si<numSensors; si++) {
             // - sensor info
             req.clear();
@@ -581,7 +581,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             pli = Ds485Comm::payload_get8(resp, pli, sensorZone);
             uint8_t sensorPushConvert;
             pli = Ds485Comm::payload_get8(resp, pli, sensorPushConvert);
-            OLOG(LOG_NOTICE,
+            OLOG(LOG_INFO,
               "device #%d: sensor #%d: type=%d, pollinterval=%d, globalZone=%d, pushConvert=%d",
               j, si, sensorType, sensorPollinterval, sensorZone, sensorPushConvert
             );
