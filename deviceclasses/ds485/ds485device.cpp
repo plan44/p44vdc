@@ -115,6 +115,7 @@ string Ds485Device::description()
 void Ds485Device::addedAndInitialized()
 {
   updatePresenceState(mIsPresent);
+  requestOutputValueUpdate();
 }
 
 
@@ -177,13 +178,21 @@ void Ds485Device::traceSceneCall(SceneNo aSceneNo)
 }
 
 
+void Ds485Device::requestOutputValueUpdate()
+{
+  if (getOutput()) {
+    string payload;
+    Ds485Comm::payload_append8(payload, 64); // bank RAM
+    Ds485Comm::payload_append8(payload, 0); // offset outputvalue
+    issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+  }
+}
+
+
 void Ds485Device::startTracingFor(SceneNo aSceneNo)
 {
-  // trigger requesting
-  string payload;
-  Ds485Comm::payload_append8(payload, 64); // bank RAM
-  Ds485Comm::payload_append8(payload, 0); // offset outputvalue
-  issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+  // trigger request for current value
+  requestOutputValueUpdate();
   // - traceChannelChange will get the actual scene value
 
   // TODO: -> update the local scene value

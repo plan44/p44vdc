@@ -25,7 +25,7 @@
 #define ALWAYS_DEBUG 0
 // - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
 //   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
-#define FOCUSLOGLEVEL 5
+#define FOCUSLOGLEVEL 7
 
 #include "ds485vdc.hpp"
 #include "ds485device.hpp"
@@ -44,7 +44,9 @@ using namespace p44;
 // MARK: - Ds485Vdc
 
 Ds485Vdc::Ds485Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
-  Vdc(aInstanceNumber, aVdcHostP, aTag)
+  Vdc(aInstanceNumber, aVdcHostP, aTag),
+  mDs485Started(false),
+  mDs485HostKnown(false)
 {
   mDs485Comm.isMemberVariable();
 }
@@ -59,22 +61,140 @@ Ds485Vdc::~Ds485Vdc()
 void Ds485Vdc::handleGlobalEvent(VdchostEvent aEvent)
 {
   if (aEvent==vdchost_vdcapi_connected) {
-    mDs485Comm.mDs485HostIP = getVdcHost().vdsmHostIp();
-    // re-connecting vdsm should re-scan ds485 devices
-    collectDevices(NoOP, rescanmode_normal);
+    if (!mDs485HostKnown) {
+      mDs485Comm.mDs485HostIP = getVdcHost().vdsmHostIp();
+      OLOG(LOG_INFO, "got dS485 host: %s", mDs485Comm.mDs485HostIP.c_str());
+      mDs485HostKnown = true;
+    }
+    if (!mDs485Started) {
+      // could not be started at initialize, do it now and then do collect
+      mDs485Started = true;
+      mDs485Comm.start(boost::bind(&Ds485Vdc::recollect, this, rescanmode_normal));
+    }
+    else {
+      // just recollect
+      recollect(rescanmode_incremental);
+    }
   }
   inherited::handleGlobalEvent(aEvent);
 }
 
 
-// MARK: - initialisation
+#define RECOLLECT_RETRY_DELAY (30*Second)
+
+void Ds485Vdc::recollect(RescanMode aRescanMode)
+{
+  mRecollectTicket.cancel();
+  if (!isCollecting()) {
+    // collect now
+    collectDevices(NoOP, aRescanMode);
+  }
+  else {
+    // retry later
+    mRecollectTicket.executeOnce(boost::bind(&Ds485Vdc::recollect, this, aRescanMode), RECOLLECT_RETRY_DELAY);
+  }
+}
+
+
+
+// MARK: - DB + initialisation
+
+// Version history
+//  1 : first version
+#define DS485_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
+#define DS485_SCHEMA_VERSION 1 // current version
+
+string Ds485Persistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
+{
+  string sql;
+  if (aFromVersion==0) {
+    // create DB from scratch
+    // - use standard globs table for schema version
+    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    // - add fields to globs table
+    sql.append(
+      "ALTER TABLE globs ADD tunnelPw TEXT;"
+      "ALTER TABLE globs ADD tunnelHost TEXT;"
+    );
+    // reached final version in one step
+    aToVersion = DS485_SCHEMA_VERSION;
+  }
+  return sql;
+}
+
+
+ErrorPtr Ds485Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
+{
+  ErrorPtr respErr;
+  if (aMethod=="setDs485Params") {
+    // hue specific addition, only via genericRequest
+    ApiValuePtr o = aParams->get("tunnelPw");
+    if (o) {
+      string pw = o->stringValue();
+      mDs485Comm.setTunnelPw(pw);
+      string host; // default to automatic
+      o = aParams->get("tunnelHost");
+      if (o) {
+        // host specified, overrides existing one
+        host = o->stringValue();
+        mDs485Comm.mApiHost = host;
+      }
+      // save
+      if(mDb.executef(
+        "UPDATE globs SET tunnelPw='%q', tunnelHost='%q'",
+        pw.c_str(), host.c_str()
+      )!=SQLITE_OK) {
+        respErr = mDb.error("saving dS485 params");
+      }
+      else {
+        // done
+        respErr = Error::ok();
+      }
+    }
+  }
+  else {
+    respErr = inherited::handleMethod(aRequest, aMethod, aParams);
+  }
+  return respErr;
+}
+
 
 void Ds485Vdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
+  // load persistent params for dSUID
+  load();
+  // load private data
+  string databaseName = getPersistentDataDir();
+  string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
+  ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), DS485_SCHEMA_VERSION, DS485_SCHEMA_MIN_VERSION, aFactoryReset);
+  if (Error::notOK(error)) aCompletedCB(error); // failed
+  // get tunnel pw
+  sqlite3pp::query qry(mDb);
+  if (qry.prepare("SELECT tunnelPw, tunnelHost FROM globs")==SQLITE_OK) {
+    sqlite3pp::query::iterator i = qry.begin();
+    if (i!=qry.end()) {
+      mDs485Comm.setTunnelPw(nonNullCStr(i->get<const char *>(0)));
+      string host = nonNullCStr(i->get<const char *>(1));
+      if (!host.empty()) {
+        mDs485Comm.mDs485HostIP = host;
+        mDs485HostKnown = true; // prevent automatic
+      }
+    }
+  }
   // install handler
   mDs485Comm.setDs485MessageHandler(boost::bind(&Ds485Vdc::ds485MessageHandler, this, _1, _2, _3));
-  // start
-  mDs485Comm.start(aCompletedCB);
+  // start if we have everything ready
+  if (
+    !mDs485Started &&
+    (mDs485Comm.mTunnelCommandTemplate.empty() || mDs485HostKnown) // no tunnel needed or already startable
+  ) {
+    mDs485Started = true;
+    mDs485Comm.start(aCompletedCB);
+  }
+  else {
+    OLOG(LOG_WARNING, "cannot yet start dS485 device scan - waiting for API to get ready");
+    if (aCompletedCB) aCompletedCB(ErrorPtr());
+  }
 }
 
 
@@ -111,6 +231,9 @@ int Ds485Vdc::getRescanModes() const
 /// @param aCompletedCB will be called when device scan for this vDC has been completed
 void Ds485Vdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
+  if (!mDs485Started) {
+    if (aCompletedCB) aCompletedCB(ErrorPtr()); // too early
+  }
   if (!(aRescanFlags & rescanmode_incremental)) {
     // full collect, remove all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);

@@ -141,6 +141,7 @@ namespace p44 {
 
   private:
 
+    void requestOutputValueUpdate();
     void startTracingFor(SceneNo aSceneNo);
 
     ErrorPtr issueDeviceRequest(uint8_t aCommand, uint8_t aModifier, const string& aMorePayload = "");

@@ -39,6 +39,17 @@ namespace p44 {
   class Ds485Vdc;
   class Ds485Device;
 
+
+  /// persistence for dS485
+  class Ds485Persistence : public SQLite3Persistence
+  {
+    typedef SQLite3Persistence inherited;
+  protected:
+    /// Get DB Schema creation/upgrade SQL statements
+    virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
+  };
+
+
   typedef boost::intrusive_ptr<Ds485Vdc> Ds485VdcPtr;
   class Ds485Vdc final : public Vdc
   {
@@ -47,6 +58,11 @@ namespace p44 {
 
     typedef std::map<string, Ds485DevicePtr> Ds485DeviceMap;
     Ds485DeviceMap mDs485Devices;
+    bool mDs485Started;
+    bool mDs485HostKnown;
+    MLTicket mRecollectTicket;
+
+    Ds485Persistence mDb;
 
   public:
 
@@ -93,6 +109,9 @@ namespace p44 {
     /// deliver (forward) notifications to devices in one call instead of forwarding on device level
     virtual void deliverToDevicesAudience(DsAddressablesList aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams) P44_OVERRIDE;
 
+    /// vdc level methods
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+
   protected:
 
     /// handle global events
@@ -113,6 +132,8 @@ namespace p44 {
 
     void ds485BusScanned(ErrorPtr aScanStatus, StatusCB aCompletedCB);
     void ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, const string aPayload);
+
+    void recollect(RescanMode aRescanMode);
 
   };
 

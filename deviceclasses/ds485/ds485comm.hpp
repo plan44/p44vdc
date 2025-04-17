@@ -89,6 +89,7 @@ namespace p44 {
 
     string mDs485HostIP;
     string mTunnelCommandTemplate;
+    string mTunnelPw;
     MLTicket mTunnelRestarter;
     pid_t mTunnelPid;
 
@@ -108,6 +109,10 @@ namespace p44 {
     ///   %HOST% will be replaced with vDSM IP if known, otherwise with host in aConnectionSpec,
     ///   %PORT% will be replaced with port in aConnectionSpec.
     void setConnectionSpecification(const char *aConnectionSpec, uint16_t aDefaultPort, const char* aTunnelCommandTemplate);
+
+    /// Set tunnel PW or token that may be needed in aTunnelCommandTemplate
+    /// @param aTunnelPW tunnel PW
+    void setTunnelPw(string aTunnelPw) { mTunnelPw = aTunnelPw; }
 
     void start(StatusCB aCompletedCB);
     void stop();

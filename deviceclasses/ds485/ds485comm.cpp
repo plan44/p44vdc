@@ -25,7 +25,7 @@
 #define ALWAYS_DEBUG 0
 // - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
 //   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
-#define FOCUSLOGLEVEL 6
+#define FOCUSLOGLEVEL 7
 
 #include "ds485comm.hpp"
 
@@ -305,8 +305,10 @@ void Ds485Comm::setupRequestCommand(ds485_container& aContainer, DsUid aDestinat
 
 void Ds485Comm::establishTunnel()
 {
-  string cmd = string_substitute(string_substitute(mTunnelCommandTemplate, "%PORT%", string_format("%d", mApiPort)), "%HOST%", mDs485HostIP);
+  string cmd = string_substitute(string_substitute(mTunnelCommandTemplate, "%PORT%", string_format("%d", mApiPort)), "%HOST%", shellQuote(mDs485HostIP));
   OLOG(LOG_INFO, "starting tunnel: %s", cmd.c_str());
+  // pw is sensitive, substitute only after logging
+  cmd = string_substitute(cmd, "%PW%", shellQuote(mTunnelPw));
   mTunnelPid = MainLoop::currentMainLoop().fork_and_system(boost::bind(&Ds485Comm::tunnelCollapsed, this, _1, _2), cmd.c_str());
   OLOG(LOG_INFO, "tunnel command pid = %d", mTunnelPid);
 }
