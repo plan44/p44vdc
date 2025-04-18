@@ -50,7 +50,8 @@ Ds485Device::Ds485Device(Ds485Vdc *aVdcP, DsUid& aDsmDsUid, uint16_t aDevId) :
   mDevId(aDevId),
   mIsPresent(false),
   mNumOPC(0),
-  mUpdatingCache(false)
+  mUpdatingCache(false),
+  mTracedScene(INVALID_SCENE_NO)
 {
 }
 
@@ -161,10 +162,34 @@ void Ds485Device::traceChannelChange(DsChannelType aChannelType, uint8_t a8BitCh
     OLOG(LOG_INFO, "channel type=%d got updated value 0x%02x / %d", aChannelType, a8BitChannelValue, a8BitChannelValue);
     ChannelBehaviourPtr ch = o->getChannelByType(aChannelType);
     if (ch) {
-      ch->syncChannelValue((double)a8BitChannelValue*100/255);
+      double newValue = (double)a8BitChannelValue*100/255;
+      ch->syncChannelValue(newValue);
       o->reportOutputState();
+      // update local scene's value
+      SceneDeviceSettingsPtr scenes = getScenes();
+      if (scenes && mTracedScene!=INVALID_SCENE_NO) {
+        DsScenePtr scene = scenes->getScene(mTracedScene);
+        if (scene && !scene->isDontCare()) {
+          SceneCmd c = scene->mSceneCmd;
+          if (
+            c==scene_cmd_invoke ||
+            c==scene_cmd_off ||
+            c==scene_cmd_min ||
+            c==scene_cmd_max
+          ) {
+            // traced channel value originates from this scene -> update local value
+            scene->setSceneValue(ch->getChannelIndex(), newValue);
+            mCachedScenes[mTracedScene] = true; // we are in sync now
+            if (scene->isDirty()) {
+              scenes->updateScene(scene);
+              POLOG(ch, LOG_NOTICE, "updated in scene %s to new value %.1f", VdcHost::sceneText(mTracedScene, false).c_str(), newValue);
+            }
+          }
+        }
+      }
     }
   }
+  mTracedScene = INVALID_SCENE_NO;
 }
 
 
@@ -172,9 +197,18 @@ void Ds485Device::traceChannelChange(DsChannelType aChannelType, uint8_t a8BitCh
 
 void Ds485Device::traceSceneCall(SceneNo aSceneNo)
 {
-  // only after a while, read back current value
-  // TODO: later, we can optimize and omit this, when we know we have the correct scene value already
-  mTracingTimer.executeOnce(boost::bind(&Ds485Device::startTracingFor, this, aSceneNo), SCENE_APPLY_RESULT_SAMPLE_DELAY);
+  if (mCachedScenes[aSceneNo]) {
+    // we have the output value(s) cached that have been invoked with this scene
+    // -> just simulate scene call to have our channel values adjusted
+    mUpdatingCache = true; // prevent actual output update
+    callScene(aSceneNo, true);
+    mUpdatingCache = false;
+  }
+  else {
+    // we do not yet have a cached value
+    // -> wait a little for output to settle, then read back current value from device
+    mTracingTimer.executeOnce(boost::bind(&Ds485Device::startTracingFor, this, aSceneNo), SCENE_APPLY_RESULT_SAMPLE_DELAY);
+  }
 }
 
 
@@ -189,28 +223,56 @@ void Ds485Device::requestOutputValueUpdate()
 }
 
 
+void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string aPayload, size_t aPli)
+{
+  bool invalidate = false;
+  switch (aFlaggedModifier) {
+    case DEV(DEVICE_ACTION_REQUEST_ACTION_SAVE_SCENE):
+    case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_SAVE_SCENE):
+      // saving scene must invalidate scene value cache
+      invalidate = true;
+    case DEV(DEVICE_ACTION_REQUEST_ACTION_CALL_SCENE):
+    case DEV(DEVICE_ACTION_REQUEST_ACTION_FORCE_CALL_SCENE):
+    case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_CALL_SCENE):
+    case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_FORCE_CALL_SCENE):
+    case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_CALL_SCENE_MIN):
+    case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_LOCAL_STOP):
+    case ZG(20): // FIXME: not in dsm-api-const, only in dsm-api.xml
+    {
+      // all these cause output to change to a unknown value, so we need to get the output
+      // state after the command completes, and update our local scene value along
+      SceneNo scene;
+      if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, scene))==0) goto error;
+      if (invalidate) {
+        mCachedScenes[scene] = false;
+        OLOG(LOG_NOTICE, "scene %s saved -> trigger updating chache", VdcHost::sceneText(mTracedScene, false).c_str());
+        // traceSceneCall will need to actually trace down the current, now saved value
+      }
+      traceSceneCall(scene);
+      break;
+    }
+    case DEV(DEVICE_ACTION_REQUEST_ACTION_SET_OUTVAL):
+    case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_SET_OUTVAL):
+    {
+      uint8_t outval;
+      if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, outval))==0) goto error;
+      traceChannelChange(channeltype_default, outval);
+      break;
+    }
+  }
+  return;
+error:
+  LOG(LOG_WARNING, "payload too short (%zu) to access data at %zu", aPayload.size(), aPli);
+}
+
+
+
 void Ds485Device::startTracingFor(SceneNo aSceneNo)
 {
   // trigger request for current value
+  mTracedScene = aSceneNo;
   requestOutputValueUpdate();
   // - traceChannelChange will get the actual scene value
-
-  // TODO: -> update the local scene value
-  // - need a pending scene value update flag for that!
-  // - also think of OPCs and shadow
-
-  // TODO: refresh scene values first
-  // dSS gets output value this way by DEVICE_CONFIG / DEVICE_CONFIG_GET / EVENT_DEVICE_CONFIG
-  //                                                                                              DevId Bk Of
-  // 302ED89F43F0000000002BA000011C8800 -> 302ED89F43F0000000000E400000E9D700, t=0x10: [06] 53 01 03 ED 40 00
-  //                                                                                                 DevId Bk Of Val
-  // 302ED89F43F0000000000E400000E9D700 -> FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, t=0xff: [08] 74 00 00 03 ED 40 00 FF
-  // 302ED89F43F0000000000E400000E9D700 -> FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, t=0xff: [08] 74 00 00 03 ED 40 01 00
-
-
-//  mUpdatingCache = true;
-//  callScene(aSceneNo, true);
-//  mUpdatingCache = false;
 }
 
 
@@ -227,6 +289,12 @@ bool Ds485Device::prepareSceneApply(DsScenePtr aScene)
   // prevent applying when just updating cache
   if (mUpdatingCache) {
     OLOG(LOG_INFO, "NOT applying scene values - just updating cache");
+    // just consider all channels already applied, which is true because
+    // this callScene run was triggered by monitoring an actual
+    // dS485 scene call of which we knew we have the values cached.
+    // So we did not retrieve and sync channels, but fake-apply the scene
+    allChannelsApplied();
+    getOutput()->reportOutputState();
   }
   return !mUpdatingCache;
 }

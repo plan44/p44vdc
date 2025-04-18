@@ -25,6 +25,7 @@
 
 #include "device.hpp"
 #include "ds485comm.hpp"
+#include <bitset>
 
 #if ENABLE_DS485DEVICES
 
@@ -34,6 +35,9 @@ namespace p44 {
 
   class Ds485Vdc;
   class Ds485Device;
+
+  #define ZG(mod) (0x5A00|(mod))
+  #define DEV(mod) (0x4400|(mod))
 
   class Ds485Device final : public Device
   {
@@ -48,6 +52,9 @@ namespace p44 {
 
     bool mUpdatingCache; ///< if this is set, channels must not be applied to dS, because we are only updating the cache FROM dS-side change
     MLTicket mTracingTimer;
+    SceneNo mTracedScene;
+
+    std::bitset<NUM_VALID_SCENES> mCachedScenes; ///< scenes we have already cached
 
   public:
 
@@ -140,6 +147,8 @@ namespace p44 {
 
 
   private:
+
+    void processActionRequest(uint16_t aFlaggedModifier, const string aPayload, size_t aPli);
 
     void requestOutputValueUpdate();
     void startTracingFor(SceneNo aSceneNo);

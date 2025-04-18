@@ -233,6 +233,7 @@ void Ds485Vdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   if (!mDs485Started) {
     if (aCompletedCB) aCompletedCB(ErrorPtr()); // too early
+    return;
   }
   if (!(aRescanFlags & rescanmode_incremental)) {
     // full collect, remove all devices
@@ -311,26 +312,30 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
       }
       break;
     }
+    case ZONE_GROUP_ACTION_REQUEST: {
+      uint16_t zoneId;
+      if ((pli = Ds485Comm::payload_get16(aPayload, pli, zoneId))==0) goto error;
+      uint8_t group;
+      if ((pli = Ds485Comm::payload_get8(aPayload, pli, group))==0) goto error;
+      uint16_t originDevId;
+      if ((pli = Ds485Comm::payload_get16(aPayload, pli, originDevId))==0) goto error;
+      // send to every device matching zone and group
+      for (Ds485DeviceMap::iterator pos = mDs485Devices.begin(); pos!=mDs485Devices.end(); ++pos) {
+        Ds485DevicePtr dev = pos->second;
+        OutputBehaviourPtr o = dev->getOutput();
+        if (o && o->isMember((DsGroup)group) && dev->getZoneID()==zoneId) {
+          // device is in this group and zone
+          dev->processActionRequest(ZG(modifier), aPayload, pli);
+        }
+      }
+      break;
+    }
     case DEVICE_ACTION_REQUEST: {
       uint16_t devId;
       if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) goto error;
       Ds485DevicePtr dev = deviceFor(aTarget, devId);
       if (dev) {
-        switch (modifier) {
-          // 302ED89F43F0000000002BA000011C8800 -> 302ED89F43F0000000000E400000E9D700: [05] 51 01 02 98 0E
-          case DEVICE_ACTION_REQUEST_ACTION_CALL_SCENE: {
-            SceneNo scene;
-            if ((pli = Ds485Comm::payload_get8(aPayload, pli, scene))==0) goto error;
-            dev->traceSceneCall(scene);
-            break;
-          }
-          // 302ED89F43F0000000002BA000011C8800 -> 302ED89F43F0000000000E400000E9D700: [5] 51 07 03 ED B8
-          case DEVICE_ACTION_REQUEST_ACTION_SET_OUTVAL: {
-            uint8_t outval;
-            if ((pli = Ds485Comm::payload_get8(aPayload, pli, outval))==0) goto error;
-            dev->traceChannelChange(channeltype_default, outval);
-          }
-        }
+        dev->processActionRequest(DEV(modifier), aPayload, pli);
       }
       break;
     }
@@ -361,6 +366,7 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
             break;
         }
       }
+      break;
     }
   }
   return;

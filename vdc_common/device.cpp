@@ -589,7 +589,7 @@ Tristate Device::hasModelFeature(DsModelFeatures aFeatureIndex)
       return canIdentifyToUser() ? yes : no;
     case modelFeature_dontcare:
       // Generic: all devices with scene table have the ability to set scene's don't care flag
-      return boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings)!=NULL ? yes : no;
+      return getScenes()!=NULL ? yes : no;
     case modelFeature_ledauto:
     case modelFeature_leddark:
       // Virtual devices do not have the standard dS LED at all
@@ -1478,7 +1478,7 @@ void Device::dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPt
   mAreaDimMode = dimmode_stop; // but do not assume dimming before we've checked the area dontCare flags
   // check area if any
   if (aArea>0) {
-    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
+    SceneDeviceSettingsPtr scenes = getScenes();
     if (scenes) {
       // check area first
       SceneNo areaScene = SimpleScene::mainSceneForArea(aArea);
@@ -1986,7 +1986,7 @@ void Device::undoScene(SceneNo aSceneNo)
 
 void Device::setLocalPriority(SceneNo aSceneNo)
 {
-  SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
+  SceneDeviceSettingsPtr scenes = getScenes();
   if (scenes) {
     OLOG(LOG_NOTICE, "SetLocalPriority(%s):", VdcHost::sceneText(aSceneNo).c_str());
     // we have a device-wide scene table, get the scene object
@@ -2001,7 +2001,7 @@ void Device::setLocalPriority(SceneNo aSceneNo)
 
 void Device::callSceneMin(SceneNo aSceneNo)
 {
-  SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
+  SceneDeviceSettingsPtr scenes = getScenes();
   if (scenes) {
     OLOG(LOG_NOTICE, "CallSceneMin(%s):", VdcHost::sceneText(aSceneNo).c_str());
     // we have a device-wide scene table, get the scene object
@@ -2040,7 +2040,7 @@ void Device::saveScene(SceneNo aSceneNo)
 {
   // see if we have a scene table at all
   OLOG(LOG_NOTICE, "SaveScene(%s)", VdcHost::sceneText(aSceneNo).c_str());
-  SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
+  SceneDeviceSettingsPtr scenes = getScenes();
   if (scenes) {
     // we have a device-wide scene table, get the scene object
     DsScenePtr scene = scenes->getScene(aSceneNo);
@@ -2070,7 +2070,7 @@ void Device::outputSceneValueSaved(DsScenePtr aScene)
         // update this main scene's dontCare
         aScene->setDontCare(mustBeDontCare);
         // also update the off scene's dontCare
-        SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
+        SceneDeviceSettingsPtr scenes = getScenes();
         DsScenePtr offScene = scenes->getScene(SimpleScene::offSceneForArea(area));
         if (offScene) {
           offScene->setDontCare(mustBeDontCare);
@@ -2087,7 +2087,7 @@ void Device::outputSceneValueSaved(DsScenePtr aScene)
 
 void Device::updateSceneIfDirty(DsScenePtr aScene)
 {
-  SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
+  SceneDeviceSettingsPtr scenes = getScenes();
   if (scenes && aScene->isDirty()) {
     scenes->updateScene(aScene);
   }
@@ -2294,7 +2294,7 @@ int Device::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
     return (int)mCachedConfigurations.size();
   }
   else if (aParentDescriptor->hasObjectKey(device_scenes_key)) {
-    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
+    SceneDeviceSettingsPtr scenes = getScenes();
     if (scenes)
       return NUM_VALID_SCENES;
     else
@@ -2475,7 +2475,7 @@ PropertyContainerPtr Device::getContainer(const PropertyDescriptorPtr aPropertyD
     return mOutput->getChannelByIndex((int)aPropertyDescriptor->fieldKey());
   }
   else if (aPropertyDescriptor->hasObjectKey(device_scenes_key)) {
-    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
+    SceneDeviceSettingsPtr scenes = getScenes();
     if (scenes) {
       return scenes->getScene(aPropertyDescriptor->fieldKey());
     }
@@ -2606,7 +2606,7 @@ ErrorPtr Device::writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr
   if (aPropertyDescriptor->hasObjectKey(device_scenes_key)) {
     // a scene was written, update needed if dirty
     DsScenePtr scene = boost::dynamic_pointer_cast<DsScene>(aContainer);
-    SceneDeviceSettingsPtr scenes = boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings);
+    SceneDeviceSettingsPtr scenes = getScenes();
     if (scenes && scene && scene->isDirty()) {
       scenes->updateScene(scene);
       return ErrorPtr();
