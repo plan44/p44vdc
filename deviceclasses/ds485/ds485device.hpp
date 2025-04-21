@@ -101,6 +101,14 @@ namespace p44 {
     /// @return URL for Web-UI (for access from local LAN)
     virtual string webuiURLString() P44_OVERRIDE;
 
+    /// Get icon data or name
+    /// @param aIcon string to put result into (when method returns true)
+    /// - if aWithData is set, binary PNG icon data for given resolution prefix is returned
+    /// - if aWithData is not set, only the icon name (without file extension) is returned
+    /// @param aWithData if set, PNG data is returned, otherwise only name
+    /// @return true if there is an icon, false if not
+    virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
+
     /// @}
 
     virtual void addedAndInitialized() P44_OVERRIDE;

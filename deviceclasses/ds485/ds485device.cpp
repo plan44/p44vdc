@@ -112,6 +112,14 @@ string Ds485Device::description()
 }
 
 
+bool Ds485Device::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
+{
+  if (getClassColoredIcon("ds485", getDominantColorClass(), aIcon, aWithData, aResolutionPrefix))
+    return true;
+  else
+    return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
+}
+
 
 void Ds485Device::addedAndInitialized()
 {
