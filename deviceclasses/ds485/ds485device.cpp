@@ -51,6 +51,7 @@ Ds485Device::Ds485Device(Ds485Vdc *aVdcP, DsUid& aDsmDsUid, uint16_t aDevId) :
   mIsPresent(false),
   mNumOPC(0),
   mUpdatingCache(false),
+  m16BitBuffer(0),
   mTracedScene(INVALID_SCENE_NO)
 {
 }
@@ -153,7 +154,7 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
         // forward to button, if any
         ButtonBehaviourPtr b = getButton(0);
         if (b) {
-          OLOG(LOG_NOTICE, "dS device button click received");
+          OLOG(LOG_NOTICE, "dS device button click received: clicktype=%d", aClickType);
           b->injectClick(aClickType);
         }
         break;
@@ -163,35 +164,96 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
 }
 
 
-void Ds485Device::traceChannelChange(DsChannelType aChannelType, uint8_t a8BitChannelValue)
+void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
+{
+  switch (aBank) {
+    case 64: // RAM
+      switch (aOffs) {
+        case 0: {
+          trace8bitChannelChange(nullptr, aByte, false);
+          break;
+        }
+        case 2: // lobyte
+        case 3: // hibyte
+        case 4:
+        case 5:
+        case 6: // lobyte
+        case 7: { // hibyte
+          ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
+          if (sb) {
+            // is shadow
+            bool transitional = false;
+            switch (aOffs) {
+              case 6: // current
+              case 2: // target
+                m16BitBuffer = aByte; // lower byte of target or actual position
+                break;
+              case 7: // current
+                transitional = true;
+              case 3: { // target
+                m16BitBuffer |= ((uint16_t)aByte)<<8; // upper byte of target or actual position
+                // position is first channel
+                ChannelBehaviourPtr ch = getOutput()->getChannelByIndex(0);
+                trace16bitChannelChange(ch, m16BitBuffer, transitional);
+                m16BitBuffer = 0;
+                break;
+              }
+              case 5: // current lamella
+                transitional = true;
+              case 4: // target lamella
+                // lamella is second channel
+                trace8bitChannelChange(getOutput()->getChannelByIndex(1), aByte, transitional);
+                break;
+            }
+          }
+          // TODO: blue and green blocks have the relevant values in other offsets
+          break;
+        }
+      }
+      break;
+  }
+}
+
+
+void Ds485Device::trace8bitChannelChange(ChannelBehaviourPtr aChannelOrNullForDefault, uint8_t a8BitChannelValue, bool aTransitional)
+{
+  trace16bitChannelChange(aChannelOrNullForDefault, (uint16_t)a8BitChannelValue<<8, aTransitional);
+}
+
+
+void Ds485Device::trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForDefault, uint16_t a16BitChannelValue, bool aTransitional)
 {
   OutputBehaviourPtr o = getOutput();
-  if (o) {
-    OLOG(LOG_INFO, "channel type=%d got updated value 0x%02x / %d", aChannelType, a8BitChannelValue, a8BitChannelValue);
-    ChannelBehaviourPtr ch = o->getChannelByType(aChannelType);
-    if (ch) {
-      double newValue = (double)a8BitChannelValue*100/255;
-      ch->syncChannelValue(newValue);
-      o->reportOutputState();
-      // update local scene's value
-      SceneDeviceSettingsPtr scenes = getScenes();
-      if (scenes && mTracedScene!=INVALID_SCENE_NO) {
-        DsScenePtr scene = scenes->getScene(mTracedScene);
-        if (scene && !scene->isDontCare()) {
-          SceneCmd c = scene->mSceneCmd;
-          if (
-            c==scene_cmd_invoke ||
-            c==scene_cmd_off ||
-            c==scene_cmd_min ||
-            c==scene_cmd_max
-          ) {
-            // traced channel value originates from this scene -> update local value
-            scene->setSceneValue(ch->getChannelIndex(), newValue);
-            mCachedScenes[mTracedScene] = true; // we are in sync now
-            if (scene->isDirty()) {
-              scenes->updateScene(scene);
-              POLOG(ch, LOG_NOTICE, "updated in scene %s to new value %.1f", VdcHost::sceneText(mTracedScene, false).c_str(), newValue);
-            }
+  if (!aChannelOrNullForDefault) {
+    if (o) aChannelOrNullForDefault = o->getChannelByType(channeltype_default);
+  }
+  if (o && aChannelOrNullForDefault) {
+    // TODO: maybe evaluate aTransitional?
+    double newValue = (double)a16BitChannelValue*100/255/0x100;
+    POLOG(aChannelOrNullForDefault, LOG_INFO,
+      "got updated dS485 value: 16bit=0x%04x/%d 8bit=0x%02x/%d) = %.2f",
+      a16BitChannelValue, a16BitChannelValue, a16BitChannelValue>>8, a16BitChannelValue>>8, newValue
+    );
+    aChannelOrNullForDefault->syncChannelValue(newValue);
+    o->reportOutputState();
+    // update local scene's value
+    SceneDeviceSettingsPtr scenes = getScenes();
+    if (scenes && mTracedScene!=INVALID_SCENE_NO) {
+      DsScenePtr scene = scenes->getScene(mTracedScene);
+      if (scene && !scene->isDontCare()) {
+        SceneCmd c = scene->mSceneCmd;
+        if (
+          c==scene_cmd_invoke ||
+          c==scene_cmd_off ||
+          c==scene_cmd_min ||
+          c==scene_cmd_max
+        ) {
+          // traced channel value originates from this scene -> update local value
+          scene->setSceneValue(aChannelOrNullForDefault->getChannelIndex(), newValue);
+          mCachedScenes[mTracedScene] = true; // we are in sync now
+          if (scene->isDirty()) {
+            scenes->updateScene(scene);
+            POLOG(aChannelOrNullForDefault, LOG_NOTICE, "updated in scene %s to new value %.1f", VdcHost::sceneText(mTracedScene, false).c_str(), newValue);
           }
         }
       }
@@ -264,7 +326,7 @@ void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string a
     {
       uint8_t outval;
       if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, outval))==0) goto error;
-      traceChannelChange(channeltype_default, outval);
+      trace8bitChannelChange(nullptr, outval, false);
       break;
     }
   }
@@ -325,7 +387,32 @@ void Ds485Device::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       l->brightnessApplied();
     }
     else if (sb) {
-      // TODO: handle shadow
+      if (sb->mPosition->needsApplying()) {
+        // set new target position
+        uint16_t new16val = sb->mPosition->getChannelValue()*255*0x100/100;
+        string payload;
+        // hi byte
+        Ds485Comm::payload_append8(payload, 64); // Bank: RAM
+        Ds485Comm::payload_append8(payload, 3); // Offset 3: hi byte
+        Ds485Comm::payload_append8(payload, new16val>>8);
+        issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_SET, payload);
+        // lo byte
+        payload.clear();
+        Ds485Comm::payload_append8(payload, 64); // Bank: RAM
+        Ds485Comm::payload_append8(payload, 2); // Offset 2: lo byte
+        Ds485Comm::payload_append8(payload, new16val & 0xFF);
+        issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_SET, payload);
+        sb->mPosition->channelValueApplied();
+      }
+      if (sb->mAngle && sb->mAngle->needsApplying()) {
+        // set new angle
+        string payload;
+        Ds485Comm::payload_append8(payload, 64); // Bank: RAM
+        Ds485Comm::payload_append8(payload, 4); // Target lamella angle
+        Ds485Comm::payload_append8(payload, sb->mAngle->getChannelValue()*255/100);
+        issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_SET, payload);
+        sb->mAngle->channelValueApplied();
+      }
     }
     else {
       // simple unspecific output

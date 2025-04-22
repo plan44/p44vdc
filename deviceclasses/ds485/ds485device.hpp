@@ -53,8 +53,10 @@ namespace p44 {
     bool mUpdatingCache; ///< if this is set, channels must not be applied to dS, because we are only updating the cache FROM dS-side change
     MLTicket mTracingTimer;
     SceneNo mTracedScene;
+    uint16_t m16BitBuffer; ///< buffer for subsequent lo/hi byte data reads
 
     std::bitset<NUM_VALID_SCENES> mCachedScenes; ///< scenes we have already cached
+
 
   public:
 
@@ -151,14 +153,15 @@ namespace p44 {
 
     /// trace scene call to figure out how the device's current state now is
     void traceSceneCall(SceneNo aSceneNo);
-    void traceChannelChange(DsChannelType aChannelType, uint8_t a8BitChannelValue);
-
+    void traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte);
 
   private:
 
     void processActionRequest(uint16_t aFlaggedModifier, const string aPayload, size_t aPli);
 
     void requestOutputValueUpdate();
+    void trace8bitChannelChange(ChannelBehaviourPtr aChannelOrNullForDefault, uint8_t a8BitChannelValue, bool aTransitional);
+    void trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForDefault, uint16_t a16BitChannelValue, bool aTransitional);
     void startTracingFor(SceneNo aSceneNo);
 
     ErrorPtr issueDeviceRequest(uint8_t aCommand, uint8_t aModifier, const string& aMorePayload = "");

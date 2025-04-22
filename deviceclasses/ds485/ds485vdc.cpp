@@ -305,7 +305,8 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
           if ((pli = Ds485Comm::payload_get8(aPayload, pli, keyNo))==0) goto error;
           uint8_t click;
           if ((pli = Ds485Comm::payload_get8(aPayload, pli, click))==0) goto error;
-          Ds485DevicePtr dev = deviceFor(aSource, devId);
+          // TODO: quality, flags, crosstalk are not read for now
+          Ds485DevicePtr dev = deviceFor(aSource, devId); // upstream -> source is relevant
           if (dev) dev->handleDeviceUpstreamMessage(isSensor, keyNo, (DsClickType)click);
           break;
         }
@@ -333,20 +334,44 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
     case DEVICE_ACTION_REQUEST: {
       uint16_t devId;
       if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) goto error;
-      Ds485DevicePtr dev = deviceFor(aTarget, devId);
+      Ds485DevicePtr dev = deviceFor(aTarget, devId); // downstream -> target is relevant
       if (dev) {
         dev->processActionRequest(DEV(modifier), aPayload, pli);
       }
       break;
     }
+    case DEVICE_CONFIG: {
+      // this is a device config (bank/offset) read or write request
+      switch (modifier) {
+        case DEVICE_CONFIG_SET: {
+          // this is a device config write
+          uint16_t devId;
+          if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) goto error;
+          Ds485DevicePtr dev = deviceFor(aTarget, devId); // downstream -> target is relevant
+          if (dev) {
+            // this is a device config write to this device
+            uint8_t bank;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, bank))==0) goto error;
+            uint8_t offs;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, offs))==0) goto error;
+            uint8_t byte;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, byte))==0) goto error;
+            dev->traceConfigValue(bank, offs, byte);
+          }
+          break;
+        }
+      }
+      break;
+    }
     case EVENT_DEVICE_CONFIG: {
+      // Note: does not have a modifier!
       // this is the response for requesting a bank/offset type DEVICE_CONFIG request
       // 302ED89F43F0000000000E400000E9D700 -> FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, t=0xff: [08] 74 00 00 03 ED 40 00 FF
       // 302ED89F43F0000000000E400000E9D700 -> FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, t=0xff: [08] 74 00 00 03 ED 40 01 00
       pli++; // skip that 3rd byte dsm events seem to have
       uint16_t devId;
       if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) goto error;
-      Ds485DevicePtr dev = deviceFor(aSource, devId);
+      Ds485DevicePtr dev = deviceFor(aSource, devId); // upstream -> source is relevant
       if (dev) {
         // this is a device config readout from this device
         uint8_t bank;
@@ -355,16 +380,7 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
         if ((pli = Ds485Comm::payload_get8(aPayload, pli, offs))==0) goto error;
         uint8_t byte;
         if ((pli = Ds485Comm::payload_get8(aPayload, pli, byte))==0) goto error;
-        switch (bank) {
-          case 64:// RAM
-            switch (offs) {
-              case 0: // standard output value
-                dev->traceChannelChange(channeltype_default, byte);
-                break;
-              // TODO: gray, blue and green blocks have the relevant values in other offsets
-            }
-            break;
-        }
+        dev->traceConfigValue(bank, offs, byte);
       }
       break;
     }
