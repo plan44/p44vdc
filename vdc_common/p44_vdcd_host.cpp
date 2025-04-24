@@ -285,6 +285,7 @@ void P44VdcHost::enableUbusApi()
   if (!mUbusApiServer) {
     // can be enabled only once
     mUbusApiServer = UbusServerPtr(new UbusServer());
+    mUbusApiServer->setLogLevelOffset(-1); // a bit more quiet by default
     UbusObjectPtr u = new UbusObject("vdcd", boost::bind(&P44VdcHost::ubusApiRequestHandler, this, _1));
     u->addMethod("api", vdcapi_policy);
 //    u->addMethod("cfg", cfgapi_policy);
@@ -301,7 +302,7 @@ void P44VdcHost::ubusApiRequestHandler(UbusRequestPtr aUbusRequest)
     aUbusRequest->sendResponse(JsonObjectPtr(), UBUS_STATUS_INVALID_ARGUMENT);
     return;
   }
-  LOG(LOG_DEBUG, "ubus -> vdcd (JSON) request received: %s", aUbusRequest->msg()->c_strValue());
+  POLOG(mUbusApiServer, LOG_INFO, "request received: %s", aUbusRequest->msg()->c_strValue());
   ErrorPtr err;
   UbusApiRequestPtr request = UbusApiRequestPtr(new UbusApiRequest(aUbusRequest));
   if (aUbusRequest->method()=="api") {
@@ -371,7 +372,7 @@ ApiValuePtr UbusApiConnection::newApiValue()
 
 UbusApiRequest::UbusApiRequest(UbusRequestPtr aUbusRequest)
 {
-  ubusRequest = aUbusRequest;
+  mUbusRequest = aUbusRequest;
 }
 
 
@@ -383,7 +384,7 @@ VdcApiConnectionPtr UbusApiRequest::connection()
 
 ErrorPtr UbusApiRequest::sendResult(ApiValuePtr aResult)
 {
-  LOG(LOG_DEBUG, "ubus <- vdcd (JSON) result sent: result=%s", aResult ? aResult->description().c_str() : "<none>");
+  POLOG(mUbusRequest->server(), LOG_INFO, "sending result: %s", aResult ? aResult->description().c_str() : "<none>");
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
   JsonObjectPtr r;
   if (result) r = result->jsonObject();
@@ -399,7 +400,7 @@ ErrorPtr UbusApiRequest::sendError(ErrorPtr aError)
   if (!aError) {
     aError = Error::ok();
   }
-  LOG(LOG_DEBUG, "ubus <- vdcd (JSON) error sent: error=%d (%s)", aError->getErrorCode(), aError->getErrorMessage());
+  POLOG(mUbusRequest->server(), LOG_INFO, "sending error: %d (%s)", aError->getErrorCode(), aError->getErrorMessage());
   sendResponse(JsonObjectPtr(), err);
   return ErrorPtr();
 }
@@ -425,8 +426,8 @@ void UbusApiRequest::sendResponse(JsonObjectPtr aResult, ErrorPtr aError)
     // no error, return result (if any)
     response->add("result", aResult);
   }
-  LOG(LOG_DEBUG, "ubus response: %s", response->c_strValue());
-  ubusRequest->sendResponse(response);
+  POLOG(mUbusRequest->server(), LOG_INFO, "sending response: %s", response->c_strValue());
+  mUbusRequest->sendResponse(response);
 }
 
 
@@ -443,6 +444,7 @@ void P44VdcHost::enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllow
   if (!mConfigApi) {
     // can be enabled only once
     mConfigApi = new P44CfgApiConnection(new SocketComm(MainLoop::currentMainLoop()));
+    mConfigApi->setLogLevelOffset(-1); // a bit more quiet by default
     mConfigApi->mJsonApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, aProtocolFamily);
     mConfigApi->mJsonApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
   }
@@ -477,7 +479,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
   signalActivity(); // P44 JSON API calls are activity as well
   if (Error::isOK(aError)) {
     // not JSON level error, try to process
-    LOG(LOG_DEBUG, "cfg -> vdcd (JSON) request received: %s", aJsonObject->c_strValue());
+    POLOG(mConfigApi, LOG_DEBUG, "request received: %s", aJsonObject->c_strValue());
     // find out which one is our actual JSON request
     // - try POST data first
     JsonObjectPtr request = aJsonObject->get("data");
@@ -523,7 +525,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
           aError = WebError::webErr(500, "no features instantiated, API not active");
         }
         else {
-          ApiRequestPtr req = ApiRequestPtr(new APICallbackRequest(request, boost::bind(&P44VdcHost::sendJsonApiResponse, aJsonComm, _1, _2, "")));
+          ApiRequestPtr req = ApiRequestPtr(new APICallbackRequest(request, boost::bind(&P44VdcHost::sendJsonApiResponse, aJsonComm, _1, _2, "", *static_cast<P44LoggingObj*>(featureApi.get()))));
           featureApi->handleRequest(req);
         }
       }
@@ -561,7 +563,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
           }
           else if (request->get("status", o) && o->boolValue()) {
             // get view status
-            sendJsonApiResponse(aJsonComm, view->viewStatus(), ErrorPtr(), reqid);
+            sendJsonApiResponse(aJsonComm, view->viewStatus(), ErrorPtr(), reqid, *mConfigApi);
             return;
           }
           else if (request->get("configure", o)) {
@@ -576,7 +578,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
             res->add("y", JsonObject::newInt32(cover.y));
             res->add("dx", JsonObject::newInt32(cover.dx));
             res->add("dy", JsonObject::newInt32(cover.dy));
-            sendJsonApiResponse(aJsonComm, res, ErrorPtr(), reqid);
+            sendJsonApiResponse(aJsonComm, res, ErrorPtr(), reqid, *mConfigApi);
             return;
           }
           else {
@@ -617,7 +619,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
   }
   // if error or explicit OK, send response now. Otherwise, request processing will create and send the response
   if (aError) {
-    sendJsonApiResponse(aJsonComm, JsonObjectPtr(), aError, reqid);
+    sendJsonApiResponse(aJsonComm, JsonObjectPtr(), aError, reqid, *mConfigApi);
   }
 }
 
@@ -652,7 +654,7 @@ ErrorPtr P44VdcHost::processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aReq
 
 // MARK: - methods for JSON APIs
 
-void P44VdcHost::sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError, string aReqId)
+void P44VdcHost::sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError, string aReqId, P44LoggingObj& aLoggingObj)
 {
   // create response
   JsonObjectPtr response = JsonObject::newObj();
@@ -674,7 +676,7 @@ void P44VdcHost::sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResul
   if (!aReqId.empty()) {
     response->add("id", JsonObject::newString(aReqId));
   }
-  LOG(LOG_DEBUG, "JSON API response: %s", response->c_strValue());
+  SOLOG(aLoggingObj, LOG_INFO, "sending response: %s", response->c_strValue());
   aJsonComm->sendMessage(response);
 }
 
@@ -781,14 +783,14 @@ VdcApiConnectionPtr P44JsonApiRequest::connection()
 
 ErrorPtr P44JsonApiRequest::sendResult(ApiValuePtr aResult)
 {
-  LOG(LOG_DEBUG, "%s <- vdcd (JSON) result: %s", mJsonApi->apiName(), aResult ? aResult->description().c_str() : "<none>");
+  POLOG(mJsonApi, LOG_INFO, "sending result: %s", aResult ? aResult->description().c_str() : "<none>");
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
   if (result) {
-    P44VdcHost::sendJsonApiResponse(mJsonComm, result->jsonObject(), ErrorPtr(), mRequestId);
+    P44VdcHost::sendJsonApiResponse(mJsonComm, result->jsonObject(), ErrorPtr(), mRequestId, *mJsonApi);
   }
   else {
     // JSON APIs: always return SOMETHING as result
-    P44VdcHost::sendJsonApiResponse(mJsonComm, JsonObject::newNull(), ErrorPtr(), mRequestId);
+    P44VdcHost::sendJsonApiResponse(mJsonComm, JsonObject::newNull(), ErrorPtr(), mRequestId, *mJsonApi);
   }
   return ErrorPtr();
 }
@@ -800,8 +802,8 @@ ErrorPtr P44JsonApiRequest::sendError(ErrorPtr aError)
   if (!aError) {
     aError = Error::ok();
   }
-  LOG(LOG_DEBUG, "%s <- vdcd (JSON) error: %ld (%s)", mJsonApi->apiName(), aError->getErrorCode(), aError->getErrorMessage());
-  P44VdcHost::sendJsonApiResponse(mJsonComm, JsonObjectPtr(), aError, mRequestId);
+  POLOG(mJsonApi, LOG_DEBUG, "sending error: %ld (%s)", aError->getErrorCode(), aError->getErrorMessage());
+  P44VdcHost::sendJsonApiResponse(mJsonComm, JsonObjectPtr(), aError, mRequestId, *mJsonApi);
   return ErrorPtr();
 }
 
@@ -849,6 +851,7 @@ void P44VdcHost::enableBridgeApi(const char *aServiceOrPort, bool aNonLocalAllow
     mBridgeApi = new BridgeApiConnection(new SocketComm(MainLoop::currentMainLoop()));
     mBridgeApi->mJsonApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, aProtocolFamily);
     mBridgeApi->mJsonApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
+    mBridgeApi->setLogLevelOffset(-1); // a bit more quiet by default
   }
 }
 
@@ -878,13 +881,13 @@ void P44VdcHost::bridgeApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
   string reqid;
   if (Error::isOK(aError)) {
     // not JSON level error, try to process
-    LOG(LOG_DEBUG, "bridge -> vdcd (JSON) request received: %s", aJsonRequest->c_strValue());
+    POLOG(mBridgeApi, LOG_INFO, "request received: %s", aJsonRequest->c_strValue());
     // - make sure we do not get an ErrorOK back from processed notifications, sender does NOT expect an answer
     aError = processVdcRequest(mBridgeApi, aJsonComm, aJsonRequest, reqid, false);
   }
   // if error or explicit OK, send response now. Otherwise, request processing will create and send the response
   if (aError) {
-    sendJsonApiResponse(aJsonComm, JsonObjectPtr(), aError, reqid);
+    sendJsonApiResponse(aJsonComm, JsonObjectPtr(), aError, reqid, *mBridgeApi);
   }
 }
 
@@ -910,7 +913,7 @@ void BridgeApiConnection::notifyBridgeClient(SocketCommPtr aSocketComm, const st
   JsonApiValuePtr notification = boost::dynamic_pointer_cast<JsonApiValue>(aParams);
   JsonCommPtr comm = dynamic_pointer_cast<JsonComm>(aSocketComm);
   if (comm && notification) {
-    LOG(LOG_DEBUG, "JSON API notification: %s", notification->jsonObject()->c_strValue());
+    OLOG(LOG_INFO, "sending notification: %s", notification->jsonObject()->c_strValue());
     comm->sendMessage(notification->jsonObject());
   }
 }
@@ -1166,6 +1169,26 @@ ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMet
   }
   return respErr;
 }
+
+
+P44LoggingObj* P44VdcHost::getTopicLogObject(const string aTopic)
+{
+  #if ENABLE_JSONCFGAPI
+  if (aTopic=="cfgapi") return mConfigApi.get();
+  #endif
+  #if ENABLE_JSONBRIDGEAPI
+  if (aTopic=="bridgeapi") return mBridgeApi.get();
+  #endif
+  #if ENABLE_UBUS
+  if (aTopic=="ubusapi") return mUbusApiServer.get();
+  #endif
+  #if P44SCRIPT_REGISTERED_SOURCE
+  if (aTopic=="scriptmanager") return mScriptManager.get();
+  #endif
+  // unknown at this level
+  return inherited::getTopicLogObject(aTopic);
+}
+
 
 
 void P44VdcHost::learnHandler(VdcApiRequestPtr aRequest, bool aLearnIn, ErrorPtr aError)
@@ -1866,7 +1889,7 @@ ApiRequestObj::ApiRequestObj(JsonCommPtr aConnection, JsonObjectPtr aRequest) :
 
 void ApiRequestObj::sendResponse(JsonObjectPtr aResponse, ErrorPtr aError)
 {
-  if (mConnection) P44VdcHost::sendJsonApiResponse(mConnection, aResponse, aError, "" /* no reqid */);
+  if (mConnection) P44VdcHost::sendJsonApiResponse(mConnection, aResponse, aError, "" /* no reqid */, *this);
   mConnection.reset(); // done now
 }
 

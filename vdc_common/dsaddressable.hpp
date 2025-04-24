@@ -390,6 +390,8 @@ namespace p44 {
     /// @return id identifying the context object
     virtual string contextId() const P44_OVERRIDE { return mDSUID.getString(); }
 
+    /// get logging object for a named topic
+    virtual P44LoggingObj* getTopicLogObject(const string aTopic) { return nullptr; /* base class has no logging subtopics */ }
 
   protected:
 

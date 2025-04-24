@@ -105,7 +105,10 @@ namespace p44 {
     /// @param aLogLevelOffset the new log level offset
     virtual void setLogLevelOffset(int aLogLevelOffset) P44_OVERRIDE;
 		
-		virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
+    /// get logging object for a named topic
+    virtual P44LoggingObj* getTopicLogObject(const string aTopic) P44_OVERRIDE;
+
+    virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     // the Eldat communication object
     EldatComm mEldatComm;

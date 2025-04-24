@@ -62,6 +62,14 @@ void HueVdc::setLogLevelOffset(int aLogLevelOffset)
 }
 
 
+P44LoggingObj* HueVdc::getTopicLogObject(const string aTopic)
+{
+  if (aTopic=="huecomm") return &mHueComm;
+  // unknown at this level
+  return inherited::getTopicLogObject(aTopic);
+}
+
+
 const char *HueVdc::vdcClassIdentifier() const
 {
   return "hue_Lights_Container";

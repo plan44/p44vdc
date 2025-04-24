@@ -69,7 +69,14 @@ void DaliVdc::setLogLevelOffset(int aLogLevelOffset)
 }
 
 
-// vDC name
+P44LoggingObj* DaliVdc::getTopicLogObject(const string aTopic)
+{
+  if (aTopic=="dalicomm") return &mDaliComm;
+  // unknown at this level
+  return inherited::getTopicLogObject(aTopic);
+}
+
+
 const char *DaliVdc::vdcClassIdentifier() const
 {
   return "DALI_Bus_Container";

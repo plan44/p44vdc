@@ -43,6 +43,14 @@ void ZfVdc::setLogLevelOffset(int aLogLevelOffset)
 }
 
 
+P44LoggingObj* ZfVdc::getTopicLogObject(const string aTopic)
+{
+  if (aTopic=="zfcomm") return &mZfComm;
+  // unknown at this level
+  return inherited::getTopicLogObject(aTopic);
+}
+
+
 const char *ZfVdc::vdcClassIdentifier() const
 {
   return "ZF_Bus_Container";

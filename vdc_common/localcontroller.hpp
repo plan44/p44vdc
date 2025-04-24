@@ -501,6 +501,9 @@ namespace p44 {
     /// @return local controller, will create one if not existing
     static LocalControllerPtr sharedLocalController();
 
+    /// @return type (such as: device, element, vdc, trigger) of the context object
+    virtual string contextType() const P44_OVERRIDE { return "localcontroller"; };
+
     /// @name following vdchost activity
     /// @{
 

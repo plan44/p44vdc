@@ -152,7 +152,7 @@ namespace p44 {
     P44CfgApiConnection(SocketCommPtr aJsonApiServer) : inherited(aJsonApiServer) {};
 
     virtual int domain() P44_OVERRIDE { return VDC_API_DOMAIN; };
-    virtual const char* apiName() P44_OVERRIDE { return "cfg"; };
+    virtual const char* apiName() const P44_OVERRIDE { return "cfg"; };
   };
   typedef boost::intrusive_ptr<P44CfgApiConnection> P44CfgApiConnectionPtr;
 
@@ -175,7 +175,7 @@ namespace p44 {
     virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) P44_OVERRIDE;
 
     virtual int domain() P44_OVERRIDE { return BRIDGE_DOMAIN; };
-    virtual const char* apiName() P44_OVERRIDE { return "bridge"; };
+    virtual const char* apiName() const P44_OVERRIDE { return "bridge"; };
 
   private:
 
@@ -230,6 +230,8 @@ namespace p44 {
 
     UbusApiConnection();
 
+    virtual const char* apiName() const { return "cfg (ubus)"; };
+
     /// install callback for received API requests
     /// @param aApiRequestHandler will be called when a API request has been received
     void setRequestHandler(VdcApiRequestCB aApiRequestHandler);
@@ -257,7 +259,7 @@ namespace p44 {
   class UbusApiRequest : public VdcApiRequest
   {
     typedef VdcApiRequest inherited;
-    UbusRequestPtr ubusRequest;
+    UbusRequestPtr mUbusRequest;
 
   public:
 
@@ -503,8 +505,11 @@ namespace p44 {
     virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     #if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
-    static void sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError, string aRequestId);
+    static void sendJsonApiResponse(JsonCommPtr aJsonComm, JsonObjectPtr aResult, ErrorPtr aError, string aRequestIdP, P44LoggingObj& aLoggingObj);
     #endif
+
+    /// get logging object for a named topic
+    virtual P44LoggingObj* getTopicLogObject(const string aTopic) P44_OVERRIDE;
 
   protected:
 

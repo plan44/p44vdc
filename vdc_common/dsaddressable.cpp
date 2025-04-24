@@ -247,6 +247,22 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
       }
     }
   }
+  else if (aMethod=="logleveloffset") {
+    ApiValuePtr o;
+    if (Error::isOK(respErr=checkParam(aParams, "value", o))) {
+      int newLevel = o->int32Value();
+      P44LoggingObj* loggingobj = this; // default to myself
+      if ((o = aParams->get("topic"))) {
+        string topic = o->stringValue();
+        loggingobj = getTopicLogObject(topic);
+        if (!loggingobj) respErr = Error::err<VdcApiError>(405, "unknown logging topic '%s'", topic.c_str());
+      }
+      if (Error::isOK(respErr)) {
+        loggingobj->setLogLevelOffset(newLevel);
+        respErr = Error::ok(); // return OK as generic response
+      }
+    }
+  }
   else if (aMethod=="logoptions") {
     // via genericRequest
     ApiValuePtr o;

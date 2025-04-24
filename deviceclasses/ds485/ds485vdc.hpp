@@ -72,6 +72,9 @@ namespace p44 {
 
     virtual ~Ds485Vdc();
 
+    /// get logging object for a named topic
+    virtual P44LoggingObj* getTopicLogObject(const string aTopic) P44_OVERRIDE;
+
     /// initialize vdc.
     /// @note this implementation will query the proxyied device and then change it's dSUID
     ///   which is allowed to happen before aCompletedCB is called. vdhost will re-map the

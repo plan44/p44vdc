@@ -244,6 +244,9 @@ namespace p44 {
     /// active vDSM session
     VdcApiConnectionPtr getVdsmSessionConnection() { return mVdsmSessionConnection; };
 
+    /// get logging object for a named topic
+    virtual P44LoggingObj* getTopicLogObject(const string aTopic) P44_OVERRIDE;
+
     // the IP address of the current vdSM
     string vdsmHostIp();
 
@@ -771,7 +774,7 @@ namespace p44 {
     virtual void closeAfterSend() P44_OVERRIDE {};
 
     /// the name of the API or the API's peer for logging
-    virtual const char* apiName() P44_OVERRIDE { return "script"; };
+    virtual const char* apiName() const P44_OVERRIDE { return "script"; };
 
     /// get a new API value suitable for this connection
     /// @return new API value of suitable internal implementation to be used on this API connection

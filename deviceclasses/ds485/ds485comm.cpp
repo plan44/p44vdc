@@ -93,14 +93,14 @@ static void blocking_cb(void *data)
 
 int Ds485Comm::linkStateChanged(bool aActive)
 {
-  FOCUSOLOG("link state: %s", aActive ? "ACTIVE" : "ISOLATED");
+  OLOG(LOG_NOTICE, "link state: %s", aActive ? "ACTIVE" : "ISOLATED");
   return 0;
 }
 
 
 int Ds485Comm::busMemberChanged(DsUid aDsUid, bool aJoined)
 {
-  FOCUSOLOG("bus: %s %s", aDsUid.getString().c_str(), aJoined ? "JOINED" : "LEFT");
+  OLOG(LOG_NOTICE, "bus: %s %s", aDsUid.getString().c_str(), aJoined ? "JOINED" : "LEFT");
   return 0;
 }
 

@@ -191,7 +191,7 @@ namespace p44 {
 
     /// Get short text to describe the operation state (such as radio RSSI, critical battery level, etc.)
     /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
-    virtual string getOpStateText() { return mOpStateText; };
+    virtual string getOpStateText() P44_OVERRIDE { return mOpStateText; };
 
     /// device class version number.
     /// @note This allows different versions of the functional representation of the device class

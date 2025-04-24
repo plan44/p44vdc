@@ -440,6 +440,20 @@ void VdcHost::checkTimeOfDayChange()
 }
 
 
+P44LoggingObj* VdcHost::getTopicLogObject(const string aTopic)
+{
+  if (aTopic=="vdsmapi") return getVdsmSessionConnection().get();
+  #if ENABLE_LOCALCONTROLLER
+  if (aTopic=="localcontroller") return mLocalController.get();
+  #endif
+  #if P44SCRIPT_FULL_SUPPORT
+  if (aTopic=="p44script") return &StandardScriptingDomain::sharedDomain();
+  #endif
+  // unknown at this level
+  return inherited::getTopicLogObject(aTopic);
+}
+
+
 // MARK: - initializisation of DB and containers
 
 
@@ -1439,39 +1453,38 @@ ErrorPtr VdcHost::handleMethodForParams(VdcApiRequestPtr aRequest, const string 
 {
   DsUid dsuid;
   ErrorPtr respErr;
-  if (Error::isOK(respErr = checkDsuidParam(aParams, "dSUID", dsuid))) {
-    DsAddressablePtr addressable;
-    if (dsuid.empty()) {
-      // not addressing by dSUID, check for alternative addressing methods
-      ApiValuePtr o = aParams->get("x-p44-itemSpec");
-      if (o) {
-        string itemSpec = o->stringValue();
-        addressable = addressableForItemSpec(itemSpec);
-      }
-      else {
-        // default to vdchost (allows start accessing a vdchost by getProperty without knowing a dSUID in the first place)
-        addressable = DsAddressablePtr(this);
-      }
+  respErr = checkDsuidParam(aParams, "dSUID", dsuid);
+  DsAddressablePtr addressable;
+  if (dsuid.empty()) {
+    // missing or invalid dSUID, check for alternative addressing methods
+    ApiValuePtr o = aParams->get("x-p44-itemSpec");
+    if (o) {
+      string itemSpec = o->stringValue();
+      addressable = addressableForItemSpec(itemSpec);
     }
     else {
-      // by dSUID
-      addressable = addressableForDsUid(dsuid);
-    }
-    if (addressable) {
-      // check special case of device remove command - we must execute this because device should not try to remove itself
-      DevicePtr dev = boost::dynamic_pointer_cast<Device>(addressable);
-      if (dev && aMethod=="remove") {
-        return removeHandler(aRequest, dev);
-      }
-      // non-device addressable or not remove -> just let addressable handle the method itself
-      return addressable->handleMethod(aRequest, aMethod, aParams);
-    }
-    else {
-      LOG(LOG_WARNING, "Target entity %s not found for method '%s'", dsuid.getString().c_str(), aMethod.c_str());
-      return Error::err<VdcApiError>(404, "unknown target (missing/invalid dSUID or itemSpec)");
+      // default to vdchost (allows start accessing a vdchost by getProperty without knowing a dSUID in the first place)
+      if (Error::notOK(respErr)) return respErr; // at least here we need an explicit dSUID
+      addressable = DsAddressablePtr(this);
     }
   }
-  return respErr;
+  else {
+    // by dSUID
+    addressable = addressableForDsUid(dsuid);
+  }
+  if (addressable) {
+    // check special case of device remove command - we must execute this because device should not try to remove itself
+    DevicePtr dev = boost::dynamic_pointer_cast<Device>(addressable);
+    if (dev && aMethod=="remove") {
+      return removeHandler(aRequest, dev);
+    }
+    // non-device addressable or not remove -> just let addressable handle the method itself
+    return addressable->handleMethod(aRequest, aMethod, aParams);
+  }
+  else {
+    LOG(LOG_WARNING, "Target entity %s not found for method '%s'", dsuid.getString().c_str(), aMethod.c_str());
+    return Error::err<VdcApiError>(404, "unknown target (missing/invalid dSUID or itemSpec)");
+  }
 }
 
 

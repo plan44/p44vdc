@@ -185,7 +185,7 @@ namespace p44 {
     virtual void closeAfterSend() P44_OVERRIDE;
 
     /// the name of the API or the API's peer for logging
-    virtual const char* apiName() P44_OVERRIDE { return "vdSM (JSON)"; };
+    virtual const char* apiName() const P44_OVERRIDE { return "vdSM (JSON)"; };
 
     /// send a API request
     /// @param aMethod the vDC API method or notification name to be sent

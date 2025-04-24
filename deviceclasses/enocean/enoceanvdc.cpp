@@ -50,6 +50,13 @@ void EnoceanVdc::setLogLevelOffset(int aLogLevelOffset)
 }
 
 
+P44LoggingObj* EnoceanVdc::getTopicLogObject(const string aTopic)
+{
+  if (aTopic=="enoceancomm") return &mEnoceanComm;
+  // unknown at this level
+  return inherited::getTopicLogObject(aTopic);
+}
+
 
 const char *EnoceanVdc::vdcClassIdentifier() const
 {

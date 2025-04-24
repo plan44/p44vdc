@@ -114,9 +114,9 @@ namespace p44 {
 
 
   /// a single API connection
-  class VdcApiConnection : public P44Obj
+  class VdcApiConnection : public P44LoggingObj
   {
-    typedef P44Obj inherited;
+    typedef P44LoggingObj inherited;
 
   protected:
 
@@ -126,6 +126,9 @@ namespace p44 {
   public:
 
     VdcApiConnection() : mApiVersion(0) {};
+
+    /// @return type (such as: device, element, vdc, trigger) of the context object
+    virtual string contextType() const { return apiName(); };
 
     /// install callback for received API requests
     /// @param aApiRequestHandler will be called when a API request has been received
@@ -161,7 +164,7 @@ namespace p44 {
     virtual int domain() { return VDC_API_DOMAIN; }
 
     /// the name of the API or the API's peer for logging
-    virtual const char* apiName() { return "(JSON)"; }; // it is json, but we don't know the peer here
+    virtual const char* apiName() const { return "(JSON)"; }; // it is json, but we don't know the peer here
 
     /// get API version
     /// @return API version for this connection

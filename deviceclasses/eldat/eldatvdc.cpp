@@ -44,6 +44,16 @@ void EldatVdc::setLogLevelOffset(int aLogLevelOffset)
 }
 
 
+P44LoggingObj* EldatVdc::getTopicLogObject(const string aTopic)
+{
+  if (aTopic=="eldatcomm") return &mEldatComm;
+  // unknown at this level
+  return inherited::getTopicLogObject(aTopic);
+}
+
+
+
+
 const char *EldatVdc::vdcClassIdentifier() const
 {
   return "Eldat_Bus_Container";
