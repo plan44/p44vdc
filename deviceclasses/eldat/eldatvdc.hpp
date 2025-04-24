@@ -108,7 +108,7 @@ namespace p44 {
 		virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     // the Eldat communication object
-    EldatComm eldatComm;
+    EldatComm mEldatComm;
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 

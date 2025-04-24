@@ -86,7 +86,7 @@ namespace p44 {
 		virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     // the Enocean communication object
-    EnoceanComm enoceanComm;
+    EnoceanComm mEnoceanComm;
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
@@ -115,7 +115,7 @@ namespace p44 {
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
     /// - enoceanaddress:XXXXXXXX = 8 hex digits enOcean device address
-    virtual string hardwareGUID() P44_OVERRIDE { return string_format("enoceanaddress:%08X", enoceanComm.modemAddress()); };
+    virtual string hardwareGUID() P44_OVERRIDE { return string_format("enoceanaddress:%08X", mEnoceanComm.modemAddress()); };
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

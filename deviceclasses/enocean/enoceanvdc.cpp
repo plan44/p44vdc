@@ -32,15 +32,15 @@ EnoceanVdc::EnoceanVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   mLearningMode(false),
   mSelfTesting(false),
   mDisableProximityCheck(false),
-	enoceanComm(MainLoop::currentMainLoop())
+	mEnoceanComm(MainLoop::currentMainLoop())
 {
-  enoceanComm.isMemberVariable();
+  mEnoceanComm.isMemberVariable();
 }
 
 
 void EnoceanVdc::setLogLevelOffset(int aLogLevelOffset)
 {
-  enoceanComm.setLogLevelOffset(aLogLevelOffset);
+  mEnoceanComm.setLogLevelOffset(aLogLevelOffset);
   #if ENABLE_ENOCEAN_SECURE
   for (EnoceanSecurityMap::iterator pos = mSecurityInfos.begin(); pos!=mSecurityInfos.end(); ++pos) {
     pos->second->setLogLevelOffset(aLogLevelOffset);
@@ -68,8 +68,8 @@ bool EnoceanVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResol
 
 string EnoceanVdc::vdcModelVersion() const
 {
-  uint32_t v = enoceanComm.modemAppVersion();
-  uint32_t a = enoceanComm.modemApiVersion();
+  uint32_t v = mEnoceanComm.modemAppVersion();
+  uint32_t a = mEnoceanComm.modemApiVersion();
   if (v==0) return inherited::vdcModelVersion();
   return string_format(
     "%d.%d.%d.%d/%d.%d.%d.%d",
@@ -163,7 +163,7 @@ void EnoceanVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     loadSecurityInfos();
     #endif
     // start communication
-    enoceanComm.initialize(aCompletedCB);
+    mEnoceanComm.initialize(aCompletedCB);
   }
 }
 
@@ -183,8 +183,8 @@ void EnoceanVdc::removeDevices(bool aForget)
 void EnoceanVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // install standard packet handler
-  enoceanComm.setRadioPacketHandler(boost::bind(&EnoceanVdc::handleRadioPacket, this, _1, _2));
-  enoceanComm.setEventPacketHandler(boost::bind(&EnoceanVdc::handleEventPacket, this, _1, _2));
+  mEnoceanComm.setRadioPacketHandler(boost::bind(&EnoceanVdc::handleRadioPacket, this, _1, _2));
+  mEnoceanComm.setEventPacketHandler(boost::bind(&EnoceanVdc::handleEventPacket, this, _1, _2));
   // incrementally collecting EnOcean devices makes no sense as the set of devices is defined by learn-in (DB state)
   if (!(aRescanFlags & rescanmode_incremental)) {
     // start with zero
@@ -365,7 +365,7 @@ ErrorPtr EnoceanVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
           }
         }
         // add-in my own ID base
-        addr += enoceanComm.idBase();
+        addr += mEnoceanComm.idBase();
       }
       // now create device(s)
       if (Error::isOK(respErr)) {
@@ -452,7 +452,7 @@ ErrorPtr EnoceanVdc::sendCommand(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
     // fill in data
     for (int i=0; i<data.size(); ++i) packet->data()[i]=data[i];
     for (int i=0; i<optdata.size(); ++i) packet->optData()[i]=optdata[i];
-    enoceanComm.sendCommand(packet, boost::bind(&EnoceanVdc::sendCommandResponse, this, aRequest, _1, _2));
+    mEnoceanComm.sendCommand(packet, boost::bind(&EnoceanVdc::sendCommandResponse, this, aRequest, _1, _2));
     OLOG(LOG_INFO, "x-p44-sendCommand sent ESP3 command:\n%s", packet->description().c_str());
   }
   return respErr;
@@ -664,10 +664,10 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
         // successfully learned at least one device
         // - confirm learning FIRST (before reporting end-of-learn!)
         if (aLearnType==learn_UTE) {
-          enoceanComm.confirmUTE(UTE_LEARNED_IN, aLearnPacket);
+          mEnoceanComm.confirmUTE(UTE_LEARNED_IN, aLearnPacket);
         }
         else if (aLearnType==learn_smartack) {
-          enoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_LEARNED, SMART_ACK_RESPONSE_TIME);
+          mEnoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_LEARNED, SMART_ACK_RESPONSE_TIME);
         }
         // - now report learned-in, which will in turn disable smart-ack learn
         getVdcHost().reportLearnEvent(true, ErrorPtr());
@@ -676,10 +676,10 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
       else {
         // unknown EEP
         if (aLearnType==learn_UTE) {
-          enoceanComm.confirmUTE(UTE_UNKNOWN_EEP, aLearnPacket);
+          mEnoceanComm.confirmUTE(UTE_UNKNOWN_EEP, aLearnPacket);
         }
         else if (aLearnType==learn_smartack) {
-          enoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_UNKNOWNEEP);
+          mEnoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_UNKNOWNEEP);
         }
         return undefined; // nothing learned in, nothing learned out
       }
@@ -694,10 +694,10 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
       bool anyRemoved = unpairDevicesByAddressAndEEP(aDeviceAddress, aEEProfile, false);
       // - confirm smart ack FIRST (before reporting end-of-learn!)
       if (aLearnType==learn_UTE) {
-        enoceanComm.confirmUTE(anyRemoved ? UTE_LEARNED_OUT : UTE_FAIL, aLearnPacket);
+        mEnoceanComm.confirmUTE(anyRemoved ? UTE_LEARNED_OUT : UTE_FAIL, aLearnPacket);
       }
       else if (aLearnType==learn_smartack) {
-        enoceanComm.smartAckRespondToLearn(anyRemoved ? SA_RESPONSECODE_REMOVED : SA_RESPONSECODE_UNKNOWNEEP);
+        mEnoceanComm.smartAckRespondToLearn(anyRemoved ? SA_RESPONSECODE_REMOVED : SA_RESPONSECODE_UNKNOWNEEP);
       }
       if (!anyRemoved) return undefined; // nothing learned out (or in)
       // - now report learned-out, which will in turn disable smart-ack learn
@@ -707,10 +707,10 @@ Tristate EnoceanVdc::processLearn(EnoceanAddress aDeviceAddress, EnoceanProfile 
   }
   // generic failure to learn in or out
   if (aLearnType==learn_UTE) {
-    enoceanComm.confirmUTE(UTE_FAIL, aLearnPacket); // general failure
+    mEnoceanComm.confirmUTE(UTE_FAIL, aLearnPacket); // general failure
   }
   else if (aLearnType==learn_smartack) {
-    enoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_NOMEM); // use "no capacity to learn in new device"
+    mEnoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_NOMEM); // use "no capacity to learn in new device"
   }
   return undefined; // nothing learned in, nothing learned out
 }
@@ -724,7 +724,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     return;
   }
   // suppress radio packets send by one of my secondary IDs
-  if ((sender & 0xFFFFFF80) == enoceanComm.idBase()) {
+  if ((sender & 0xFFFFFF80) == mEnoceanComm.idBase()) {
     OLOG(LOG_DEBUG, "Suppressed radio packet coming from one of my own base IDs: %08X", sender);
     return;
   }
@@ -753,7 +753,7 @@ void EnoceanVdc::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
           for (int seg=0; seg<2; seg++) {
             Esp3PacketPtr secTeachInResponse = sec->teachInMessage(seg);
             secTeachInResponse->setRadioDestination(sender);
-            enoceanComm.sendPacket(secTeachInResponse);
+            mEnoceanComm.sendPacket(secTeachInResponse);
             OLOG(LOG_DEBUG, "Sent secure teach-in response segment #%d:\n%s", seg, secTeachInResponse->description().c_str());
           }
         }
@@ -945,7 +945,7 @@ void EnoceanVdc::handleEventPacket(Esp3PacketPtr aEsp3PacketPtr, ErrorPtr aError
     }
     else {
       OLOG(LOG_WARNING, "Received SA_CONFIRM_LEARN while not in learning mode -> rejecting");
-      enoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_NOMEM);
+      mEnoceanComm.smartAckRespondToLearn(SA_RESPONSECODE_NOMEM);
     }
   }
   else {
@@ -962,7 +962,7 @@ void EnoceanVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck,
   mDisableProximityCheck = aDisableProximityCheck;
   mOnlyEstablish = aOnlyEstablish;
   // also enable smartAck learn mode in the EnOcean module
-  enoceanComm.smartAckLearnMode(aEnableLearning, 60*Second); // actual timeout of learn is usually smaller
+  mEnoceanComm.smartAckLearnMode(aEnableLearning, 60*Second); // actual timeout of learn is usually smaller
 }
 
 
@@ -973,7 +973,7 @@ void EnoceanVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck,
 void EnoceanVdc::selfTest(StatusCB aCompletedCB)
 {
   // install test packet handler
-  enoceanComm.setRadioPacketHandler(boost::bind(&EnoceanVdc::handleTestRadioPacket, this, aCompletedCB, _1, _2));
+  mEnoceanComm.setRadioPacketHandler(boost::bind(&EnoceanVdc::handleTestRadioPacket, this, aCompletedCB, _1, _2));
 }
 
 
@@ -981,13 +981,13 @@ void EnoceanVdc::handleTestRadioPacket(StatusCB aCompletedCB, Esp3PacketPtr aEsp
 {
   // ignore packets with error
   if (Error::isOK(aError)) {
-    if (aEsp3PacketPtr->eepRorg()==rorg_RPS && aEsp3PacketPtr->radioDBm()>MIN_LEARN_DBM && enoceanComm.modemAppVersion()>0) {
+    if (aEsp3PacketPtr->eepRorg()==rorg_RPS && aEsp3PacketPtr->radioDBm()>MIN_LEARN_DBM && mEnoceanComm.modemAppVersion()>0) {
       // uninstall handler
-      enoceanComm.setRadioPacketHandler(NoOP);
+      mEnoceanComm.setRadioPacketHandler(NoOP);
       // seen both watchdog response (modem works) and independent RPS telegram (RF is ok)
       OLOG(LOG_NOTICE,
         "- modem info: appVersion=0x%08X, apiVersion=0x%08X, modemAddress=0x%08X, idBase=0x%08X",
-        enoceanComm.modemAppVersion(), enoceanComm.modemApiVersion(), enoceanComm.modemAddress(), enoceanComm.idBase()
+        mEnoceanComm.modemAppVersion(), mEnoceanComm.modemApiVersion(), mEnoceanComm.modemAddress(), mEnoceanComm.idBase()
       );
       aCompletedCB(ErrorPtr());
       // done

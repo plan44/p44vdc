@@ -260,7 +260,7 @@ void EnoceanDevice::sendCommand(Esp3PacketPtr aCommandPacket, ESPPacketCB aRespo
 {
   aCommandPacket->finalize();
   OLOG(LOG_INFO, "Sending EnOcean Packet:\n%s", aCommandPacket->description().c_str());
-  getEnoceanVdc().enoceanComm.sendCommand(aCommandPacket, aResponsePacketCB);
+  getEnoceanVdc().mEnoceanComm.sendCommand(aCommandPacket, aResponsePacketCB);
 }
 
 

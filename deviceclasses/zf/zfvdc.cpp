@@ -29,16 +29,16 @@ using namespace p44;
 
 ZfVdc::ZfVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-	zfComm(MainLoop::currentMainLoop()),
+	mZfComm(MainLoop::currentMainLoop()),
   learningMode(false)
 {
-  zfComm.isMemberVariable();
+  mZfComm.isMemberVariable();
 }
 
 
 void ZfVdc::setLogLevelOffset(int aLogLevelOffset)
 {
-  zfComm.setLogLevelOffset(aLogLevelOffset);
+  mZfComm.setLogLevelOffset(aLogLevelOffset);
   inherited::setLogLevelOffset(aLogLevelOffset);
 }
 
@@ -103,7 +103,7 @@ void ZfVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   }
   else {
     // start communication
-    zfComm.initialize(aCompletedCB);
+    mZfComm.initialize(aCompletedCB);
   }
 }
 
@@ -123,7 +123,7 @@ void ZfVdc::removeDevices(bool aForget)
 void ZfVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // install standard message handler
-  zfComm.setReceivedPacketHandler(boost::bind(&ZfVdc::handlePacket, this, _1, _2));
+  mZfComm.setReceivedPacketHandler(boost::bind(&ZfVdc::handlePacket, this, _1, _2));
   // incrementally collecting ZF devices makes no sense as the set of devices is defined by learn-in (DB state)
   if (!(aRescanFlags & rescanmode_incremental)) {
     // start with zero

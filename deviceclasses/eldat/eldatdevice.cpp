@@ -651,7 +651,7 @@ void EldatRemoteControlDevice::markUsedSendChannels(string &aUsedSendChannelsMap
 void EldatRemoteControlDevice::sendFunction(EldatFunction aFunction)
 {
   string cmd = string_format("TXP,%02X,%c", getAddress() & 0x7F, aFunction);
-  getEldatVdc().eldatComm.sendCommand(cmd, boost::bind(&EldatRemoteControlDevice::sentFunction, this, _1, _2));
+  getEldatVdc().mEldatComm.sendCommand(cmd, boost::bind(&EldatRemoteControlDevice::sentFunction, this, _1, _2));
 }
 
 

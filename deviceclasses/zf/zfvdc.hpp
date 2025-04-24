@@ -105,7 +105,7 @@ namespace p44 {
 		virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 
     // the Zf communication object
-    ZfComm zfComm;
+    ZfComm mZfComm;
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 

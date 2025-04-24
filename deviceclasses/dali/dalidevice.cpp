@@ -1,6 +1,6 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
-//  Copyright (c) 2013-2024 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2025 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -87,7 +87,7 @@ string DaliBusDevice::contextId() const
 
 int DaliBusDevice::getLogLevelOffset()
 {
-  if (logLevelOffset==0) {
+  if (mLogLevelOffset==0) {
     // no own offset - inherit vdc's
     return mDaliVdc.getLogLevelOffset();
   }

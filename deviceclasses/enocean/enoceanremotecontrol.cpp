@@ -90,7 +90,7 @@ void EnoceanRemoteControlDevice::buttonAction(bool aRight, bool aUp, bool aPress
     packet->radioUserData()[0] = 0x00; // release
     packet->setRadioStatus(status_T21); // released
   }
-  packet->setRadioSender(getEnoceanVdc().enoceanComm.makeSendAddress(getAddress()));
+  packet->setRadioSender(getEnoceanVdc().mEnoceanComm.makeSendAddress(getAddress()));
   sendCommand(packet, NoOP);
 }
 
@@ -417,7 +417,7 @@ uint8_t EnoceanSEHeatTubeDevice::teachInSignal(int8_t aVariant)
     packet->initForRorg(rorg_4BS);
     packet->setRadioDestination(EnoceanBroadcast);
     packet->set4BSdata(0x00000140);
-    packet->setRadioSender(getEnoceanVdc().enoceanComm.makeSendAddress(getAddress()));
+    packet->setRadioSender(getEnoceanVdc().mEnoceanComm.makeSendAddress(getAddress()));
     sendCommand(packet, NoOP);
     return 1;
   }
@@ -459,7 +459,7 @@ void EnoceanSEHeatTubeDevice::setPowerState(int aLevel, bool aInitial)
   packet->initForRorg(rorg_4BS);
   packet->setRadioDestination(EnoceanBroadcast);
   packet->set4BSdata(0x00000140+((uint32_t)pwr<<16));
-  packet->setRadioSender(getEnoceanVdc().enoceanComm.makeSendAddress(getAddress()));
+  packet->setRadioSender(getEnoceanVdc().mEnoceanComm.makeSendAddress(getAddress()));
   sendCommand(packet, NoOP);
   // repeat non-zero power state level
   if (pwr!=0x00) {

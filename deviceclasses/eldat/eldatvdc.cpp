@@ -29,17 +29,17 @@ using namespace p44;
 
 EldatVdc::EldatVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-	eldatComm(MainLoop::currentMainLoop()),
+	mEldatComm(MainLoop::currentMainLoop()),
   learningMode(false),
   disableProximityCheck(false)
 {
-  eldatComm.isMemberVariable();
+  mEldatComm.isMemberVariable();
 }
 
 
 void EldatVdc::setLogLevelOffset(int aLogLevelOffset)
 {
-  eldatComm.setLogLevelOffset(aLogLevelOffset);
+  mEldatComm.setLogLevelOffset(aLogLevelOffset);
   inherited::setLogLevelOffset(aLogLevelOffset);
 }
 
@@ -104,7 +104,7 @@ void EldatVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   }
   else {
     // start communication
-    eldatComm.initialize(aCompletedCB);
+    mEldatComm.initialize(aCompletedCB);
   }
 }
 
@@ -124,7 +124,7 @@ void EldatVdc::removeDevices(bool aForget)
 void EldatVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   // install standard message handler
-  eldatComm.setReceivedMessageHandler(boost::bind(&EldatVdc::handleMessage, this, _1, _2));
+  mEldatComm.setReceivedMessageHandler(boost::bind(&EldatVdc::handleMessage, this, _1, _2));
   // incrementally collecting Eldat devices makes no sense as the set of devices is defined by learn-in (DB state)
   if (!(aRescanFlags & rescanmode_incremental)) {
     // start with zero
@@ -446,7 +446,7 @@ void EldatVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, T
 void EldatVdc::selfTest(StatusCB aCompletedCB)
 {
   // install test message handler, then wait for message
-  eldatComm.setReceivedMessageHandler(boost::bind(&EldatVdc::handleTestMessage, this, aCompletedCB, _1, _2));
+  mEldatComm.setReceivedMessageHandler(boost::bind(&EldatVdc::handleTestMessage, this, aCompletedCB, _1, _2));
 }
 
 
@@ -464,7 +464,7 @@ void EldatVdc::handleTestMessage(StatusCB aCompletedCB, string aEldatMessage, Er
       LOG(LOG_NOTICE, "Received REC message mode=%d, sender=0x%08X, RSSI=%d", mode, senderAddress, rssi);
       if (rssi>=MIN_LEARN_DBM) {
         // uninstall handler
-        eldatComm.setReceivedMessageHandler(NoOP);
+        mEldatComm.setReceivedMessageHandler(NoOP);
         // seen both init response and independent REC message with sufficient RSSI (RF is ok)
         aCompletedCB(ErrorPtr());
         // done
