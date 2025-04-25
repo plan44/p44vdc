@@ -309,7 +309,12 @@ void Ds485Comm::establishTunnel()
   OLOG(LOG_INFO, "starting tunnel: %s", cmd.c_str());
   // pw is sensitive, substitute only after logging
   cmd = string_substitute(cmd, "%PW%", shellQuote(mTunnelPw));
-  mTunnelPid = MainLoop::currentMainLoop().fork_and_system(boost::bind(&Ds485Comm::tunnelCollapsed, this, _1, _2), cmd.c_str());
+  mTunnelPid = MainLoop::currentMainLoop().fork_and_system(
+    boost::bind(&Ds485Comm::tunnelCollapsed, this, _1, _2),
+    cmd.c_str(),
+    false, nullptr, -1, -1,
+    SIGTERM // end tunnel when this process terminates
+  );
   OLOG(LOG_INFO, "tunnel command pid = %d", mTunnelPid);
 }
 
