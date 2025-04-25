@@ -295,6 +295,9 @@ MLMicroSeconds ChannelBehaviour::remainingTransitionTime()
     // timed transition, we know when it is finished
     return mNextTransitionTime*(1-mProgress);
   }
+  if (mCachedChannelValue==mPreviousChannelValue) {
+    return 0; // already reached target (even if mProgress might say otherwise)
+  }
   // estimate from progress and time already spent
   MLMicroSeconds spent = MainLoop::now()-mTransitionStarted;
   // below 10% progress, just assume 10% done
