@@ -173,6 +173,13 @@ void Ds485Comm::payload_appendString(string &aPayload, size_t aFieldSize, const 
 }
 
 
+static size_t payloaderr(const string& aPayload, size_t aAtIndex, const char* aDesc)
+{
+  LOG(LOG_WARNING, "payload too short (%zu) to access %s data at %zu", aPayload.size(), aDesc, aAtIndex);
+  return 0; // indicates error
+}
+
+
 string Ds485Comm::getPayload(const ds485_container& aContainer)
 {
   string payload;
@@ -181,26 +188,26 @@ string Ds485Comm::getPayload(const ds485_container& aContainer)
 }
 
 
-size_t Ds485Comm::payload_get8(const string &aPayload, size_t aAtIndex, uint8_t &aByte)
+size_t Ds485Comm::payload_get8(const string& aPayload, size_t aAtIndex, uint8_t &aByte)
 {
-  if (aAtIndex+1>aPayload.size()) return 0;
+  if (aAtIndex+1>aPayload.size()) return payloaderr(aPayload, aAtIndex, "uint8");
   aByte = (uint8_t)aPayload[aAtIndex++];
   return aAtIndex;
 }
 
 
-size_t Ds485Comm::payload_get16(const string &aPayload, size_t aAtIndex, uint16_t &aWord)
+size_t Ds485Comm::payload_get16(const string& aPayload, size_t aAtIndex, uint16_t &aWord)
 {
-  if (aAtIndex+2>aPayload.size()) return 0; // cannot happen except in error case
+  if (aAtIndex+2>aPayload.size()) return payloaderr(aPayload, aAtIndex, "uint16");
   aWord  = (uint16_t)(aPayload[aAtIndex++] & 0xFF)<<8;
   aWord |= (uint16_t)(aPayload[aAtIndex++] & 0xFF);
   return aAtIndex;
 }
 
 
-size_t Ds485Comm::payload_get32(const string &aPayload, size_t aAtIndex, uint32_t &aLongWord)
+size_t Ds485Comm::payload_get32(const string& aPayload, size_t aAtIndex, uint32_t &aLongWord)
 {
-  if (aAtIndex+4>aPayload.size()) return 0; // cannot happen except in error case
+  if (aAtIndex+4>aPayload.size()) return payloaderr(aPayload, aAtIndex, "uint32");
   aLongWord  = (uint32_t)(aPayload[aAtIndex++] & 0xFF)<<24;
   aLongWord |= (uint32_t)(aPayload[aAtIndex++] & 0xFF)<<16;
   aLongWord |= (uint32_t)(aPayload[aAtIndex++] & 0xFF)<<8;
@@ -209,10 +216,10 @@ size_t Ds485Comm::payload_get32(const string &aPayload, size_t aAtIndex, uint32_
 }
 
 
-size_t Ds485Comm::payload_getGroups(const string &aPayload, size_t aAtIndex, uint64_t &aLongLongWord)
+size_t Ds485Comm::payload_getGroups(const string& aPayload, size_t aAtIndex, uint64_t &aLongLongWord)
 {
   // DS groups are not a 64bit integer! MSB contains groups 0..7, etc.
-  if (aAtIndex+8>aPayload.size()) return 0; // cannot happen except in error case
+  if (aAtIndex+8>aPayload.size()) return payloaderr(aPayload, aAtIndex, "groupmask");
   aLongLongWord  = (uint64_t)(aPayload[aAtIndex++] & 0xFF);
   aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<8;
   aLongLongWord |= (uint64_t)(aPayload[aAtIndex++] & 0xFF)<<16;
@@ -225,9 +232,9 @@ size_t Ds485Comm::payload_getGroups(const string &aPayload, size_t aAtIndex, uin
 }
 
 
-size_t Ds485Comm::payload_getString(const string &aPayload, size_t aAtIndex, size_t aFieldSize, string &aString)
+size_t Ds485Comm::payload_getString(const string& aPayload, size_t aAtIndex, size_t aFieldSize, string &aString)
 {
-  if (aAtIndex+aFieldSize>aPayload.size()) return 0; // cannot happen except in error case
+  if (aAtIndex+aFieldSize>aPayload.size()) return payloaderr(aPayload, aAtIndex, "string");
   string f = aPayload.substr(aAtIndex, aFieldSize);
   aString = f.c_str(); // do not copy any garbage beyond terminator
   aAtIndex += aFieldSize;
@@ -421,7 +428,7 @@ ErrorPtr Ds485Comm::issueRequest(DsUid aDestination, uint8_t aCommand, uint8_t a
 // MARK: - blocking calls, only to use in ds485 client thread
 
 
-#define DEFAULT_QUERY_TIMEOUT (2*Second)
+#define DEFAULT_QUERY_TIMEOUT (5*Second)
 
 ErrorPtr Ds485Comm::executeQuerySync(string &aResponse, MLMicroSeconds aTimeout, DsUid aDestination, uint8_t aCommand, uint8_t aModifier, const string& aPayload)
 {

@@ -859,7 +859,7 @@ void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActio
 
 bool ButtonBehaviour::isEnabled()
 {
-  // only app buttons are available for use in local processing
+  // only app buttons are available for use in local processing as valuesource
   return mButtonFunc==buttonFunc_app;
 }
 

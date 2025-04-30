@@ -40,6 +40,8 @@
 #include "colorlightbehaviour.hpp"
 #include "shadowbehaviour.hpp"
 
+#include <math.h>
+
 using namespace p44;
 
 
@@ -125,7 +127,19 @@ bool Ds485Device::getDeviceIcon(string &aIcon, bool aWithData, const char *aReso
 void Ds485Device::addedAndInitialized()
 {
   updatePresenceState(mIsPresent);
+  // request output states
   requestOutputValueUpdate();
+  // request sensor states
+  for (uint8_t sidx = 0; sidx<mSensorInfos.size(); ++sidx) {
+    requestSensorValueUpdate(sidx);
+  }
+  // request binary input states
+  uint8_t iidx = 0;
+  BinaryInputBehaviourPtr ib;
+  while ((ib = getInput(iidx))) {
+    requestInputValueUpdate(iidx);
+    iidx++;
+  }
 }
 
 
@@ -162,6 +176,89 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
     }
   }
 }
+
+
+static double standardConv(uint16_t aValue, SensorBehaviourPtr aSensorBehaviour)
+{
+  return aSensorBehaviour->getMin()+(aValue*aSensorBehaviour->getResolution());
+}
+
+static double logConv(uint16_t aValue, SensorBehaviourPtr aSensorBehaviour)
+{
+  // lux = 10^(engineeringvalue/800)
+  return pow(10, (double)aValue/800.0);
+}
+
+
+static const DsSensorTypeInfo sensorInfo[] = {
+  // Internal:
+  // dSTy  internal,  vdcTy                       usage             min      max      resolution    convfunc        colorclass          group
+  {  3,    true,      sensorType_power,           usage_undefined,  0,       4092,    4,            &standardConv,  class_black_joker,  group_black_variable }, // zone power
+  {  4,    true,      sensorType_power,           usage_undefined,  0,       4095,    1,            &standardConv,  class_black_joker,  group_black_variable }, // output power
+  {  5,    true,      sensorType_current,         usage_undefined,  0,       4.095,   0.001,        &standardConv,  class_black_joker,  group_black_variable }, // output current
+  {  6,    true,      sensorType_energy,          usage_undefined,  0,       40.95,   0.01,         &standardConv,  class_black_joker,  group_black_variable }, // energy counter
+  {  61,   true,      sensorType_temperature,     usage_undefined,  -55,     125,     1,            &standardConv,  class_black_joker,  group_black_variable }, // chip temperature
+  {  64,   true,      sensorType_current,         usage_undefined,  0,       16.380,  0.004,        &standardConv,  class_black_joker,  group_black_variable }, // output current of device
+  {  65,   true,      sensorType_power,           usage_undefined,  0,       4095,    1,            &standardConv,  class_black_joker,  group_black_variable }, // output power in VA
+  // public:
+  // dSTy  internal,  vdcTy                       usage             min      max      resolution    convfunc
+  {  9,    false,     sensorType_temperature,     usage_room,       -43.15,  59.225,  0.025,        &standardConv,  class_blue_climate, group_roomtemperature_control },
+  {  10,   false,     sensorType_temperature,     usage_outdoors,   -43.15,  59.225,  0.025,        &standardConv,  class_blue_climate, group_roomtemperature_control },
+  {  11,   false,     sensorType_illumination,    usage_room,       0,       131447,  1,            &logConv,       class_yellow_light, group_yellow_light            },
+  {  12,   false,     sensorType_illumination,    usage_outdoors,   0,       131447,  1,            &logConv,       class_yellow_light, group_yellow_light            },
+  {  13,   false,     sensorType_humidity,        usage_room,       0,       100,     0.025,        &standardConv,  class_blue_climate, group_roomtemperature_control },
+  {  14,   false,     sensorType_humidity,        usage_outdoors,   0,       100,     0.025,        &standardConv,  class_blue_climate, group_roomtemperature_control },
+  {  15,   false,     sensorType_air_pressure,    usage_outdoors,   200,     1024,    0.25,         &standardConv,  class_blue_climate, group_roomtemperature_control }, // FIXME: really correct?
+  {  18,   false,     sensorType_wind_speed,      usage_outdoors,   0,       102.3,   0.025,        &standardConv,  class_blue_climate, group_roomtemperature_control },
+  {  19,   false,     sensorType_wind_direction,  usage_outdoors,   0,       360,     1,            &standardConv,  class_blue_climate, group_roomtemperature_control },
+  {  20,   false,     sensorType_precipitation,   usage_outdoors,   0,       102.3,   0.025,        &standardConv,  class_blue_climate, group_roomtemperature_control },
+  {  21,   false,     sensorType_gas_CO2,         usage_outdoors,   0,       131447,  1,            &logConv,       class_blue_climate, group_blue_ventilation        },
+  // terminator
+  {  0,    true,      sensorType_none,            usage_undefined,  0,       0,       0,            NoOP }
+};
+
+
+const DsSensorTypeInfo* Ds485Device::sensorTypeInfoByDsType(uint8_t aDsSensorType)
+{
+  const DsSensorTypeInfo* siP = &sensorInfo[0];
+  while (siP->convFunc) {
+    if (siP->dsSensorType==aDsSensorType) return siP;
+    siP++;
+  }
+  return nullptr;
+}
+
+
+void Ds485Device::setSensorInfoAtIndex(int aIndex, DsSensorInstanceInfo aInstanceInfo)
+{
+  if (mSensorInfos.size()<=aIndex) {
+    mSensorInfos.resize(aIndex+1, DsSensorInstanceInfo());
+  }
+  mSensorInfos[aIndex] = aInstanceInfo;
+}
+
+
+void Ds485Device::processSensorValue12Bit(uint8_t aSensorIndex, uint16_t a12BitSensorValue)
+{
+  // Note: passed DS sensor index is not the same as our behaviour index, because not all sensors get mapped
+  if (aSensorIndex>=mSensorInfos.size()) return; // fatal, index too high
+  DsSensorInstanceInfo& si = mSensorInfos[aSensorIndex];
+  SensorBehaviourPtr s = si.mSensorBehaviour;
+  if (si.mSensorTypeInfoP && s) {
+    double v = si.mSensorTypeInfoP->convFunc(a12BitSensorValue, s);
+    s->updateSensorValue(v);
+  }
+}
+
+
+void Ds485Device::processBinaryInputValue(uint8_t aBinaryInputIndex, uint8_t aBinaryInputValue)
+{
+  BinaryInputBehaviourPtr i = getInput(aBinaryInputIndex);
+  if (i) {
+    i->updateInputState(aBinaryInputValue);
+  }
+}
+
 
 
 void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
@@ -293,6 +390,31 @@ void Ds485Device::requestOutputValueUpdate()
 }
 
 
+void Ds485Device::requestSensorValueUpdate(uint8_t aDsSensorIndex)
+{
+  if (aDsSensorIndex>=mSensorInfos.size()) return; // fatal, index too high
+  DsSensorInstanceInfo& si = mSensorInfos[aDsSensorIndex];
+  SensorBehaviourPtr s = si.mSensorBehaviour;
+  if (s) {
+    // request value of this sensor
+    string payload;
+    Ds485Comm::payload_append8(payload, aDsSensorIndex);
+    issueDeviceRequest(DEVICE_SENSOR, DEVICE_SENSOR_GET_VALUE, payload);
+  }
+}
+
+
+void Ds485Device::requestInputValueUpdate(uint8_t aDsInputIndex)
+{
+  // Ds and Vdc input indices map 1:1
+  BinaryInputBehaviourPtr i = getInput(aDsInputIndex);
+  if (i) {
+    // request value of this input
+    // FIXME: seems we can't trigger this, but maybe we can somehow
+  }
+}
+
+
 void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string aPayload, size_t aPli)
 {
   bool invalidate = false;
@@ -312,7 +434,7 @@ void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string a
       // all these cause output to change to a unknown value, so we need to get the output
       // state after the command completes, and update our local scene value along
       SceneNo scene;
-      if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, scene))==0) goto error;
+      if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, scene))==0) return;
       if (invalidate) {
         mCachedScenes[scene] = false;
         OLOG(LOG_NOTICE, "scene %s saved -> trigger updating chache", VdcHost::sceneText(mTracedScene, false).c_str());
@@ -325,14 +447,12 @@ void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string a
     case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_SET_OUTVAL):
     {
       uint8_t outval;
-      if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, outval))==0) goto error;
+      if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, outval))==0) return;
       trace8bitChannelChange(nullptr, outval, false);
       break;
     }
   }
   return;
-error:
-  LOG(LOG_WARNING, "payload too short (%zu) to access data at %zu", aPayload.size(), aPli);
 }
 
 
@@ -344,6 +464,52 @@ void Ds485Device::startTracingFor(SceneNo aSceneNo)
   requestOutputValueUpdate();
   // - traceChannelChange will get the actual scene value
 }
+
+
+void Ds485Device::processPropertyRequest(uint16_t aFlaggedModifier, const string aPayload, size_t aPli)
+{
+  ButtonBehaviourPtr b = getButton(0);
+  switch (aFlaggedModifier) {
+    case DEV(DEVICE_PROPERTIES_SET_NAME): {
+      string newname;
+      if ((aPli = Ds485Comm::payload_getString(aPayload, aPli, 21, newname))==0) return;
+      setName(newname); // update and propagate to bridges
+      break;
+    }
+    case DEV(DEVICE_PROPERTIES_SET_ZONE): {
+      uint16_t zoneId;
+      if ((aPli = Ds485Comm::payload_get16(aPayload, aPli, zoneId))==0) return;
+      setZoneID(zoneId); // update and propagate to bridges
+      break;
+    }
+    case DEV(DEVICE_PROPERTIES_SET_BUTTON_ACTIVE_GROUP): {
+      uint8_t buttonGroup;
+      if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, buttonGroup))==0) return;
+      if (b) b->setGroup((DsGroup)buttonGroup);
+      break;
+    }
+    case DEV(DEVICE_PROPERTIES_SET_BUTTON_SET_OUTPUT_CHANNEL): {
+      uint8_t channelId;
+      if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, channelId))==0) return;
+      if (b) b->setChannel((DsChannelType)channelId);
+      break;
+    }
+    case DEV(DEVICE_PROPERTIES_SET_BUTTON_SET_LOCAL_PRIORITY): {
+      uint8_t localprio;
+      if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, localprio))==0) return;
+      if (b) b->setSetsLocalPriority(localprio);
+      break;
+    }
+    case DEV(DEVICE_PROPERTIES_SET_BUTTON_SET_NO_COMING_HOME_CALL): {
+      uint8_t preventPresent;
+      if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, preventPresent))==0) return;
+      if (b) b->setCallsPresent(!preventPresent);
+      break;
+    }
+  }
+  return;
+}
+
 
 
 // MARK: - output

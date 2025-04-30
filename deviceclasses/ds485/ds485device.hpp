@@ -29,6 +29,8 @@
 
 #if ENABLE_DS485DEVICES
 
+#include "sensorbehaviour.hpp"
+
 using namespace std;
 
 namespace p44 {
@@ -38,6 +40,29 @@ namespace p44 {
 
   #define ZG(mod) (0x5A00|(mod))
   #define DEV(mod) (0x4400|(mod))
+
+  typedef double (*DsSensorConverter_func)(uint16_t aValue, SensorBehaviourPtr aSensorBehaviour);
+
+  typedef struct {
+    uint8_t dsSensorType;
+    bool internal;
+    VdcSensorType vdcSensorType;
+    VdcUsageHint usageHint;
+    double min;
+    double max;
+    double resolution;
+    DsSensorConverter_func convFunc;
+    DsClass colorclass;
+    DsGroup group;
+  } DsSensorTypeInfo;
+
+  class DsSensorInstanceInfo {
+  public:
+    DsSensorInstanceInfo() : mSensorTypeInfoP(nullptr) {};
+    const DsSensorTypeInfo* mSensorTypeInfoP;
+    SensorBehaviourPtr mSensorBehaviour;
+  };
+
 
   class Ds485Device final : public Device
   {
@@ -56,7 +81,7 @@ namespace p44 {
     uint16_t m16BitBuffer; ///< buffer for subsequent lo/hi byte data reads
 
     std::bitset<NUM_VALID_SCENES> mCachedScenes; ///< scenes we have already cached
-
+    std::vector<DsSensorInstanceInfo> mSensorInfos; ///< sensor infos by index
 
   public:
 
@@ -158,16 +183,27 @@ namespace p44 {
   private:
 
     void processActionRequest(uint16_t aFlaggedModifier, const string aPayload, size_t aPli);
+    void processPropertyRequest(uint16_t aFlaggedModifier, const string aPayload, size_t aPli);
+    void processSensorValue12Bit(uint8_t aSensorIndex, uint16_t a12BitSensorValue);
+    void processBinaryInputValue(uint8_t aBinaryInputIndex, uint8_t aBinaryInputValue);
 
     void requestOutputValueUpdate();
     void trace8bitChannelChange(ChannelBehaviourPtr aChannelOrNullForDefault, uint8_t a8BitChannelValue, bool aTransitional);
     void trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForDefault, uint16_t a16BitChannelValue, bool aTransitional);
     void startTracingFor(SceneNo aSceneNo);
 
+    void requestSensorValueUpdate(uint8_t aDsSensorIndex);
+    void requestInputValueUpdate(uint8_t aDsInputIndex);
+
+
     ErrorPtr issueDeviceRequest(uint8_t aCommand, uint8_t aModifier, const string& aMorePayload = "");
     ErrorPtr issueDsmRequest(uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
 
     void executeDsmQuery(QueryCB aQueryCB, MLMicroSeconds aTimeout, uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
+
+    static const DsSensorTypeInfo* sensorTypeInfoByDsType(uint8_t aDsSensorType); ///< sensor info lookup
+    void setSensorInfoAtIndex(int aIndex, DsSensorInstanceInfo aInstanceInfo);
+
 
   };
   typedef boost::intrusive_ptr<Ds485Device> Ds485DevicePtr;

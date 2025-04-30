@@ -295,24 +295,24 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
   OLOG(LOG_INFO,"dS485 Message: %s -> %s: [%zu] %s", aSource.text().c_str(), aTarget.text().c_str(), aPayload.size(), binaryToHexString(aPayload, ' ').c_str());
   size_t pli = 0;
   uint8_t command;
-  if ((pli = Ds485Comm::payload_get8(aPayload, pli, command))==0) goto error;
+  if ((pli = Ds485Comm::payload_get8(aPayload, pli, command))==0) return;
   uint8_t modifier;
-  if ((pli = Ds485Comm::payload_get8(aPayload, pli, modifier))==0) goto error;
+  if ((pli = Ds485Comm::payload_get8(aPayload, pli, modifier))==0) return;
   switch (command) {
     case EVENT_COMMUNICATION_LOG: {
       switch (modifier) {
         case EVENT_COMMUNICATION_LOG_UPSTREAM_SHORT: {
           pli++; // skip that 3rd byte dsm events seem to have
           uint16_t devId;
-          if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) goto error;
+          if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) return;
           pli++; // skip CircuitId
           pli++; // skip Resend // TODO: maybe evaluate this
           uint8_t isSensor;
-          if ((pli = Ds485Comm::payload_get8(aPayload, pli, isSensor))==0) goto error;
+          if ((pli = Ds485Comm::payload_get8(aPayload, pli, isSensor))==0) return;
           uint8_t keyNo;
-          if ((pli = Ds485Comm::payload_get8(aPayload, pli, keyNo))==0) goto error;
+          if ((pli = Ds485Comm::payload_get8(aPayload, pli, keyNo))==0) return;
           uint8_t click;
-          if ((pli = Ds485Comm::payload_get8(aPayload, pli, click))==0) goto error;
+          if ((pli = Ds485Comm::payload_get8(aPayload, pli, click))==0) return;
           // TODO: quality, flags, crosstalk are not read for now
           Ds485DevicePtr dev = deviceFor(aSource, devId); // upstream -> source is relevant
           if (dev) dev->handleDeviceUpstreamMessage(isSensor, keyNo, (DsClickType)click);
@@ -321,13 +321,49 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
       }
       break;
     }
+    case EVENT_DEVICE_SENSOR: {
+      pli++; // skip that 3rd byte dsm events seem to have
+      uint16_t devId;
+      if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) return;
+      Ds485DevicePtr dev = deviceFor(aSource, devId); // upstream -> source is relevant
+      if (dev) {
+        switch (modifier) {
+          case EVENT_DEVICE_SENSOR_VALUE: {
+            uint8_t sensIdx;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, sensIdx))==0) return;
+            uint16_t sens12bit;
+            if ((pli = Ds485Comm::payload_get16(aPayload, pli, sens12bit))==0) return;
+            dev->processSensorValue12Bit(sensIdx, sens12bit);
+          }
+          case 5 /* missing: EVENT_DEVICE_SENSOR_VALUE_EXTENDED */: {
+            uint8_t sensIdx;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, sensIdx))==0) return;
+            POLOG(dev, LOG_WARNING, "dS485 Sensor extended (double) value event not yet handled: sensor index=%d", sensIdx);
+          }
+          case EVENT_DEVICE_SENSOR_BINARYINPUTEVENT: {
+            uint8_t bininpIdx;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, bininpIdx))==0) return;
+            uint8_t bininpType;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, bininpType))==0) return;
+            uint8_t bininpVal;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, bininpVal))==0) return;
+            dev->processBinaryInputValue(bininpIdx, bininpVal);
+          }
+          case EVENT_DEVICE_SENSOR_EVENT: {
+            uint8_t eventIdx;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, eventIdx))==0) return;
+            POLOG(dev, LOG_WARNING, "dS485 Sensor event not yet handled: event index=%d", eventIdx);
+          }
+        }
+      }
+    }
     case ZONE_GROUP_ACTION_REQUEST: {
       uint16_t zoneId;
-      if ((pli = Ds485Comm::payload_get16(aPayload, pli, zoneId))==0) goto error;
+      if ((pli = Ds485Comm::payload_get16(aPayload, pli, zoneId))==0) return;
       uint8_t group;
-      if ((pli = Ds485Comm::payload_get8(aPayload, pli, group))==0) goto error;
+      if ((pli = Ds485Comm::payload_get8(aPayload, pli, group))==0) return;
       uint16_t originDevId;
-      if ((pli = Ds485Comm::payload_get16(aPayload, pli, originDevId))==0) goto error;
+      if ((pli = Ds485Comm::payload_get16(aPayload, pli, originDevId))==0) return;
       // send to every device matching zone and group
       for (Ds485DeviceMap::iterator pos = mDs485Devices.begin(); pos!=mDs485Devices.end(); ++pos) {
         Ds485DevicePtr dev = pos->second;
@@ -341,10 +377,19 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
     }
     case DEVICE_ACTION_REQUEST: {
       uint16_t devId;
-      if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) goto error;
+      if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) return;
       Ds485DevicePtr dev = deviceFor(aTarget, devId); // downstream -> target is relevant
       if (dev) {
         dev->processActionRequest(DEV(modifier), aPayload, pli);
+      }
+      break;
+    }
+    case DEVICE_PROPERTIES: {
+      uint16_t devId;
+      if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) return;
+      Ds485DevicePtr dev = deviceFor(aTarget, devId); // downstream -> target is relevant
+      if (dev) {
+        dev->processPropertyRequest(DEV(modifier), aPayload, pli);
       }
       break;
     }
@@ -354,16 +399,16 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
         case DEVICE_CONFIG_SET: {
           // this is a device config write
           uint16_t devId;
-          if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) goto error;
+          if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) return;
           Ds485DevicePtr dev = deviceFor(aTarget, devId); // downstream -> target is relevant
           if (dev) {
             // this is a device config write to this device
             uint8_t bank;
-            if ((pli = Ds485Comm::payload_get8(aPayload, pli, bank))==0) goto error;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, bank))==0) return;
             uint8_t offs;
-            if ((pli = Ds485Comm::payload_get8(aPayload, pli, offs))==0) goto error;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, offs))==0) return;
             uint8_t byte;
-            if ((pli = Ds485Comm::payload_get8(aPayload, pli, byte))==0) goto error;
+            if ((pli = Ds485Comm::payload_get8(aPayload, pli, byte))==0) return;
             dev->traceConfigValue(bank, offs, byte);
           }
           break;
@@ -378,24 +423,22 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
       // 302ED89F43F0000000000E400000E9D700 -> FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF, t=0xff: [08] 74 00 00 03 ED 40 01 00
       pli++; // skip that 3rd byte dsm events seem to have
       uint16_t devId;
-      if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) goto error;
+      if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) return;
       Ds485DevicePtr dev = deviceFor(aSource, devId); // upstream -> source is relevant
       if (dev) {
         // this is a device config readout from this device
         uint8_t bank;
-        if ((pli = Ds485Comm::payload_get8(aPayload, pli, bank))==0) goto error;
+        if ((pli = Ds485Comm::payload_get8(aPayload, pli, bank))==0) return;
         uint8_t offs;
-        if ((pli = Ds485Comm::payload_get8(aPayload, pli, offs))==0) goto error;
+        if ((pli = Ds485Comm::payload_get8(aPayload, pli, offs))==0) return;
         uint8_t byte;
-        if ((pli = Ds485Comm::payload_get8(aPayload, pli, byte))==0) goto error;
+        if ((pli = Ds485Comm::payload_get8(aPayload, pli, byte))==0) return;
         dev->traceConfigValue(bank, offs, byte);
       }
       break;
     }
   }
   return;
-error:
-  LOG(LOG_WARNING, "payload too short (%zu) to access data at %zu", aPayload.size(), pli);
 }
 
 
@@ -433,23 +476,23 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
       if (Error::notOK(err)) return err;
       pli = 3;
       uint32_t dsmHwVersion;
-      pli = Ds485Comm::payload_get32(resp, pli, dsmHwVersion);
+      if ((pli = Ds485Comm::payload_get32(resp, pli, dsmHwVersion))==0) continue; // something is wrong, skip
       uint32_t dsmArmVersion;
-      pli = Ds485Comm::payload_get32(resp, pli, dsmArmVersion);
+      if ((pli = Ds485Comm::payload_get32(resp, pli, dsmArmVersion))==0) continue; // something is wrong, skip
       uint32_t dsmDSPVersion;
-      pli = Ds485Comm::payload_get32(resp, pli, dsmDSPVersion);
+      if ((pli = Ds485Comm::payload_get32(resp, pli, dsmDSPVersion))==0) continue; // something is wrong, skip
       uint16_t dsmAPIVersion;
-      pli = Ds485Comm::payload_get16(resp, pli, dsmAPIVersion);
+      if ((pli = Ds485Comm::payload_get16(resp, pli, dsmAPIVersion))==0) continue; // something is wrong, skip
       pli += 12; // skip "dSID"
       string dsmName;
-      pli = Ds485Comm::payload_getString(resp, pli, 21, dsmName);
+      if ((pli = Ds485Comm::payload_getString(resp, pli, 21, dsmName))==0) continue; // something is wrong, skip
       OLOG(LOG_INFO, "dSM #%d: '%s', hwV=0x%08x, armV=0x%08x, dspV=0x%08x, apiV=0x%04x", di, dsmName.c_str(), dsmHwVersion, dsmArmVersion, dsmDSPVersion, dsmAPIVersion);
       // - get the zone count
       err = mDs485Comm.executeQuerySync(resp, 0, dsmDsuid, ZONE_COUNT);
       if (Error::notOK(err)) return err;
       pli = 3;
       uint8_t zoneCount;
-      pli = Ds485Comm::payload_get8(resp, pli, zoneCount);
+      if ((pli = Ds485Comm::payload_get8(resp, pli, zoneCount))==0) continue; // something is wrong, skip
       OLOG(LOG_INFO, "dSM #%d: has %d zones", di, zoneCount);
       // - the zones
       for (int i=0; i<zoneCount; i++) {
@@ -460,13 +503,13 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
         size_t pli;
         pli = 3;
         uint16_t zoneId;
-        pli = Ds485Comm::payload_get16(resp, pli, zoneId);
+        if ((pli = Ds485Comm::payload_get16(resp, pli, zoneId))==0) continue; // something is wrong, skip
         uint8_t vzoneId;
-        pli = Ds485Comm::payload_get8(resp, pli, vzoneId);
+        if ((pli = Ds485Comm::payload_get8(resp, pli, vzoneId))==0) continue; // something is wrong, skip
         uint8_t numGroups;
-        pli = Ds485Comm::payload_get8(resp, pli, numGroups);
+        if ((pli = Ds485Comm::payload_get8(resp, pli, numGroups))==0) continue; // something is wrong, skip
         string zonename;
-        pli = Ds485Comm::payload_getString(resp, pli, 21, zonename);
+        if ((pli = Ds485Comm::payload_getString(resp, pli, 21, zonename))==0) continue; // something is wrong, skip
         OLOG(LOG_NOTICE, "scanning zone #%d: id=%d, virtid=%d, numgroups=%d, name='%s'", i, zoneId, vzoneId, numGroups, zonename.c_str());
         // - the devices in the zone
         req.clear();
@@ -475,7 +518,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
         if (Error::notOK(err)) return err;
         uint16_t numZoneDevices;
         pli = 3;
-        pli = Ds485Comm::payload_get16(resp, pli, numZoneDevices);
+        if ((pli = Ds485Comm::payload_get16(resp, pli, numZoneDevices))==0) continue; // something is wrong, skip
         OLOG(LOG_INFO, "zone #%d: number of devices = %d", i, numZoneDevices);
         for (int j=0; j<numZoneDevices; j++) {
           string req;
@@ -485,35 +528,35 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           if (Error::notOK(err)) return err;
           pli = 3;
           uint16_t devId;
-          pli = Ds485Comm::payload_get16(resp, pli, devId);
+          if ((pli = Ds485Comm::payload_get16(resp, pli, devId))==0) continue; // something is wrong, skip
           uint16_t vendId;
-          pli = Ds485Comm::payload_get16(resp, pli, vendId);
+          if ((pli = Ds485Comm::payload_get16(resp, pli, vendId))==0) continue; // something is wrong, skip
           uint16_t prodId;
-          pli = Ds485Comm::payload_get16(resp, pli, prodId);
+          if ((pli = Ds485Comm::payload_get16(resp, pli, prodId))==0) continue; // something is wrong, skip
           uint16_t funcId;
-          pli = Ds485Comm::payload_get16(resp, pli, funcId);
+          if ((pli = Ds485Comm::payload_get16(resp, pli, funcId))==0) continue; // something is wrong, skip
           uint16_t vers;
-          pli = Ds485Comm::payload_get16(resp, pli, vers);
+          if ((pli = Ds485Comm::payload_get16(resp, pli, vers))==0) continue; // something is wrong, skip
           uint16_t zoneId;
-          pli = Ds485Comm::payload_get16(resp, pli, zoneId);
+          if ((pli = Ds485Comm::payload_get16(resp, pli, zoneId))==0) continue; // something is wrong, skip
           uint8_t active;
-          pli = Ds485Comm::payload_get8(resp, pli, active);
+          if ((pli = Ds485Comm::payload_get8(resp, pli, active))==0) continue; // something is wrong, skip
           uint8_t locked;
-          pli = Ds485Comm::payload_get8(resp, pli, locked);
+          if ((pli = Ds485Comm::payload_get8(resp, pli, locked))==0) continue; // something is wrong, skip
           uint8_t outMode;
-          pli = Ds485Comm::payload_get8(resp, pli, outMode);
+          if ((pli = Ds485Comm::payload_get8(resp, pli, outMode))==0) continue; // something is wrong, skip
           uint8_t ltMode;
-          pli = Ds485Comm::payload_get8(resp, pli, ltMode);
+          if ((pli = Ds485Comm::payload_get8(resp, pli, ltMode))==0) continue; // something is wrong, skip
           DsGroupMask groups;
-          pli = Ds485Comm::payload_getGroups(resp, pli, groups);
+          if ((pli = Ds485Comm::payload_getGroups(resp, pli, groups))==0) continue; // something is wrong, skip
           string devName;
-          pli = Ds485Comm::payload_getString(resp, pli, 21, devName);
+          if ((pli = Ds485Comm::payload_getString(resp, pli, 21, devName))==0) continue; // something is wrong, skip
           DsUid dSUID;
           dSUID.setAsBinary(resp.substr(pli, 17)); pli += 17;
           uint8_t activeGroup;
-          pli = Ds485Comm::payload_get8(resp, pli, activeGroup);
+          if ((pli = Ds485Comm::payload_get8(resp, pli, activeGroup))==0) continue; // something is wrong, skip
           uint8_t defaultGroup;
-          pli = Ds485Comm::payload_get8(resp, pli, defaultGroup);
+          if ((pli = Ds485Comm::payload_get8(resp, pli, defaultGroup))==0) continue; // something is wrong, skip
           OLOG(LOG_INFO,
             "device #%d: %s [0x%04x] - '%s'\n"
             "- vendId=0x%04x, prodId=0x%04x, funcId=0x%04x, vers=0x%04x\n"
@@ -538,7 +581,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           if (Error::notOK(err)) return err;
           pli = 3;
           uint8_t numOPC;
-          pli = Ds485Comm::payload_get8(resp, pli, numOPC);
+          if ((pli = Ds485Comm::payload_get8(resp, pli, numOPC))==0) continue; // something is wrong, skip
           OLOG(LOG_INFO, "device #%d: number of OPC channels = %d", j, numOPC);
           dev->mNumOPC = numOPC;
           // - output mode and function
@@ -557,7 +600,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             if (Error::notOK(err)) return err;
             pli = 3;
             uint8_t channelId;
-            pli = Ds485Comm::payload_get8(resp, pli, channelId);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, channelId))==0) continue; // something is wrong, skip
             OLOG(LOG_INFO, "device #%d: channel #%d: channelId=%d", j, oi, channelId);
             // check channelid, gives indication for output function
             if (channelId==channeltype_hue) func = outputFunction_colordimmer;
@@ -632,14 +675,14 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             if (Error::notOK(err)) return err;
             pli = 3;
             uint8_t ltNumGrp0;
-            pli = Ds485Comm::payload_get8(resp, pli, ltNumGrp0);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, ltNumGrp0))==0) goto nobutton; // something is wrong, skip
             pli++; // skip "DeprecatedGroupIfUpTo15"
             uint8_t buttongroup;
-            pli = Ds485Comm::payload_get8(resp, pli, buttongroup);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, buttongroup))==0) goto nobutton; // something is wrong, skip
             uint8_t buttonflags;
-            pli = Ds485Comm::payload_get8(resp, pli, buttonflags);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, buttonflags))==0) goto nobutton; // something is wrong, skip
             uint8_t buttonchannel;
-            pli = Ds485Comm::payload_get8(resp, pli, buttonchannel);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, buttonchannel))==0) goto nobutton; // something is wrong, skip
             pli++; // skip "unused"
             OLOG(LOG_INFO,
               "device #%d '%s': button: id/LTNUMGRP0=0x%02x, group=%d, flags=0x%02x, channel=%d",
@@ -665,13 +708,14 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
               bb->setChannel((DsChannelType)buttonchannel);
               bb->setFunction((DsButtonFunc)(ltNumGrp0 & 0x0F));
               bb->setDsMode(buttonMode);
-              bb->setCallsPresent(buttonflags&(1<<1));
+              bb->setCallsPresent((buttonflags&(1<<1))==0); // inversed, bit 1 means NOT calling present
               bb->setSetsLocalPriority(buttonflags&(1<<0));
               dev->addBehaviour(bb);
               bname = "down";
               bel = buttonElement_down;
             }
           }
+        nobutton:
           // - binary input info
           req.clear();
           Ds485Comm::payload_append16(req, devId);
@@ -679,7 +723,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           if (Error::notOK(err)) return err;
           pli = 3;
           uint8_t numBinInps;
-          pli = Ds485Comm::payload_get8(resp, pli, numBinInps);
+          if ((pli = Ds485Comm::payload_get8(resp, pli, numBinInps))==0) continue; // something is wrong, skip
           OLOG(LOG_INFO, "device #%d: number of binary inputs = %d", j, numBinInps);
           for (int bi=0; bi<numBinInps; bi++) {
             // - binary input info
@@ -690,15 +734,15 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             if (Error::notOK(err)) return err;
             pli = 3;
             uint8_t inpTargetGroupType;
-            pli = Ds485Comm::payload_get8(resp, pli, inpTargetGroupType);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, inpTargetGroupType))==0) continue; // something is wrong, skip
             uint8_t inpTargetGroup;
-            pli = Ds485Comm::payload_get8(resp, pli, inpTargetGroup);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, inpTargetGroup))==0) continue; // something is wrong, skip
             uint8_t inpType;
-            pli = Ds485Comm::payload_get8(resp, pli, inpType);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, inpType))==0) continue; // something is wrong, skip
             uint8_t inpButtonId;
-            pli = Ds485Comm::payload_get8(resp, pli, inpButtonId);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, inpButtonId))==0) continue; // something is wrong, skip
             uint8_t inpIndependent;
-            pli = Ds485Comm::payload_get8(resp, pli, inpIndependent);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, inpIndependent))==0) continue; // something is wrong, skip
             OLOG(LOG_INFO,
               "- device #%d: binary input #%d: targetGroupType=%d, targetGroup=%d, type=%d, buttonId=0x%02x, independent=%d",
               j, bi, inpTargetGroupType, inpTargetGroup, inpType, inpButtonId, inpIndependent
@@ -716,9 +760,11 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           if (Error::notOK(err)) return err;
           pli = 3;
           uint8_t numSensors;
-          pli = Ds485Comm::payload_get8(resp, pli, numSensors);
+          if ((pli = Ds485Comm::payload_get8(resp, pli, numSensors))==0) continue; // something is wrong, skip
           OLOG(LOG_INFO, "device #%d: number of sensors = %d", j, numSensors);
           for (int si=0; si<numSensors; si++) {
+            // all sensors must have a corresponding info, even if null
+            dev->setSensorInfoAtIndex(si, DsSensorInstanceInfo()); ///< we do not know it yet, if we fail getting details we still need this index position occupied
             // - sensor info
             req.clear();
             Ds485Comm::payload_append16(req, devId);
@@ -727,55 +773,36 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             if (Error::notOK(err)) return err;
             pli = 3;
             uint8_t sensorType;
-            pli = Ds485Comm::payload_get8(resp, pli, sensorType);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, sensorType))==0) continue; // something is wrong, skip
             uint32_t sensorPollinterval;
-            pli = Ds485Comm::payload_get32(resp, pli, sensorPollinterval);
+            if ((pli = Ds485Comm::payload_get32(resp, pli, sensorPollinterval))==0) continue; // something is wrong, skip
             uint8_t sensorZone;
-            pli = Ds485Comm::payload_get8(resp, pli, sensorZone);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, sensorZone))==0) continue; // something is wrong, skip
             uint8_t sensorPushConvert;
-            pli = Ds485Comm::payload_get8(resp, pli, sensorPushConvert);
+            if ((pli = Ds485Comm::payload_get8(resp, pli, sensorPushConvert))==0) continue; // something is wrong, skip
             OLOG(LOG_INFO,
               "device #%d: sensor #%d: type=%d, pollinterval=%d, globalZone=%d, pushConvert=%d",
               j, si, sensorType, sensorPollinterval, sensorZone, sensorPushConvert
             );
-            VdcSensorType st = sensorType_none;
-            VdcUsageHint su = usage_undefined;
-            bool internalSensor = false;
-            switch (sensorType) {
-              // internal power sensors
-              case 3: st = sensorType_power; internalSensor = true; break; // zone power
-              case 4: st = sensorType_power; internalSensor = true; break; // output power
-              case 5: st = sensorType_current; internalSensor = true; break; // output current
-              case 6: st = sensorType_energy; internalSensor = true; break; // energy counter
-              case 61: st = sensorType_temperature; internalSensor = true; break; // chip temperature
-              case 64: st = sensorType_current; internalSensor = true; break; // output current
-              case 65: st = sensorType_power; internalSensor = true; break; // output power
-              // user facing sensors
-              case 9: st = sensorType_temperature; usage = usage_room; break;
-              case 10: st = sensorType_temperature; usage = usage_outdoors; break;
-              case 11: st = sensorType_illumination; usage = usage_room; break;
-              case 12: st = sensorType_illumination; usage = usage_outdoors; break;
-              case 13: st = sensorType_humidity; usage = usage_room; break;
-              case 14: st = sensorType_humidity; usage = usage_outdoors; break;
-              case 15: st = sensorType_air_pressure; usage = usage_outdoors; break;
-              case 16: break; // m3/sec gas
-              case 17: break; // m3/sec liquid, maybe use sensorType_water_flowrate
-              case 18: st = sensorType_wind_speed; usage = usage_outdoors; break;
-              case 19: st = sensorType_wind_direction; usage = usage_outdoors; break;
-              case 20: st = sensorType_precipitation; usage = usage_outdoors; break;
-              case 21: st = sensorType_gas_CO2; usage = usage_outdoors; break;
-              case 22: break; // Messumformer
-              case 23: break; // Messumformer
-              case 24: break; // Sound events
-              case 66: break; // UV-A mw/cm2
-              case 67: break; // UV-B mw/cm2
-              case 68: break; // Infrared mw/cm2
-              default: internalSensor = true; // not really known
-            }
-            if (!internalSensor) {
-              SensorBehaviourPtr sb = new SensorBehaviour(*dev, ""); // automatic ID
-              sb->setHardwareSensorConfig(st, su, 0, 4096, 1, sensorPollinterval*Second, sensorPollinterval*Second*3);
-              dev->addBehaviour(sb);
+            // get sensor info
+            const DsSensorTypeInfo* siP = Ds485Device::sensorTypeInfoByDsType(sensorType);
+            if (siP) {
+              // update info we need later to process values
+              DsSensorInstanceInfo sinfo;
+              sinfo.mSensorTypeInfoP = siP;
+              if (!siP->internal) {
+                SensorBehaviourPtr sb = new SensorBehaviour(*dev, ""); // automatic ID
+                sb->setHardwareSensorConfig(
+                  siP->vdcSensorType, siP->usageHint,
+                  siP->min, siP->max, siP->resolution,
+                  sensorPollinterval*Second, sensorPollinterval*Second*3
+                );
+                sb->initColorClass(siP->colorclass);
+                sb->setGroup(siP->group);
+                dev->addBehaviour(sb);
+                sinfo.mSensorBehaviour = sb;
+              }
+              dev->setSensorInfoAtIndex(si, sinfo);
             }
           } // sensors
           // save device in list
