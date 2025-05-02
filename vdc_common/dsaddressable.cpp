@@ -616,7 +616,11 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         case name_key: setName(aPropValue->stringValue()); return true;
         case logLevelOffset_key: setLogLevelOffset(aPropValue->int32Value()); return true;
         #if ENABLE_JSONBRIDGEAPI
-        case isBridged_key: if (bridgeable()) { mBridged = aPropValue->boolValue(); return true; } else return false;
+        case isBridged_key: {
+          bool br = aPropValue->boolValue();
+          if (!bridgeable() && br) return false; // cannot turn ON bridged status when not bridgeable
+          mBridged = br; return true; // but turning OFF bridged status is ok (bridge confirming un-bridging)
+        }
         #endif
       }
     }
