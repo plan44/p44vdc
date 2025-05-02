@@ -324,6 +324,10 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     // note: bridgeable status just treated like presence
     FOCUSOLOG("update bridgeable state to %d", o->boolValue());
     updatePresenceState(o->boolValue());
+    // but confirm to bridgeAPI we have recognized it (will also stop getting notifications)
+    JsonObjectPtr p = JsonObject::newBool(o->boolValue());
+    p = p->wrapAs("x-p44-bridged")->wrapAs("properties");
+    call("setProperty", p, NoOP);
   }
   // input states we actually need to propagate
   if (aProps->get("buttonInputStates", elements)) {
