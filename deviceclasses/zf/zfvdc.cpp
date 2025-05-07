@@ -30,7 +30,7 @@ using namespace p44;
 ZfVdc::ZfVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
 	mZfComm(MainLoop::currentMainLoop()),
-  learningMode(false)
+  mLearningMode(false)
 {
   mZfComm.isMemberVariable();
 }
@@ -103,7 +103,7 @@ void ZfVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // load persistent params for dSUID
   load();
   // load private data
-  ErrorPtr err = initializePersistence(db, ZF_SCHEMA_VERSION, ZF_SCHEMA_MIN_VERSION);
+  ErrorPtr err = initializePersistence(mDb, ZF_SCHEMA_VERSION, ZF_SCHEMA_MIN_VERSION);
   if (Error::notOK(err)) {
     // failed DB, no point in starting communication
     aCompletedCB(err); // return status of DB init
@@ -122,7 +122,7 @@ void ZfVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 void ZfVdc::removeDevices(bool aForget)
 {
   inherited::removeDevices(aForget);
-  zfDevices.clear();
+  mZfDevices.clear();
 }
 
 
@@ -136,8 +136,8 @@ void ZfVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // start with zero
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // - read learned-in EnOcean button IDs from DB
-    sqlite3pp::query qry(db.db());
-    if (qry.prepare(db.prefixedSql("SELECT zfAddress, subdevice, deviceType FROM $PREFIX_knownDevices").c_str())==SQLITE_OK) {
+    sqlite3pp::query qry(mDb.db());
+    if (qry.prepare(mDb.prefixedSql("SELECT zfAddress, subdevice, deviceType FROM $PREFIX_knownDevices").c_str())==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         ZfSubDevice subDeviceIndex = i->get<int>(1);
         ZfDevicePtr newdev = ZfDevice::newDevice(
@@ -172,7 +172,7 @@ bool ZfVdc::addKnownDevice(ZfDevicePtr aZfDevice)
 {
   if (simpleIdentifyAndAddDevice(aZfDevice)) {
     // not a duplicate, actually added - add to my own list
-    zfDevices.insert(make_pair(aZfDevice->getAddress(), aZfDevice));
+    mZfDevices.insert(make_pair(aZfDevice->getAddress(), aZfDevice));
     return true;
   }
   return false;
@@ -185,13 +185,13 @@ bool ZfVdc::addAndRememberDevice(ZfDevicePtr aZfDevice)
   if (addKnownDevice(aZfDevice)) {
     // save ZF ID to DB
     // - check if this subdevice is already stored
-    if(db.db().executef(
-      db.prefixedSql("INSERT OR REPLACE INTO $PREFIX_knownDevices (zfAddress, subdevice, deviceType) VALUES (%d,%d,%d)").c_str(),
+    if(mDb.db().executef(
+      mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_knownDevices (zfAddress, subdevice, deviceType) VALUES (%d,%d,%d)").c_str(),
       aZfDevice->getAddress(),
       aZfDevice->getSubDevice(),
       aZfDevice->getZfDeviceType()
     )!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error saving device: %s", db.db().error()->description().c_str());
+      OLOG(LOG_ERR, "Error saving device: %s", mDb.db().error()->description().c_str());
     }
     return true;
   }
@@ -206,11 +206,11 @@ void ZfVdc::removeDevice(DevicePtr aDevice, bool aForget)
     // - remove single device from superclass
     inherited::removeDevice(aDevice, aForget);
     // - remove only selected subdevice from my own list, other subdevices might be other devices
-    ZfDeviceMap::iterator pos = zfDevices.lower_bound(ed->getAddress());
-    while (pos!=zfDevices.upper_bound(ed->getAddress())) {
+    ZfDeviceMap::iterator pos = mZfDevices.lower_bound(ed->getAddress());
+    while (pos!=mZfDevices.upper_bound(ed->getAddress())) {
       if (pos->second->getSubDevice()==ed->getSubDevice()) {
         // this is the subdevice we want deleted
-        zfDevices.erase(pos);
+        mZfDevices.erase(pos);
         break; // done
       }
       pos++;
@@ -225,7 +225,7 @@ void ZfVdc::unpairDevicesByAddress(ZfAddress aZfAddress, bool aForgetParams, ZfS
   typedef list<ZfDevicePtr> TbdList;
   TbdList toBeDeleted;
   // collect those we need to remove
-  for (ZfDeviceMap::iterator pos = zfDevices.lower_bound(aZfAddress); pos!=zfDevices.upper_bound(aZfAddress); ++pos) {
+  for (ZfDeviceMap::iterator pos = mZfDevices.lower_bound(aZfAddress); pos!=mZfDevices.upper_bound(aZfAddress); ++pos) {
     // check subdevice index
     ZfSubDevice i = pos->second->getSubDevice();
     if (i>=aFromIndex && ((aNumIndices==0) || (i<aFromIndex+aNumIndices))) {
@@ -245,7 +245,7 @@ void ZfVdc::unpairDevicesByAddress(ZfAddress aZfAddress, bool aForgetParams, ZfS
 void ZfVdc::handlePacket(ZfPacketPtr aPacket, ErrorPtr aError)
 {
   if (Error::isOK(aError)) {
-    if (learningMode) {
+    if (mLearningMode) {
       processLearn(aPacket);
     }
     else {
@@ -265,7 +265,7 @@ Tristate ZfVdc::processLearn(ZfPacketPtr aPacket)
     ZfSubDevice subdevice = 0;
     ZfSubDevice numSubDevices = 1; // default to 1 (for removal, 0 for removing all subdevices of same address)
     bool learnIn = true; // if we don't find anything below, it's a learn-in for sure
-    for (ZfDeviceMap::iterator pos = zfDevices.lower_bound(aPacket->uid); pos!=zfDevices.upper_bound(aPacket->uid); ++pos) {
+    for (ZfDeviceMap::iterator pos = mZfDevices.lower_bound(aPacket->uid); pos!=mZfDevices.upper_bound(aPacket->uid); ++pos) {
       ZfSubDevice i = pos->second->getSubDevice();
       if (numSubDevices==0 || (subdevice>=i && subdevice<i+numSubDevices)) {
         // always delete all subdevices or unlearn comes from specified subdevice range
@@ -274,7 +274,7 @@ Tristate ZfVdc::processLearn(ZfPacketPtr aPacket)
       }
     }
     if (learnIn) {
-      if (onlyEstablish!=no && type!=zf_unknown) {
+      if (mOnlyEstablish!=no && type!=zf_unknown) {
         int numNewDevices = ZfDevice::createDevicesFromType(this, aPacket->uid, type, subdevice);
         if (numNewDevices>0) {
           // successfully learned at least one device
@@ -285,7 +285,7 @@ Tristate ZfVdc::processLearn(ZfPacketPtr aPacket)
       }
     }
     else {
-      if (onlyEstablish!=yes) {
+      if (mOnlyEstablish!=yes) {
         // device learned out, un-pair all logical dS devices it has represented
         // but keep dS level config in case it is reconnected
         unpairDevicesByAddress(aPacket->uid, false, subdevice, numSubDevices);
@@ -301,7 +301,7 @@ Tristate ZfVdc::processLearn(ZfPacketPtr aPacket)
 void ZfVdc::dispatchPacket(ZfPacketPtr aPacket)
 {
   bool reachedDevice = false;
-  for (ZfDeviceMap::iterator pos = zfDevices.lower_bound(aPacket->uid); pos!=zfDevices.upper_bound(aPacket->uid); ++pos) {
+  for (ZfDeviceMap::iterator pos = mZfDevices.lower_bound(aPacket->uid); pos!=mZfDevices.upper_bound(aPacket->uid); ++pos) {
     // handle regularily (might be RPS switch which does not have separate learn/action packets
     pos->second->handlePacket(aPacket);
     reachedDevice = true;
@@ -403,8 +403,8 @@ ErrorPtr ZfVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, A
 void ZfVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish)
 {
   // put normal radio packet evaluator into learn mode
-  learningMode = aEnableLearning;
-  onlyEstablish = aOnlyEstablish;
+  mLearningMode = aEnableLearning;
+  mOnlyEstablish = aOnlyEstablish;
   // TODO: do we need that?
   // disableProximityCheck = aDisableProximityCheck;
 }

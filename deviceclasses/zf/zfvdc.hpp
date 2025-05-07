@@ -87,12 +87,13 @@ namespace p44 {
   {
     friend class ZfDevice;
     typedef Vdc inherited;
-    bool learningMode;
-    Tristate onlyEstablish;
 
-    ZfDeviceMap zfDevices; ///< local map linking ZfDeviceID to devices
+    bool mLearningMode;
+    Tristate mOnlyEstablish;
 
-		ZfPersistence db;
+    ZfDeviceMap mZfDevices; ///< local map linking ZfDeviceID to devices
+
+		ZfPersistence mDb;
 
   public:
 
