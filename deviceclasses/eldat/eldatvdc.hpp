@@ -89,13 +89,14 @@ namespace p44 {
   {
     friend class EldatDevice;
     typedef Vdc inherited;
-    bool learningMode;
-    Tristate onlyEstablish;
-    bool disableProximityCheck;
 
-    EldatDeviceMap eldatDevices; ///< local map linking EldatDeviceID to devices
+    bool mLearningMode;
+    Tristate mOnlyEstablish;
+    bool mDisableProximityCheck;
 
-		EldatPersistence db;
+    EldatDeviceMap mEldatDevices; ///< local map linking EldatDeviceID to devices
+
+		EldatPersistence mDb;
 
   public:
 

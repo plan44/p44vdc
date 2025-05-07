@@ -30,8 +30,8 @@ using namespace p44;
 EldatVdc::EldatVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
 	mEldatComm(MainLoop::currentMainLoop()),
-  learningMode(false),
-  disableProximityCheck(false)
+  mLearningMode(false),
+  mDisableProximityCheck(false)
 {
   mEldatComm.isMemberVariable();
 }
@@ -106,7 +106,7 @@ void EldatVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // load persistent params for dSUID
   load();
   // load private data
-  ErrorPtr err = initializePersistence(db, ELDAT_SCHEMA_VERSION, ELDAT_SCHEMA_MIN_VERSION);
+  ErrorPtr err = initializePersistence(mDb, ELDAT_SCHEMA_VERSION, ELDAT_SCHEMA_MIN_VERSION);
   if (Error::notOK(err)) {
     // failed DB, no point in starting communication
     aCompletedCB(err); // return status of DB init
@@ -125,7 +125,7 @@ void EldatVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 void EldatVdc::removeDevices(bool aForget)
 {
   inherited::removeDevices(aForget);
-  eldatDevices.clear();
+  mEldatDevices.clear();
 }
 
 
@@ -139,8 +139,8 @@ void EldatVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // start with zero
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // - read learned-in ELDAT devices from DB
-    sqlite3pp::query qry(db.db());
-    if (qry.prepare(db.prefixedSql("SELECT eldatAddress, subdevice, deviceType FROM $PREFIX_knownDevices").c_str())==SQLITE_OK) {
+    sqlite3pp::query qry(mDb.db());
+    if (qry.prepare(mDb.prefixedSql("SELECT eldatAddress, subdevice, deviceType FROM $PREFIX_knownDevices").c_str())==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         EldatSubDevice subDeviceIndex = i->get<int>(1);
         EldatDevicePtr newdev = EldatDevice::newDevice(
@@ -175,7 +175,7 @@ bool EldatVdc::addKnownDevice(EldatDevicePtr aEldatDevice)
 {
   if (simpleIdentifyAndAddDevice(aEldatDevice)) {
     // not a duplicate, actually added - add to my own list
-    eldatDevices.insert(make_pair(aEldatDevice->getAddress(), aEldatDevice));
+    mEldatDevices.insert(make_pair(aEldatDevice->getAddress(), aEldatDevice));
     return true;
   }
   return false;
@@ -188,13 +188,13 @@ bool EldatVdc::addAndRememberDevice(EldatDevicePtr aEldatDevice)
   if (addKnownDevice(aEldatDevice)) {
     // save Eldat ID to DB
     // - check if this subdevice is already stored
-    if(db.db().executef(
-      db.prefixedSql("INSERT OR REPLACE INTO knownDevices (eldatAddress, subdevice, deviceType) VALUES (%d,%d,%d)").c_str(),
+    if(mDb.db().executef(
+      mDb.prefixedSql("INSERT OR REPLACE INTO knownDevices (eldatAddress, subdevice, deviceType) VALUES (%d,%d,%d)").c_str(),
       aEldatDevice->getAddress(),
       aEldatDevice->getSubDevice(),
       aEldatDevice->getEldatDeviceType()
     )!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error saving device: %s", db.db().error()->description().c_str());
+      OLOG(LOG_ERR, "Error saving device: %s", mDb.db().error()->description().c_str());
     }
     return true;
   }
@@ -209,11 +209,11 @@ void EldatVdc::removeDevice(DevicePtr aDevice, bool aForget)
     // - remove single device from superclass
     inherited::removeDevice(aDevice, aForget);
     // - remove only selected subdevice from my own list, other subdevices might be other devices
-    EldatDeviceMap::iterator pos = eldatDevices.lower_bound(ed->getAddress());
-    while (pos!=eldatDevices.upper_bound(ed->getAddress())) {
+    EldatDeviceMap::iterator pos = mEldatDevices.lower_bound(ed->getAddress());
+    while (pos!=mEldatDevices.upper_bound(ed->getAddress())) {
       if (pos->second->getSubDevice()==ed->getSubDevice()) {
         // this is the subdevice we want deleted
-        eldatDevices.erase(pos);
+        mEldatDevices.erase(pos);
         break; // done
       }
       pos++;
@@ -228,7 +228,7 @@ void EldatVdc::unpairDevicesByAddress(EldatAddress aEldatAddress, bool aForgetPa
   typedef list<EldatDevicePtr> TbdList;
   TbdList toBeDeleted;
   // collect those we need to remove
-  for (EldatDeviceMap::iterator pos = eldatDevices.lower_bound(aEldatAddress); pos!=eldatDevices.upper_bound(aEldatAddress); ++pos) {
+  for (EldatDeviceMap::iterator pos = mEldatDevices.lower_bound(aEldatAddress); pos!=mEldatDevices.upper_bound(aEldatAddress); ++pos) {
     // check subdevice index
     EldatSubDevice i = pos->second->getSubDevice();
     if (i>=aFromIndex && ((aNumIndices==0) || (i<aFromIndex+aNumIndices))) {
@@ -256,7 +256,7 @@ void EldatVdc::handleMessage(string aEldatMessage, ErrorPtr aError)
     if (sscanf(aEldatMessage.c_str(),"REC%2d,-%X,%X,%99s", &mode, &rssi, &senderAddress, data)==4) {
       rssi = -rssi;
       LOG(LOG_INFO, "processing REC message mode=%d, sender=0x%08X, RSSI=%d", mode, senderAddress, rssi);
-      if (learningMode) {
+      if (mLearningMode) {
         processLearn(senderAddress, (EldatMode)mode, rssi, data);
       }
       else {
@@ -279,7 +279,7 @@ Tristate EldatVdc::processLearn(EldatAddress aSenderAddress, EldatMode aMode, in
   if (aMode!=0 || aData.size()!=1)
     return undefined; // invalid data
   // check RSSI
-  if (!disableProximityCheck && aRSSI<MIN_LEARN_DBM) {
+  if (!mDisableProximityCheck && aRSSI<MIN_LEARN_DBM) {
     // not close enough
     return undefined; // signal too weak for learn-in, treat as invalid data
   }
@@ -302,7 +302,7 @@ Tristate EldatVdc::processLearn(EldatAddress aSenderAddress, EldatMode aMode, in
   }
   // check if we already know the (sub)device
   bool learnIn = true; // if we don't find anything below, it's a learn-in for sure
-  for (EldatDeviceMap::iterator pos = eldatDevices.lower_bound(aSenderAddress); pos!=eldatDevices.upper_bound(aSenderAddress); ++pos) {
+  for (EldatDeviceMap::iterator pos = mEldatDevices.lower_bound(aSenderAddress); pos!=mEldatDevices.upper_bound(aSenderAddress); ++pos) {
     EldatSubDevice i = pos->second->getSubDevice();
     if (numSubDevices==0 || (subdevice>=i && subdevice<i+numSubDevices)) {
       // always delete all subdevices or unlearn comes from specified subdevice range
@@ -311,7 +311,7 @@ Tristate EldatVdc::processLearn(EldatAddress aSenderAddress, EldatMode aMode, in
     }
   }
   if (learnIn) {
-    if (onlyEstablish!=no && type!=eldat_unknown) {
+    if (mOnlyEstablish!=no && type!=eldat_unknown) {
       int numNewDevices = EldatDevice::createDevicesFromType(this, aSenderAddress, type, subdevice);
       if (numNewDevices>0) {
         // successfully learned at least one device
@@ -322,7 +322,7 @@ Tristate EldatVdc::processLearn(EldatAddress aSenderAddress, EldatMode aMode, in
     }
   }
   else {
-    if (onlyEstablish!=yes) {
+    if (mOnlyEstablish!=yes) {
       // device learned out, un-pair all logical dS devices it has represented
       // but keep dS level config in case it is reconnected
       unpairDevicesByAddress(aSenderAddress, false, subdevice, numSubDevices);
@@ -337,7 +337,7 @@ Tristate EldatVdc::processLearn(EldatAddress aSenderAddress, EldatMode aMode, in
 void EldatVdc::dispatchMessage(EldatAddress aSenderAddress, EldatMode aMode, int aRSSI, string aData)
 {
   bool reachedDevice = false;
-  for (EldatDeviceMap::iterator pos = eldatDevices.lower_bound(aSenderAddress); pos!=eldatDevices.upper_bound(aSenderAddress); ++pos) {
+  for (EldatDeviceMap::iterator pos = mEldatDevices.lower_bound(aSenderAddress); pos!=mEldatDevices.upper_bound(aSenderAddress); ++pos) {
     // handle regularily (might be RPS switch which does not have separate learn/action packets
     pos->second->handleMessage(aMode, aRSSI, aData);
     reachedDevice = true;
@@ -391,7 +391,7 @@ ErrorPtr EldatVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
           // - get map of already used sending channels
           string usedSendChannelsMap;
           usedSendChannelsMap.assign(128,'0');
-          for (EldatDeviceMap::iterator pos = eldatDevices.begin(); pos!=eldatDevices.end(); ++pos) {
+          for (EldatDeviceMap::iterator pos = mEldatDevices.begin(); pos!=mEldatDevices.end(); ++pos) {
             pos->second->markUsedSendChannels(usedSendChannelsMap);
           }
           addr &= 0xFF; // extract channel
@@ -442,9 +442,9 @@ ErrorPtr EldatVdc::addProfile(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
 void EldatVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish)
 {
   // put normal radio packet evaluator into learn mode
-  learningMode = aEnableLearning;
-  onlyEstablish = aOnlyEstablish;
-  disableProximityCheck = aDisableProximityCheck;
+  mLearningMode = aEnableLearning;
+  mOnlyEstablish = aOnlyEstablish;
+  mDisableProximityCheck = aDisableProximityCheck;
 }
 
 
