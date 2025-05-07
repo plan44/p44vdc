@@ -45,11 +45,11 @@ namespace p44 {
 
 
   /// persistence for LedChain device container
-  class LedChainDevicePersistence : public SQLite3Persistence  {
-    typedef SQLite3Persistence inherited;
+  class LedChainDevicePersistence : public SQLite3TableGroup  {
+    typedef SQLite3TableGroup inherited;
   protected:
     /// Get DB Schema creation/upgrade SQL statements
-    virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
+    virtual string schemaUpgradeSQL(int aFromVersion, int &aToVersion);
   };
 
   typedef vector<string> StringVector;

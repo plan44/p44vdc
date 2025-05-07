@@ -663,7 +663,7 @@ ErrorPtr SceneDeviceSettings::loadChildren()
   sqlite3pp::query *queryP = scene->newLoadAllQuery(parentID.c_str());
   if (queryP==NULL) {
     // real error preparing query
-    err = mParamStore.error();
+    err = mParamStore.db().error();
   }
   else {
     for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {

@@ -38,11 +38,11 @@ namespace p44 {
   class BridgeDevice;
 
   /// persistence for static device container
-  class BridgeDevicePersistence : public SQLite3Persistence  {
-    typedef SQLite3Persistence inherited;
+  class BridgeDevicePersistence : public SQLite3TableGroup  {
+    typedef SQLite3TableGroup inherited;
   protected:
     /// Get DB Schema creation/upgrade SQL statements
-    virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
+    virtual string schemaUpgradeSQL(int aFromVersion, int &aToVersion);
   };
 
 

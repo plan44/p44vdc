@@ -81,7 +81,7 @@ namespace p44 {
     typedef ParamStore inherited;
   protected:
     /// Get DB Schema creation/upgrade SQL statements
-    virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
+    virtual string schemaUpgradeSQL(int aFromVersion, int &aToVersion);
   };
 
   /// Scene kind flags
@@ -157,7 +157,8 @@ namespace p44 {
     bool mAllowCloud; ///< if not set, vdcs are forbidden to use cloud-based services such as N-UPnP that are not actively/obviously configured by the user him/herself
 
     DsDeviceMap mDSDevices; ///< available devices by API-exposed ID (dSUID or derived dsid)
-    DsParamStore mDSParamStore; ///< the database for storing dS device parameters
+    SQLite3Persistence mPersistence; ///< the database holding all settings
+    DsParamStore mDSParamStore; ///< the tables for storing dS device parameters
 
     string mIconDir; ///< the directory where to load icons from
     string mPersistentDataDir; ///< the directory for the vdc host to store SQLite DBs and possibly other persistent data
@@ -476,7 +477,10 @@ namespace p44 {
 		/// @return full path to directory to save persistent data
 		const char *getPersistentDataDir();
 
-    /// get the dsParamStore
+    /// get the persistence store (the now unified database holding all settings, general and vdc private)
+    SQLite3Persistence& getPersistence() { return mPersistence; }
+
+    /// get the sqlite (no-prefix) table group managing the DsParams
     DsParamStore &getDsParamStore() { return mDSParamStore; }
 
     /// @}

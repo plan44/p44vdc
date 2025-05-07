@@ -72,12 +72,12 @@ namespace p44 {
 
 
   /// persistence for Zf device container
-  class ZfPersistence : public SQLite3Persistence
+  class ZfPersistence : public SQLite3TableGroup
   {
-    typedef SQLite3Persistence inherited;
+    typedef SQLite3TableGroup inherited;
   protected:
     /// Get DB Schema creation/upgrade SQL statements
-    virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
+    virtual string schemaUpgradeSQL(int aFromVersion, int &aToVersion);
   };
 
 

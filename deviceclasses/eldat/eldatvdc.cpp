@@ -77,16 +77,17 @@ bool EldatVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolut
 #define ELDAT_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
 #define ELDAT_SCHEMA_VERSION 1 // current version
 
-string EldatPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
+string EldatPersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
     // create DB from scratch
 		// - use standard globs table for schema version
-    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
 		// - create my tables
     sql.append(
-			"CREATE TABLE knownDevices ("
+      "DROP TABLE IF EXISTS $PREFIX_knownDevices;"
+			"CREATE TABLE $PREFIX_knownDevices ("
 			" eldatAddress INTEGER,"
       " subdevice INTEGER,"
       " deviceType INTEGER,"
@@ -105,12 +106,10 @@ void EldatVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // load persistent params for dSUID
   load();
   // load private data
-	string databaseName = getPersistentDataDir();
-	string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), ELDAT_SCHEMA_VERSION, ELDAT_SCHEMA_MIN_VERSION, aFactoryReset);
-  if (Error::notOK(error)) {
+  ErrorPtr err = initializePersistence(db, ELDAT_SCHEMA_VERSION, ELDAT_SCHEMA_MIN_VERSION);
+  if (Error::notOK(err)) {
     // failed DB, no point in starting communication
-    aCompletedCB(error); // return status of DB init
+    aCompletedCB(err); // return status of DB init
   }
   else {
     // start communication
@@ -140,8 +139,8 @@ void EldatVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // start with zero
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // - read learned-in ELDAT devices from DB
-    sqlite3pp::query qry(db);
-    if (qry.prepare("SELECT eldatAddress, subdevice, deviceType FROM knownDevices")==SQLITE_OK) {
+    sqlite3pp::query qry(db.db());
+    if (qry.prepare(db.prefixedSql("SELECT eldatAddress, subdevice, deviceType FROM $PREFIX_knownDevices").c_str())==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         EldatSubDevice subDeviceIndex = i->get<int>(1);
         EldatDevicePtr newdev = EldatDevice::newDevice(
@@ -189,13 +188,13 @@ bool EldatVdc::addAndRememberDevice(EldatDevicePtr aEldatDevice)
   if (addKnownDevice(aEldatDevice)) {
     // save Eldat ID to DB
     // - check if this subdevice is already stored
-    if(db.executef(
-      "INSERT OR REPLACE INTO knownDevices (eldatAddress, subdevice, deviceType) VALUES (%d,%d,%d)",
+    if(db.db().executef(
+      db.prefixedSql("INSERT OR REPLACE INTO knownDevices (eldatAddress, subdevice, deviceType) VALUES (%d,%d,%d)").c_str(),
       aEldatDevice->getAddress(),
       aEldatDevice->getSubDevice(),
       aEldatDevice->getEldatDeviceType()
     )!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error saving device: %s", db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error saving device: %s", db.db().error()->description().c_str());
     }
     return true;
   }

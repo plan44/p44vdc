@@ -74,12 +74,12 @@ namespace p44 {
 
 
   /// persistence for Eldat device container
-  class EldatPersistence : public SQLite3Persistence
+  class EldatPersistence : public SQLite3TableGroup
   {
-    typedef SQLite3Persistence inherited;
+    typedef SQLite3TableGroup inherited;
   protected:
     /// Get DB Schema creation/upgrade SQL statements
-    virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
+    virtual string schemaUpgradeSQL(int aFromVersion, int &aToVersion);
   };
 
 

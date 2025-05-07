@@ -74,16 +74,17 @@ bool ZfVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolution
 #define ZF_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
 #define ZF_SCHEMA_VERSION 1 // current version
 
-string ZfPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
+string ZfPersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
     // create DB from scratch
 		// - use standard globs table for schema version
-    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
 		// - create my tables
     sql.append(
-			"CREATE TABLE knownDevices ("
+      "DROP TABLE IF EXISTS $PREFIX_knownDevices;"
+			"CREATE TABLE $PREFIX_knownDevices ("
 			" zfAddress INTEGER,"
       " subdevice INTEGER,"
       " deviceType INTEGER,"
@@ -102,12 +103,10 @@ void ZfVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // load persistent params for dSUID
   load();
   // load private data
-	string databaseName = getPersistentDataDir();
-	string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  ErrorPtr error = db.connectAndInitialize(databaseName.c_str(), ZF_SCHEMA_VERSION, ZF_SCHEMA_MIN_VERSION, aFactoryReset);
-  if (Error::notOK(error)) {
+  ErrorPtr err = initializePersistence(db, ZF_SCHEMA_VERSION, ZF_SCHEMA_MIN_VERSION);
+  if (Error::notOK(err)) {
     // failed DB, no point in starting communication
-    aCompletedCB(error); // return status of DB init
+    aCompletedCB(err); // return status of DB init
   }
   else {
     // start communication
@@ -137,8 +136,8 @@ void ZfVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // start with zero
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // - read learned-in EnOcean button IDs from DB
-    sqlite3pp::query qry(db);
-    if (qry.prepare("SELECT zfAddress, subdevice, deviceType FROM knownDevices")==SQLITE_OK) {
+    sqlite3pp::query qry(db.db());
+    if (qry.prepare(db.prefixedSql("SELECT zfAddress, subdevice, deviceType FROM $PREFIX_knownDevices").c_str())==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         ZfSubDevice subDeviceIndex = i->get<int>(1);
         ZfDevicePtr newdev = ZfDevice::newDevice(
@@ -186,13 +185,13 @@ bool ZfVdc::addAndRememberDevice(ZfDevicePtr aZfDevice)
   if (addKnownDevice(aZfDevice)) {
     // save ZF ID to DB
     // - check if this subdevice is already stored
-    if(db.executef(
-      "INSERT OR REPLACE INTO knownDevices (zfAddress, subdevice, deviceType) VALUES (%d,%d,%d)",
+    if(db.db().executef(
+      db.prefixedSql("INSERT OR REPLACE INTO $PREFIX_knownDevices (zfAddress, subdevice, deviceType) VALUES (%d,%d,%d)").c_str(),
       aZfDevice->getAddress(),
       aZfDevice->getSubDevice(),
       aZfDevice->getZfDeviceType()
     )!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error saving device: %s", db.error()->description().c_str());
+      OLOG(LOG_ERR, "Error saving device: %s", db.db().error()->description().c_str());
     }
     return true;
   }

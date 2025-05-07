@@ -67,8 +67,8 @@ void StaticDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResult
   OLOG(LOG_DEBUG, "disconnecting static device with rowid=%lld", mStaticDeviceRowID);
   // clear learn-in data from DB
   if (mStaticDeviceRowID) {
-    if(getStaticVdc().mDb.executef("DELETE FROM devConfigs WHERE rowid=%lld", mStaticDeviceRowID)!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Edeleting static device: %s", getStaticVdc().mDb.error()->description().c_str());
+    if(getStaticVdc().mDb.db().executef(getStaticVdc().mDb.prefixedSql("DELETE FROM $PREFIX_devConfigs WHERE rowid=%lld").c_str(), mStaticDeviceRowID)!=SQLITE_OK) {
+      OLOG(LOG_ERR, "Error deleting static device: %s", getStaticVdc().mDb.db().error()->description().c_str());
     }
   }
   // disconnection is immediate, so we can call inherited right now
@@ -84,16 +84,17 @@ void StaticDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResult
 #define STATICDEVICES_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
 #define STATICDEVICES_SCHEMA_VERSION 1 // current version
 
-string StaticDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
+string StaticDevicePersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
     // create DB from scratch
     // - use standard globs table for schema version
-    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
     // - create my tables
     sql.append(
-      "CREATE TABLE devConfigs ("
+      "DROP TABLE IF EXISTS $PREFIX_devConfigs;"
+      "CREATE TABLE $PREFIX_devConfigs ("
       " devicetype TEXT,"
       " deviceconfig TEXT"
       ");"
@@ -118,11 +119,9 @@ void StaticVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // load persistent params for dSUID
   load();
   // load private data
-  string databaseName = getPersistentDataDir();
-  string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), STATICDEVICES_SCHEMA_VERSION, STATICDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
+  ErrorPtr err = initializePersistence(mDb, STATICDEVICES_SCHEMA_VERSION, STATICDEVICES_SCHEMA_MIN_VERSION);
   if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
-  aCompletedCB(error); // return status of DB init
+  aCompletedCB(err); // return status of DB init
 }
 
 
@@ -175,8 +174,8 @@ void StaticVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
       }
     }
     // then add those from the DB
-    sqlite3pp::query qry(mDb);
-    if (qry.prepare("SELECT devicetype, deviceconfig, rowid FROM devConfigs")==SQLITE_OK) {
+    sqlite3pp::query qry(mDb.db());
+    if (qry.prepare(mDb.prefixedSql("SELECT devicetype, deviceconfig, rowid FROM $PREFIX_devConfigs").c_str())==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         StaticDevicePtr dev = createStaticDevice(i->get<string>(0), i->get<string>(1));
         if (dev) {
@@ -218,14 +217,14 @@ ErrorPtr StaticVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
             customized = true;
           }
           // insert into database
-          if(mDb.executef(
-            "INSERT OR REPLACE INTO devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')",
+          if(mDb.db().executef(
+            mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')").c_str(),
             deviceType.c_str(), deviceConfig.c_str()
           )!=SQLITE_OK) {
-            respErr = mDb.error("saving static device params");
+            respErr = mDb.db().error("saving static device params");
           }
           else {
-            dev->mStaticDeviceRowID = mDb.last_insert_rowid();
+            dev->mStaticDeviceRowID = mDb.db().last_insert_rowid();
             simpleIdentifyAndAddDevice(dev); // includes load() which clears dirty status
             if (customized) dev->mDeviceSettings->markDirty(); // make sure customized name gets persisted
             // confirm

@@ -121,19 +121,19 @@ string HueVdc::vendorName()
 #define HUE_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
 #define HUE_SCHEMA_VERSION 2 // current version
 
-string HuePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
+string HuePersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
     // create DB from scratch
 		// - use standard globs table for schema version
-    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
 		// - add fields to globs table
     sql.append(
-      "ALTER TABLE globs ADD hueBridgeUUID TEXT;"
-      "ALTER TABLE globs ADD hueBridgeUser TEXT;"
-      "ALTER TABLE globs ADD hueApiURL TEXT;"
-      "ALTER TABLE globs ADD fixedURL INTEGER;"
+      "ALTER TABLE $PREFIX_globs ADD hueBridgeUUID TEXT;"
+      "ALTER TABLE $PREFIX_globs ADD hueBridgeUser TEXT;"
+      "ALTER TABLE $PREFIX_globs ADD hueApiURL TEXT;"
+      "ALTER TABLE $PREFIX_globs ADD fixedURL INTEGER;"
     );
     // reached final version in one step
     aToVersion = HUE_SCHEMA_VERSION;
@@ -141,8 +141,8 @@ string HuePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
   else if (aFromVersion==1) {
     // V1->V2: stored API url added
     sql =
-      "ALTER TABLE globs ADD hueApiURL TEXT;"
-      "ALTER TABLE globs ADD fixedURL INTEGER;";
+      "ALTER TABLE $PREFIX_globs ADD hueApiURL TEXT;"
+      "ALTER TABLE $PREFIX_globs ADD fixedURL INTEGER;";
     // reached version 2
     aToVersion = 2;
   }
@@ -158,10 +158,8 @@ void HueVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // load persistent params for dSUID
   load();
   // load private data
-	string databaseName = getPersistentDataDir();
-	string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), HUE_SCHEMA_VERSION, HUE_SCHEMA_MIN_VERSION, aFactoryReset);
-	aCompletedCB(error); // return status of DB init
+  ErrorPtr err = initializePersistence(mDb, HUE_SCHEMA_VERSION, HUE_SCHEMA_MIN_VERSION);
+	aCompletedCB(err); // return status of DB init
   // schedule rescans
   setPeriodicRecollection(HUE_RECOLLECT_INTERVAL, rescanmode_incremental);
 }
@@ -185,8 +183,8 @@ void HueVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
   // load hue bridge uuid and token
-  sqlite3pp::query qry(mDb);
-  if (qry.prepare("SELECT hueBridgeUUID, hueBridgeUser, hueApiURL, fixedURL FROM globs")==SQLITE_OK) {
+  sqlite3pp::query qry(mDb.db());
+  if (qry.prepare("SELECT hueBridgeUUID, hueBridgeUser, hueApiURL, fixedURL FROM $PREFIX_globs")==SQLITE_OK) {
     sqlite3pp::query::iterator i = qry.begin();
     if (i!=qry.end()) {
       mBridgeIdentifier = nonNullCStr(i->get<const char *>(0));
@@ -260,12 +258,12 @@ void HueVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
       mBridgeApiURL = mHueComm.mBaseURL;
       mBridgeIdentifier = mHueComm.mBridgeIdentifier;
       // save back into database
-      if(mDb.executef(
-        "UPDATE globs SET hueBridgeUUID='%q', hueApiURL='%q', fixedURL=0",
+      if(mDb.db().executef(
+        mDb.prefixedSql("UPDATE $PREFIX_globs SET hueBridgeUUID='%q', hueApiURL='%q', fixedURL=0").c_str(),
         mBridgeIdentifier.c_str(),
         mBridgeApiURL.c_str()
       )!=SQLITE_OK) {
-        OLOG(LOG_ERR, "Error saving hue bridge url: %s", mDb.error()->description().c_str());
+        OLOG(LOG_ERR, "Error saving hue bridge url: %s", mDb.db().error()->description().c_str());
       }
     }
     // collect existing lights
@@ -315,12 +313,12 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
         mBridgeIdentifier = PSEUDO_UUID_FOR_FIXED_API;
         mFixedURL = true;
         // save the bridge parameters
-        if(mDb.executef(
-          "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='', hueApiURL='%q', fixedURL=1",
+        if(mDb.db().executef(
+          mDb.prefixedSql("UPDATE $PREFIX_globs SET hueBridgeUUID='%q', hueBridgeUser='', hueApiURL='%q', fixedURL=1").c_str(),
           mBridgeIdentifier.c_str(),
           mBridgeApiURL.c_str()
         )!=SQLITE_OK) {
-          respErr = mDb.error("saving hue bridge params");
+          respErr = mDb.db().error("saving hue bridge params");
         }
         else {
           // done (separate learn-in required, because button press at the bridge is required)
@@ -330,8 +328,8 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       else {
         // unregister
         mFixedURL = false;
-        if(mDb.executef("UPDATE globs SET hueBridgeUUID='', hueBridgeUser='', hueApiURL='', fixedURL=0")!=SQLITE_OK) {
-          respErr = mDb.error("clearing hue bridge params");
+        if(mDb.db().executef(mDb.prefixedSql("UPDATE $PREFIX_globs SET hueBridgeUUID='', hueBridgeUser='', hueApiURL='', fixedURL=0").c_str())!=SQLITE_OK) {
+          respErr = mDb.db().error("clearing hue bridge params");
         }
         else {
           // done
@@ -346,12 +344,12 @@ ErrorPtr HueVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       respErr = checkStringParam(aParams, "bridgeUsername", mBridgeUserName);
       if (Error::notOK(respErr)) return respErr;
       // save the bridge parameters
-      if(mDb.executef(
-        "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='', fixedURL=0",
+      if(mDb.db().executef(
+        mDb.prefixedSql("UPDATE $PREFIX_globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='', fixedURL=0").c_str(),
         mBridgeIdentifier.c_str(),
         mBridgeUserName.c_str()
       )!=SQLITE_OK) {
-        respErr = mDb.error("saving hue bridge migration params");
+        respErr = mDb.db().error("saving hue bridge migration params");
       }
       else {
         // now collect the lights from the new bridge, remove all settings from previous bridge
@@ -446,13 +444,13 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
         mBridgeApiURL.clear();
       }
       // save the bridge parameters
-      if(mDb.executef(
-        "UPDATE globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='%q', fixedURL=0",
+      if(mDb.db().executef(
+        mDb.prefixedSql("UPDATE $PREFIX_globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='%q', fixedURL=0").c_str(),
         mBridgeIdentifier.c_str(),
         mBridgeUserName.c_str(),
         mBridgeApiURL.c_str()
       )!=SQLITE_OK) {
-        OLOG(LOG_ERR, "Error saving hue bridge learn params: %s", mDb.error()->description().c_str());
+        OLOG(LOG_ERR, "Error saving hue bridge learn params: %s", mDb.db().error()->description().c_str());
       }
       // now process the learn in/out
       if (learnedIn==yes) {

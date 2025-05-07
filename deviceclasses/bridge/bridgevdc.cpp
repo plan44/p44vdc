@@ -36,16 +36,17 @@ using namespace p44;
 #define BRIDGEDEVICES_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
 #define BRIDGEDEVICES_SCHEMA_VERSION 1 // current version
 
-string BridgeDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
+string BridgeDevicePersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
     // create DB from scratch
     // - use standard globs table for schema version
-    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
     // - create my tables
     sql.append(
-      "CREATE TABLE bridgedevices ("
+      "DROP TABLE IF EXISTS $PREFIX_bridgedevices;"
+      "CREATE TABLE $PREFIX_bridgedevices ("
       " bridgeDeviceId, config TEXT,"
       " PRIMARY KEY (bridgeDeviceId)"
       ");"
@@ -69,11 +70,9 @@ void BridgeVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // load persistent params for dSUID
   load();
   // load private data
-  string databaseName = getPersistentDataDir();
-  string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), BRIDGEDEVICES_SCHEMA_VERSION, BRIDGEDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
+  ErrorPtr err = initializePersistence(mDb, BRIDGEDEVICES_SCHEMA_VERSION, BRIDGEDEVICES_SCHEMA_MIN_VERSION);
   if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
-  aCompletedCB(error); // return status of DB init
+  aCompletedCB(err); // return status of DB init
 }
 
 
@@ -105,8 +104,8 @@ void BridgeVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // non-incremental, re-collect all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // add from the DB
-    sqlite3pp::query qry(mDb);
-    if (qry.prepare("SELECT bridgeDeviceId, config, rowid FROM bridgedevices")==SQLITE_OK) {
+    sqlite3pp::query qry(mDb.db());
+    if (qry.prepare(mDb.prefixedSql("SELECT bridgeDeviceId, config, rowid FROM $PREFIX_bridgedevices").c_str())==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         // for pre-existing devices, group and bridgeable will be overridden from persistent settings
         BridgeDevicePtr dev = BridgeDevicePtr(new BridgeDevice(this, i->get<string>(0), i->get<string>(1), group_undefined, true));
@@ -162,14 +161,14 @@ ErrorPtr BridgeVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
           customized = true;
         }
         // insert into database
-        if (mDb.executef(
-          "INSERT OR REPLACE INTO bridgedevices (bridgeDeviceId, config) VALUES ('%q','%q')",
+        if (mDb.db().executef(
+          mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_bridgedevices (bridgeDeviceId, config) VALUES ('%q','%q')").c_str(),
           bridgeDeviceId.c_str(), bridgeConfig.c_str()
         )!=SQLITE_OK) {
-          respErr = mDb.error("saving bridge device");
+          respErr = mDb.db().error("saving bridge device");
         }
         else {
-          dev->mBridgeDeviceRowID = mDb.last_insert_rowid();
+          dev->mBridgeDeviceRowID = mDb.db().last_insert_rowid();
           simpleIdentifyAndAddDevice(dev);  // includes load() which clears dirty status
           if (customized) {
             dev->setDirty(true); // make sure customized name/color/allowbridging state gets persisted

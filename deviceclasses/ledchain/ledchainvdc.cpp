@@ -40,16 +40,17 @@ using namespace p44;
 #define LEDCHAINDEVICES_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
 #define LEDCHAINDEVICES_SCHEMA_VERSION 3 // current version
 
-string LedChainDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
+string LedChainDevicePersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
     // create DB from scratch
     // - use standard globs table for schema version
-    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
     // - create my tables
     sql.append(
-      "CREATE TABLE devConfigs ("
+      "DROP TABLE IF EXIST $PREFIX_devConfigs;"
+      "CREATE TABLE $PREFIX_devConfigs ("
       " firstLED INTEGER," // now x
       " numLEDs INTEGER," // now dx
       " y INTEGER,"
@@ -64,15 +65,15 @@ string LedChainDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToV
   else if (aFromVersion==1) {
     // V1->V2: y/dy added
     sql =
-      "ALTER TABLE devConfigs ADD y INTEGER;"
-      "ALTER TABLE devConfigs ADD dy INTEGER;";
+      "ALTER TABLE $PREFIX_devConfigs ADD y INTEGER;"
+      "ALTER TABLE $PREFIX_devConfigs ADD dy INTEGER;";
     // reached version 2
     aToVersion = 2;
   }
   else if (aFromVersion==2) {
     // V2->V3: zorder added
     sql =
-      "ALTER TABLE devConfigs ADD zorder INTEGER;";
+      "ALTER TABLE $PREFIX_devConfigs ADD zorder INTEGER;";
     // reached version 3
     aToVersion = 3;
   }
@@ -115,16 +116,14 @@ void LedChainVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     mRootView->setFrame(r);
     mRootView->setBackgroundColor(black); // stack with black background is more efficient (and there's nothing below, anyway)
     mLedArrangement->setRootView(mRootView);
-    // initialize database
-    string databaseName = getPersistentDataDir();
-    string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-    err = mDb.connectAndInitialize(databaseName.c_str(), LEDCHAINDEVICES_SCHEMA_VERSION, LEDCHAINDEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
+    // initialize persistence
+    err = initializePersistence(mDb, LEDCHAINDEVICES_SCHEMA_VERSION, LEDCHAINDEVICES_SCHEMA_MIN_VERSION);
     // Initialize chain driver
     mLedArrangement->begin(true);
   }
   // done
   if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
-  aCompletedCB(ErrorPtr());
+  aCompletedCB(err);
 }
 
 
@@ -197,8 +196,8 @@ void LedChainVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // non-incremental, re-collect all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // then add those from the DB
-    sqlite3pp::query qry(mDb);
-    if (qry.prepare("SELECT rowid, firstLED, numLEDs, y, dy, zorder, deviceconfig FROM devConfigs ORDER BY zorder,rowid")==SQLITE_OK) {
+    sqlite3pp::query qry(mDb.db());
+    if (qry.prepare("SELECT rowid, firstLED, numLEDs, y, dy, zorder, deviceconfig FROM $PREFIX_devConfigs ORDER BY zorder,rowid")==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         int zorder;
         long long rowid = i->get<int>(0);
@@ -267,14 +266,14 @@ ErrorPtr LedChainVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
             // set name
             if (name.size()>0) dev->setName(name);
             // insert into database
-            if(mDb.executef(
-              "INSERT OR REPLACE INTO devConfigs (firstLED, numLEDs, y, dy, zorder, deviceconfig) VALUES (%d, %d, %d, %d, %d, '%q')",
+            if(mDb.db().executef(
+              "INSERT OR REPLACE INTO $PREFIX_devConfigs (firstLED, numLEDs, y, dy, zorder, deviceconfig) VALUES (%d, %d, %d, %d, %d, '%q')",
               x, dx, y, dy, zorder, deviceConfig.c_str()
             )!=SQLITE_OK) {
-              respErr = mDb.error("saving LED chain segment params");
+              respErr = mDb.db().error("saving LED chain segment params");
             }
             else {
-              dev->mLedChainDeviceRowID = mDb.last_insert_rowid();
+              dev->mLedChainDeviceRowID = mDb.db().last_insert_rowid();
               // confirm
               ApiValuePtr r = aRequest->newApiValue();
               r->setType(apivalue_object);

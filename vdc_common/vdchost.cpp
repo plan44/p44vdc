@@ -464,13 +464,13 @@ P44LoggingObj* VdcHost::getTopicLogObject(const string aTopic)
 #define DSPARAMS_SCHEMA_MIN_VERSION 3 // minimally supported version, anything older will be deleted
 #define DSPARAMS_SCHEMA_VERSION 3 // current version
 
-string DsParamStore::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
+string DsParamStore::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
     // create DB from scratch
 		// - use standard globs table for schema version
-    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
 		// - no vdchost level table to create at this time
     //   (PersistentParams create and update their tables as needed)
     // reached final version in one step
@@ -483,10 +483,15 @@ string DsParamStore::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
 
 ErrorPtr VdcHost::prepareForVdcs(bool aFactoryReset)
 {
+  ErrorPtr err;
   // initialize dsParamsDB database
   string databaseName = getPersistentDataDir();
   string_format_append(databaseName, "DsParams.sqlite3");
-  ErrorPtr err = mDSParamStore.connectAndInitialize(databaseName.c_str(), DSPARAMS_SCHEMA_VERSION, DSPARAMS_SCHEMA_MIN_VERSION, aFactoryReset);
+  err = mPersistence.connectDatabase(databaseName.c_str(), aFactoryReset);
+  if (Error::isOK(err)) {
+    // DsParams does NOT have table prefixes, and will not be migrated from other DBs!
+    mDSParamStore.initialize(mPersistence, "", DSPARAMS_SCHEMA_VERSION, DSPARAMS_SCHEMA_MIN_VERSION, nullptr);
+  }
   // load the vdc host settings and determine the dSUID (external > stored > mac-derived)
   loadAndFixDsUID();
   return err;

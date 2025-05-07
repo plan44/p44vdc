@@ -51,12 +51,12 @@ namespace p44 {
 
 
   /// persistence for enocean device container
-  class DaliPersistence : public SQLite3Persistence
+  class DaliPersistence : public SQLite3TableGroup
   {
-    typedef SQLite3Persistence inherited;
+    typedef SQLite3TableGroup inherited;
   protected:
     /// Get DB Schema creation/upgrade SQL statements
-    virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
+    virtual string schemaUpgradeSQL(int aFromVersion, int &aToVersion);
   };
 
 

@@ -198,8 +198,8 @@ void BridgeDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResult
 {
   // clear learn-in data from DB
   if (mBridgeDeviceRowID) {
-    if(getBridgeVdc().mDb.executef("DELETE FROM bridgedevices WHERE rowid=%lld", mBridgeDeviceRowID)!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error deleting bridgedevice: %s", getBridgeVdc().mDb.error()->description().c_str());
+    if(getBridgeVdc().mDb.db().executef(getBridgeVdc().mDb.prefixedSql("DELETE FROM $PREFIX_bridgedevices WHERE rowid=%lld").c_str(), mBridgeDeviceRowID)!=SQLITE_OK) {
+      OLOG(LOG_ERR, "Error deleting bridgedevice: %s", getBridgeVdc().mDb.db().error()->description().c_str());
     }
   }
   // disconnection is immediate, so we can call inherited right now

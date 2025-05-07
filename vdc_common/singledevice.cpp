@@ -816,7 +816,7 @@ ErrorPtr CustomActions::load()
   sqlite3pp::query *queryP = newAction->newLoadAllQuery(parentID.c_str());
   if (queryP==NULL) {
     // real error preparing query
-    err = newAction->mParamStore.error();
+    err = newAction->mParamStore.db().error();
   }
   else {
     for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {

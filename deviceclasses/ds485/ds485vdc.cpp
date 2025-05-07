@@ -112,17 +112,17 @@ void Ds485Vdc::recollect(RescanMode aRescanMode)
 #define DS485_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
 #define DS485_SCHEMA_VERSION 1 // current version
 
-string Ds485Persistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
+string Ds485Persistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
-    // create DB from scratch
+    // create table group from scratch
     // - use standard globs table for schema version
-    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
     // - add fields to globs table
     sql.append(
-      "ALTER TABLE globs ADD tunnelPw TEXT;"
-      "ALTER TABLE globs ADD tunnelHost TEXT;"
+      "ALTER TABLE $PREFIX_globs ADD tunnelPw TEXT;"
+      "ALTER TABLE $PREFIX_globs ADD tunnelHost TEXT;"
     );
     // reached final version in one step
     aToVersion = DS485_SCHEMA_VERSION;
@@ -148,11 +148,11 @@ ErrorPtr Ds485Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod
         mDs485Comm.mApiHost = host;
       }
       // save
-      if(mDb.executef(
-        "UPDATE globs SET tunnelPw='%q', tunnelHost='%q'",
+      if(mDb.db().executef(
+        mDb.prefixedSql("UPDATE $PREFIX_globs SET tunnelPw='%q', tunnelHost='%q'").c_str(),
         pw.c_str(), host.c_str()
       )!=SQLITE_OK) {
-        respErr = mDb.error("saving dS485 params");
+        respErr = mDb.db().error("saving dS485 params");
       }
       else {
         // done
@@ -172,13 +172,11 @@ void Ds485Vdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // load persistent params for dSUID
   load();
   // load private data
-  string databaseName = getPersistentDataDir();
-  string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), DS485_SCHEMA_VERSION, DS485_SCHEMA_MIN_VERSION, aFactoryReset);
-  if (Error::notOK(error)) aCompletedCB(error); // failed
+  ErrorPtr err = initializePersistence(mDb,  DS485_SCHEMA_VERSION, DS485_SCHEMA_MIN_VERSION);
+  if (Error::notOK(err)) aCompletedCB(err); // failed
   // get tunnel pw
-  sqlite3pp::query qry(mDb);
-  if (qry.prepare("SELECT tunnelPw, tunnelHost FROM globs")==SQLITE_OK) {
+  sqlite3pp::query qry(mDb.db());
+  if (qry.prepare(mDb.prefixedSql("SELECT tunnelPw, tunnelHost FROM $PREFIX_globs").c_str())==SQLITE_OK) {
     sqlite3pp::query::iterator i = qry.begin();
     if (i!=qry.end()) {
       mDs485Comm.setTunnelPw(nonNullCStr(i->get<const char *>(0)));

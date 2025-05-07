@@ -49,16 +49,17 @@ using namespace p44;
 #define OLADEVICES_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
 #define OLADEVICES_SCHEMA_VERSION 1 // current version
 
-string DmxDevicePersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
+string DmxDevicePersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
     // create DB from scratch
     // - use standard globs table for schema version
-    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
     // - create my tables
     sql.append(
-      "CREATE TABLE devConfigs ("
+      "DROP TABLE IF EXISTS $PREFIX_devConfigs;"
+      "CREATE TABLE $PREFIX_devConfigs ("
       " devicetype TEXT,"
       " deviceconfig TEXT"
       ");"
@@ -113,9 +114,7 @@ void DmxVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // load persistent params for dSUID
   load();
   // load private data
-  string databaseName = getPersistentDataDir();
-  string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  err = mDb.connectAndInitialize(databaseName.c_str(), OLADEVICES_SCHEMA_VERSION, OLADEVICES_SCHEMA_MIN_VERSION, aFactoryReset);
+  err = initializePersistence(mDb, OLADEVICES_SCHEMA_VERSION, OLADEVICES_SCHEMA_MIN_VERSION);
   // launch sender thread
   pthread_mutex_init(&mDmxBufferAccess, NULL);
   #if ENABLE_OLA
@@ -302,8 +301,8 @@ void DmxVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // non-incremental, re-collect all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // then add those from the DB
-    sqlite3pp::query qry(mDb);
-    if (qry.prepare("SELECT devicetype, deviceconfig, rowid FROM devConfigs")==SQLITE_OK) {
+    sqlite3pp::query qry(mDb.db());
+    if (qry.prepare(mDb.prefixedSql("SELECT devicetype, deviceconfig, rowid FROM $PREFIX_devConfigs").c_str())==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         DmxDevicePtr dev =addDmxDevice(i->get<string>(0), i->get<string>(1));
         dev->mDmxDeviceRowID = i->get<int>(2);
@@ -338,14 +337,14 @@ ErrorPtr DmxVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
           // set name
           if (name.size()>0) dev->setName(name);
           // insert into database
-          if(mDb.executef(
-            "INSERT OR REPLACE INTO devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')",
+          if(mDb.db().executef(
+            mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')").c_str(),
             deviceType.c_str(), deviceConfig.c_str()
           )!=SQLITE_OK) {
-            respErr = mDb.error("saving DMX params");
+            respErr = mDb.db().error("saving DMX params");
           }
           else {
-            dev->mDmxDeviceRowID = mDb.last_insert_rowid();
+            dev->mDmxDeviceRowID = mDb.db().last_insert_rowid();
             // confirm
             ApiValuePtr r = aRequest->newApiValue();
             r->setType(apivalue_object);

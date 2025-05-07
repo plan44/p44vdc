@@ -177,7 +177,7 @@ void DaliBusDevice::deriveDsUid()
     dsUidForDeviceInfoStatus(shortAddrBasedDsUid, DaliDeviceInfo::devinf_notForID);
     // - check for named device in database consisting of this dimmer with shortaddr based dSUID
     //   Note that only single dimmer device are checked for, composite devices will not have this compatibility mechanism
-    sqlite3pp::query qry(mDaliVdc.getVdcHost().getDsParamStore());
+    sqlite3pp::query qry(mDaliVdc.getVdcHost().getDsParamStore().db());
     // Note: this is a bit ugly, as it has the device settings table name hard coded
     string sql = string_format("SELECT deviceName FROM DeviceSettings WHERE parentID='%s'", shortAddrBasedDsUid.getString().c_str());
     if (qry.prepare(sql.c_str())==SQLITE_OK) {
@@ -2335,8 +2335,8 @@ void DaliInputDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectRes
   OLOG(LOG_DEBUG, "disconnecting DALI input device with rowid=%lld", mDaliInputDeviceRowID);
   // clear learn-in data from DB
   if (mDaliInputDeviceRowID) {
-    if(daliVdc().mDb.executef("DELETE FROM inputDevices WHERE rowid=%lld", mDaliInputDeviceRowID)!=SQLITE_OK) {
-      OLOG(LOG_ERR, "deleting DALI input device: %s", daliVdc().mDb.error()->description().c_str());
+    if(daliVdc().mDb.db().executef(daliVdc().mDb.prefixedSql("DELETE FROM $PREFIX_inputDevices WHERE rowid=%lld").c_str(), mDaliInputDeviceRowID)!=SQLITE_OK) {
+      OLOG(LOG_ERR, "deleting DALI input device: %s", daliVdc().mDb.db().error()->description().c_str());
     }
     for (int i=0; i<mNumAddresses; i++) {
       daliVdc().markUsed(mBaseAddress+i, false);

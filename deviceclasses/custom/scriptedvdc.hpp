@@ -73,11 +73,11 @@ namespace p44 {
 
 
   /// persistence for scripted device container
-  class ScriptedDevicePersistence : public SQLite3Persistence  {
-    typedef SQLite3Persistence inherited;
+  class ScriptedDevicePersistence : public SQLite3TableGroup  {
+    typedef SQLite3TableGroup inherited;
   protected:
     /// Get DB Schema creation/upgrade SQL statements
-    virtual string dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion);
+    virtual string schemaUpgradeSQL(int aFromVersion, int &aToVersion);
   };
 
 

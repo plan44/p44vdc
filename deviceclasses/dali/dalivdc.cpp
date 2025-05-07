@@ -105,12 +105,12 @@ bool DaliVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResoluti
 #define DALI_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
 #define DALI_SCHEMA_VERSION 6 // current version
 
-string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
+string DaliPersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   // input devices table needed for fromVersion==0 and 2
   static const char *inputDevicesTable =
-    "CREATE TABLE inputDevices ("
+    "CREATE TABLE $PREFIX_inputDevices ("
     " daliInputConfig TEXT," // the input configuration
     " daliBaseAddr INTEGER," // DALI base address (internal abstracted DaliAddress type) of input device
     " PRIMARY KEY (daliBaseAddr)"
@@ -119,10 +119,12 @@ string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
   if (aFromVersion==0) {
     // create DB from scratch
 		// - use standard globs table for schema version
-    sql = inherited::dbSchemaUpgradeSQL(aFromVersion, aToVersion);
+    sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
 		// - create my tables
     sql.append(
-      "CREATE TABLE compositeDevices ("
+      "DROP TABLE IF EXISTS $PREFIX_inputDevices;"
+      "DROP TABLE IF EXISTS $PREFIX_compositeDevices;"
+      "CREATE TABLE $PREFIX_compositeDevices ("
       " dimmerUID TEXT,"
       " dimmerType TEXT,"
       " collectionID INTEGER," // table-unique ID for this collection
@@ -133,19 +135,19 @@ string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
     sql.append(inputDevicesTable);
 		// - add dali2ScanLock to globs table and set it to 0 (this is a fresh installation)
     sql.append(
-      "ALTER TABLE globs ADD dali2ScanLock INTEGER;"
-      "UPDATE globs SET dali2ScanLock=0;" // nothing locked
+      "ALTER TABLE $PREFIX_globs ADD dali2ScanLock INTEGER;"
+      "UPDATE $PREFIX_globs SET dali2ScanLock=0;" // nothing locked
     );
     // - add daliDefaultGamma with modern (2024) default value (this is a fresh installation)
-    sql.append("ALTER TABLE globs ADD daliDefaultGamma FLOAT;");
-    string_format_append(sql, "UPDATE globs SET daliDefaultGamma=%f;", P44_NEW_DALI_GAMMA);
+    sql.append("ALTER TABLE $PREFIX_globs ADD daliDefaultGamma FLOAT;");
+    string_format_append(sql, "UPDATE $PREFIX_globs SET daliDefaultGamma=%f;", P44_NEW_DALI_GAMMA);
     // reached final version in one step
     aToVersion = DALI_SCHEMA_VERSION;
   }
   else if (aFromVersion==1) {
     // V1->V2: groupNo added
     sql =
-      "ALTER TABLE compositeDevices ADD groupNo INTEGER;";
+      "ALTER TABLE $PREFIX_compositeDevices ADD groupNo INTEGER;";
     // reached version 2
     aToVersion = 2;
   }
@@ -158,22 +160,22 @@ string DaliPersistence::dbSchemaUpgradeSQL(int aFromVersion, int &aToVersion)
   else if (aFromVersion==3) {
     // V3->V4: added dali2ScanLock
     sql =
-      "ALTER TABLE globs ADD dali2ScanLock INTEGER;"
-      "UPDATE globs SET dali2ScanLock=1;"; // this is an upgrade: LOCKED!
+      "ALTER TABLE $PREFIX_globs ADD dali2ScanLock INTEGER;"
+      "UPDATE $PREFIX_globs SET dali2ScanLock=1;"; // this is an upgrade: LOCKED!
     // reached version 4
     aToVersion = 4;
   }
   else if (aFromVersion==4) {
     // V4->V5: extended dali2ScanLock for dali2LUNLock
     sql =
-      "UPDATE globs SET dali2ScanLock=dali2ScanLock | 2;"; // this is an upgrade: lock DALI2 LUN support
+      "UPDATE $PREFIX_globs SET dali2ScanLock=dali2ScanLock | 2;"; // this is an upgrade: lock DALI2 LUN support
     // reached version 5
     aToVersion = 5;
   }
   else if (aFromVersion==5) {
     // V5->V6: add daliDefaultGamma with historic default value to retain brightness behaviour in existing setups
-    sql = "ALTER TABLE globs ADD daliDefaultGamma FLOAT;";
-    string_format_append(sql, "UPDATE globs SET daliDefaultGamma=%f;", P44_HISTORIC_DALI_GAMMA);
+    sql = "ALTER TABLE $PREFIX_globs ADD daliDefaultGamma FLOAT;";
+    string_format_append(sql, "UPDATE $PREFIX_globs SET daliDefaultGamma=%f;", P44_HISTORIC_DALI_GAMMA);
     // reached version 6
     aToVersion = 6;
   }
@@ -186,12 +188,10 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // load persistent params for dSUID
   load();
   // load private data
-	string databaseName = getPersistentDataDir();
-	string_format_append(databaseName, "%s_%d.sqlite3", vdcClassIdentifier(), getInstanceNumber());
-  ErrorPtr error = mDb.connectAndInitialize(databaseName.c_str(), DALI_SCHEMA_VERSION, DALI_SCHEMA_MIN_VERSION, aFactoryReset);
+  ErrorPtr err = initializePersistence(mDb, DALI_SCHEMA_VERSION, DALI_SCHEMA_MIN_VERSION);
   // load dali2ScanLock
-  sqlite3pp::query qry(mDb);
-  if (qry.prepare("SELECT dali2ScanLock, daliDefaultGamma FROM globs")==SQLITE_OK) {
+  sqlite3pp::query qry(mDb.db());
+  if (qry.prepare(mDb.prefixedSql("SELECT dali2ScanLock, daliDefaultGamma FROM $PREFIX_globs").c_str())==SQLITE_OK) {
     sqlite3pp::query::iterator i = qry.begin();
     if (i!=qry.end()) {
       // dali2ScanLock DB field contains dali2ScanLock flag in bit 0 and dali2LUNLock in bit 1
@@ -206,7 +206,7 @@ void DaliVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   // update map of groups and scenes used by manually configured groups and scene-listening input devices
   reserveLocallyUsedGroupsAndScenes();
   // return status of DB init
-	aCompletedCB(error);
+	aCompletedCB(err);
 }
 
 
@@ -231,8 +231,8 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     #if ENABLE_DALI_INPUTS
     // - add the DALI input devices from config
     mInputDevices.clear();
-    sqlite3pp::query qry(mDb);
-    if (qry.prepare("SELECT daliInputConfig, daliBaseAddr, rowid FROM inputDevices")==SQLITE_OK) {
+    sqlite3pp::query qry(mDb.db());
+    if (qry.prepare(mDb.prefixedSql("SELECT daliInputConfig, daliBaseAddr, rowid FROM $PREFIX_inputDevices").c_str())==SQLITE_OK) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         DaliInputDevicePtr dev = addInputDevice(i->get<string>(0), i->get<int>(1));
         if (dev) {
@@ -247,7 +247,7 @@ void DaliVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     if (mDaliComm.mDali2ScanLock || mDaliComm.mDali2LUNLock) {
       mDaliComm.mDali2ScanLock = false;
       mDaliComm.mDali2LUNLock = false;
-      mDb.execute("UPDATE globs SET dali2ScanLock=0"); // clear DALI2.0 scan lock and LUN lock
+      mDb.db().execute(mDb.prefixedSql("UPDATE $PREFIX_globs SET dali2ScanLock=0").c_str()); // clear DALI2.0 scan lock and LUN lock
     }
   }
   // wipe bus addresses
@@ -420,15 +420,15 @@ void DaliVdc::queryNextDev(DaliBusDeviceListPtr aBusDevices, DaliBusDeviceList::
       // get first remaining
       DaliBusDevicePtr busDevice = aBusDevices->front();
       // check if this device is part of a DALI group
-      sqlite3pp::query qry(mDb);
-      string sql = string_format("SELECT groupNo FROM compositeDevices WHERE dimmerUID = '%s' AND dimmerType='GRP'", busDevice->mDSUID.getString().c_str());
+      sqlite3pp::query qry(mDb.db());
+      string sql = mDb.prefixedSql(string_format("SELECT groupNo FROM $PREFIX_compositeDevices WHERE dimmerUID = '%s' AND dimmerType='GRP'", busDevice->mDSUID.getString().c_str()));
       if (qry.prepare(sql.c_str())==SQLITE_OK) {
         sqlite3pp::query::iterator i = qry.begin();
         if (i!=qry.end()) {
           // this is part of a DALI group
           int groupNo = i->get<int>(0);
           // - collect all with same group (= those that once were combined, in any order)
-          sql = string_format("SELECT dimmerUID FROM compositeDevices WHERE groupNo = %d AND dimmerType='GRP'", groupNo);
+          sql = mDb.prefixedSql(string_format("SELECT dimmerUID FROM $PREFIX_compositeDevices WHERE groupNo = %d AND dimmerType='GRP'", groupNo));
           if (qry.prepare(sql.c_str())==SQLITE_OK) {
             // we know that we found at least one dimmer of this group on the bus, so we'll instantiate
             // the group (even if some dimmers might be missing)
@@ -511,15 +511,15 @@ void DaliVdc::createDsDevices(DaliBusDeviceListPtr aDimmerDevices, StatusCB aCom
     // get first remaining
     DaliBusDevicePtr busDevice = aDimmerDevices->front();
     // check if this device is part of a multi-channel composite device (but not a DALI group)
-    sqlite3pp::query qry(mDb);
-    string sql = string_format("SELECT collectionID FROM compositeDevices WHERE dimmerUID = '%s' AND dimmerType!='GRP'", busDevice->mDSUID.getString().c_str());
+    sqlite3pp::query qry(mDb.db());
+    string sql = mDb.prefixedSql(string_format("SELECT collectionID FROM $PREFIX_compositeDevices WHERE dimmerUID = '%s' AND dimmerType!='GRP'", busDevice->mDSUID.getString().c_str()));
     if (qry.prepare(sql.c_str())==SQLITE_OK) {
       sqlite3pp::query::iterator i = qry.begin();
       if (i!=qry.end()) {
         // this is part of a composite device
         int collectionID = i->get<int>(0);
         // - collect all with same collectionID (= those that once were combined, in any order)
-        sql = string_format("SELECT dimmerType, dimmerUID FROM compositeDevices WHERE collectionID = %d", collectionID);
+        sql = mDb.prefixedSql(string_format("SELECT dimmerType, dimmerUID FROM $PREFIX_compositeDevices WHERE collectionID = %d", collectionID));
         if (qry.prepare(sql.c_str())==SQLITE_OK) {
           // we know that we found at least one dimmer of this composite on the bus, so we'll instantiate
           // a composite (even if some dimmers might be missing)
@@ -982,7 +982,7 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
                 deviceFound = true;
                 // determine free group No
                 if (groupNo<0) {
-                  sqlite3pp::query qry(mDb);
+                  sqlite3pp::query qry(mDb.db());
                   for (groupNo=0; groupNo<16; ++groupNo) {
                     if ((mUsedDaliGroupsMask & (1<<groupNo))==0) {
                       // group number is free - use it
@@ -997,36 +997,36 @@ ErrorPtr DaliVdc::groupDevices(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
                 }
                 // - create DB entry for DALI group member
                 markUsed(DaliGroup+groupNo, true);
-                if (mDb.executef(
-                  "INSERT OR REPLACE INTO compositeDevices (dimmerUID, dimmerType, groupNo) VALUES ('%q','GRP',%d)",
+                if (mDb.db().executef(
+                  mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_compositeDevices (dimmerUID, dimmerType, groupNo) VALUES ('%q','GRP',%d)").c_str(),
                   memberUID.getString().c_str(),
                   groupNo
                 )!=SQLITE_OK) {
-                  OLOG(LOG_ERR, "Error saving DALI group member: %s", mDb.error()->description().c_str());
+                  OLOG(LOG_ERR, "Error saving DALI group member: %s", mDb.db().error()->description().c_str());
                 }
               }
             }
             else {
               deviceFound = true;
               // - create DB entry for member of composite device
-              if (mDb.executef(
-                "INSERT OR REPLACE INTO compositeDevices (dimmerUID, dimmerType, collectionID) VALUES ('%q','%q',%lld)",
+              if (mDb.db().executef(
+                mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_compositeDevices (dimmerUID, dimmerType, collectionID) VALUES ('%q','%q',%lld)").c_str(),
                 memberUID.getString().c_str(),
                 dimmerType.c_str(),
                 collectionID
               )!=SQLITE_OK) {
-                OLOG(LOG_ERR, "Error saving DALI composite device member: %s", mDb.error()->description().c_str());
+                OLOG(LOG_ERR, "Error saving DALI composite device member: %s", mDb.db().error()->description().c_str());
               }
               if (collectionID<0) {
                 // use rowid of just inserted item as collectionID
-                collectionID = mDb.last_insert_rowid();
+                collectionID = mDb.db().last_insert_rowid();
                 // - update already inserted first record
-                if (mDb.executef(
-                  "UPDATE compositeDevices SET collectionID=%lld WHERE ROWID=%lld",
+                if (mDb.db().executef(
+                  mDb.prefixedSql("UPDATE $PREFIX_compositeDevices SET collectionID=%lld WHERE ROWID=%lld").c_str(),
                   collectionID,
                   collectionID
                 )!=SQLITE_OK) {
-                  OLOG(LOG_ERR, "Error updating DALI composite device: %s", mDb.error()->description().c_str());
+                  OLOG(LOG_ERR, "Error updating DALI composite device: %s", mDb.db().error()->description().c_str());
                 }
               }
             }
@@ -1065,11 +1065,11 @@ ErrorPtr DaliVdc::ungroupDevice(DaliOutputDevicePtr aDevice, VdcApiRequestPtr aR
     // composite device, delete grouping
     DaliCompositeDevicePtr dev = boost::dynamic_pointer_cast<DaliCompositeDevice>(aDevice);
     if (dev) {
-      if(mDb.executef(
-        "DELETE FROM compositeDevices WHERE dimmerType!='GRP' AND collectionID=%ld",
+      if(mDb.db().executef(
+        mDb.prefixedSql("DELETE FROM $PREFIX_compositeDevices WHERE dimmerType!='GRP' AND collectionID=%ld").c_str(),
         (long)dev->mCollectionID
       )!=SQLITE_OK) {
-        OLOG(LOG_ERR, "Error deleting DALI composite device: %s", mDb.error()->description().c_str());
+        OLOG(LOG_ERR, "Error deleting DALI composite device: %s", mDb.db().error()->description().c_str());
       }
     }
   }
@@ -1079,11 +1079,11 @@ ErrorPtr DaliVdc::ungroupDevice(DaliOutputDevicePtr aDevice, VdcApiRequestPtr aR
     if (dev) {
       int groupNo = dev->mDaliController->mDeviceInfo->mShortAddress & DaliGroupMask;
       markUsed(DaliGroup+groupNo, false);
-      if(mDb.executef(
-        "DELETE FROM compositeDevices WHERE dimmerType='GRP' AND groupNo=%d",
+      if(mDb.db().executef(
+        mDb.prefixedSql("DELETE FROM $PREFIX_compositeDevices WHERE dimmerType='GRP' AND groupNo=%d").c_str(),
         groupNo
       )!=SQLITE_OK) {
-        OLOG(LOG_ERR, "Error deleting DALI group: %s", mDb.error()->description().c_str());
+        OLOG(LOG_ERR, "Error deleting DALI group: %s", mDb.db().error()->description().c_str());
       }
     }
   }
@@ -1145,15 +1145,15 @@ void DaliVdc::removeMemberships(DaliAddress aSceneOrGroup)
 
 void DaliVdc::reserveLocallyUsedGroupsAndScenes()
 {
-  sqlite3pp::query qry(mDb);
-  if (qry.prepare("SELECT DISTINCT groupNo FROM compositeDevices WHERE dimmerType='GRP'")==SQLITE_OK) {
+  sqlite3pp::query qry(mDb.db());
+  if (qry.prepare(mDb.prefixedSql("SELECT DISTINCT groupNo FROM $PREFIX_compositeDevices WHERE dimmerType='GRP'").c_str())==SQLITE_OK) {
     for (sqlite3pp::query::iterator i = qry.begin(); i!=qry.end(); ++i) {
       // this is a DALI group in use
       markUsed(DaliGroup+i->get<int>(0), true);
     }
   }
   #if ENABLE_DALI_INPUTS
-  if (qry.prepare("SELECT DISTINCT daliBaseAddr FROM inputDevices")==SQLITE_OK) {
+  if (qry.prepare(mDb.prefixedSql("SELECT DISTINCT daliBaseAddr FROM $PREFIX_inputDevices").c_str())==SQLITE_OK) {
     for (sqlite3pp::query::iterator i = qry.begin(); i!=qry.end(); ++i) {
       markUsed(i->get<int>(0), true); // mark scenes and groups
     }
@@ -1523,14 +1523,14 @@ ErrorPtr DaliVdc::addDaliInput(VdcApiRequestPtr aRequest, ApiValuePtr aParams)
         // set name
         if (name.size()>0) dev->setName(name);
         // insert into database
-        if(mDb.executef(
-          "INSERT OR REPLACE INTO inputDevices (daliInputConfig, daliBaseAddr) VALUES ('%q', %d)",
+        if(mDb.db().executef(
+          mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_inputDevices (daliInputConfig, daliBaseAddr) VALUES ('%q', %d)").c_str(),
           deviceConfig.c_str(), baseAddress
         )!=SQLITE_OK) {
-          respErr = mDb.error("saving DALI input device params");
+          respErr = mDb.db().error("saving DALI input device params");
         }
         else {
-          dev->mDaliInputDeviceRowID = mDb.last_insert_rowid();
+          dev->mDaliInputDeviceRowID = mDb.db().last_insert_rowid();
           // confirm
           ApiValuePtr r = aRequest->newApiValue();
           r->setType(apivalue_object);

@@ -620,6 +620,9 @@ namespace p44 {
 
     void setVdcFlag(VdcFlags aFlagMask, bool aNewValue) { setPVar(mVdcFlags, (mVdcFlags & ~aFlagMask) | (aNewValue ? aFlagMask : 0)); }
 
+    // internal helper for initializing vdc private persistent storage
+    ErrorPtr initializePersistence(SQLite3TableGroup& aPersistence, int aNeededSchemaVersion, int aMinSchemaVersion);
+
     // derive dSUID
     // Note: base class implementation derives dSUID from vdcInstanceIdentifier()
     //   This is what all vDCs initially use after instantiation, and most vDCs will keep this initial dSUID.

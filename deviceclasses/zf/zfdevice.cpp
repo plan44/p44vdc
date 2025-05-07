@@ -136,8 +136,8 @@ bool ZfDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolut
 void ZfDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
   // clear learn-in data from DB
-  if(getZfVdc().db.executef("DELETE FROM knownDevices WHERE zfAddress=%d AND subdevice=%d", getAddress(), getSubDevice())!=SQLITE_OK) {
-    OLOG(LOG_ERR, "Error deleting device: %s", getZfVdc().db.error()->description().c_str());
+  if(getZfVdc().db.db().executef(getZfVdc().mDb.prefixedSql("DELETE FROM $PREFIX_knownDevices WHERE zfAddress=%d AND subdevice=%d").c_str(), getAddress(), getSubDevice())!=SQLITE_OK) {
+    OLOG(LOG_ERR, "Error deleting device: %s", getZfVdc().mDb.db().error()->description().c_str());
   }
   // disconnection is immediate, so we can call inherited right now
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);

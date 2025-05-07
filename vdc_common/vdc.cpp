@@ -1177,7 +1177,7 @@ ErrorPtr Vdc::loadOptimizerCache()
   sqlite3pp::query *queryP = newEntry->newLoadAllQuery(mDSUID.getString().c_str());
   if (queryP==NULL) {
     // real error preparing query
-    err = newEntry->mParamStore.error();
+    err = newEntry->mParamStore.db().error();
   }
   else {
     for (sqlite3pp::query::iterator row = queryP->begin(); row!=queryP->end(); ++row) {
@@ -1518,6 +1518,24 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
 
 
 // MARK: - persistence implementation
+
+
+// Note: this is for Vdc-private persistence, which are NOT in persistentparams!
+ErrorPtr Vdc::initializePersistence(SQLite3TableGroup& aPersistence, int aNeededSchemaVersion, int aMinSchemaVersion)
+{
+  ErrorPtr err;
+  string prefix = string_format("%s_%d", vdcClassIdentifier(), getInstanceNumber());
+  #if SQLITE3_UNIFY_DB_MIGRATION
+  string databaseName = getPersistentDataDir();
+  string_format_append(databaseName, "%s.sqlite3", prefix.c_str());
+  err = aPersistence.initialize(getVdcHost().getPersistence(), prefix, aNeededSchemaVersion, aMinSchemaVersion, databaseName.c_str());
+  #else
+  err = aPersistence.initialize(getVdcHost().getPersistence(), prefix, aNeededSchemaVersion, aMinSchemaVersion);
+  #endif
+  return err;
+}
+
+
 
 // SQLIte3 table name to store these parameters to
 const char *Vdc::tableName()
