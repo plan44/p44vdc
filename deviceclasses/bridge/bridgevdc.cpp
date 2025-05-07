@@ -40,7 +40,7 @@ string BridgeDevicePersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersi
 {
   string sql;
   if (aFromVersion==0) {
-    // create DB from scratch
+    // create table group from scratch
     // - use standard globs table for schema version
     sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
     // - create my tables
@@ -104,8 +104,8 @@ void BridgeVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // non-incremental, re-collect all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // add from the DB
-    sqlite3pp::query qry(mDb.db());
-    if (qry.prepare(mDb.prefixedSql("SELECT bridgeDeviceId, config, rowid FROM $PREFIX_bridgedevices").c_str())==SQLITE_OK) {
+    SQLiteTGQuery qry(mDb);
+    if (Error::isOK(qry.prefixedPrepare("SELECT bridgeDeviceId, config, rowid FROM $PREFIX_bridgedevices"))) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         // for pre-existing devices, group and bridgeable will be overridden from persistent settings
         BridgeDevicePtr dev = BridgeDevicePtr(new BridgeDevice(this, i->get<string>(0), i->get<string>(1), group_undefined, true));
@@ -161,13 +161,11 @@ ErrorPtr BridgeVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
           customized = true;
         }
         // insert into database
-        if (mDb.db().executef(
-          mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_bridgedevices (bridgeDeviceId, config) VALUES ('%q','%q')").c_str(),
+        respErr = mDb.prefixedExecute(
+          "INSERT OR REPLACE INTO $PREFIX_bridgedevices (bridgeDeviceId, config) VALUES ('%q','%q')",
           bridgeDeviceId.c_str(), bridgeConfig.c_str()
-        )!=SQLITE_OK) {
-          respErr = mDb.db().error("saving bridge device");
-        }
-        else {
+        );
+        if (Error::isOK(respErr)) {
           dev->mBridgeDeviceRowID = mDb.db().last_insert_rowid();
           simpleIdentifyAndAddDevice(dev);  // includes load() which clears dirty status
           if (customized) {

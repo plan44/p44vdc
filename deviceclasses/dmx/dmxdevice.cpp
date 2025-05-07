@@ -175,8 +175,9 @@ void DmxDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHan
 {
   // clear learn-in data from DB
   if (mDmxDeviceRowID) {
-    if(getDmxVdc().mDb.db().executef(getDmxVdc().mDb.prefixedSql("DELETE FROM $PREFIX_devConfigs WHERE rowid=%lld").c_str(), mDmxDeviceRowID)!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error deleting device: %s", getDmxVdc().mDb.db().error()->description().c_str());
+    ErrorPtr err = getDmxVdc().mDb.prefixedExecute("DELETE FROM $PREFIX_devConfigs WHERE rowid=%lld", mDmxDeviceRowID);
+    if (Error::notOK(err)) {
+      OLOG(LOG_ERR, "Error deleting device: %s", err->text());
     }
   }
   // disconnection is immediate, so we can call inherited right now

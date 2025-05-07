@@ -53,7 +53,7 @@ string DmxDevicePersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
-    // create DB from scratch
+    // create table group from scratch
     // - use standard globs table for schema version
     sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
     // - create my tables
@@ -301,8 +301,8 @@ void DmxVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // non-incremental, re-collect all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // then add those from the DB
-    sqlite3pp::query qry(mDb.db());
-    if (qry.prepare(mDb.prefixedSql("SELECT devicetype, deviceconfig, rowid FROM $PREFIX_devConfigs").c_str())==SQLITE_OK) {
+    SQLiteTGQuery qry(mDb);
+    if (Error::isOK(qry.prefixedPrepare("SELECT devicetype, deviceconfig, rowid FROM $PREFIX_devConfigs"))) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         DmxDevicePtr dev =addDmxDevice(i->get<string>(0), i->get<string>(1));
         dev->mDmxDeviceRowID = i->get<int>(2);
@@ -337,13 +337,10 @@ ErrorPtr DmxVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
           // set name
           if (name.size()>0) dev->setName(name);
           // insert into database
-          if(mDb.db().executef(
-            mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')").c_str(),
+          respErr = mDb.prefixedExecute("INSERT OR REPLACE INTO $PREFIX_devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')",
             deviceType.c_str(), deviceConfig.c_str()
-          )!=SQLITE_OK) {
-            respErr = mDb.db().error("saving DMX params");
-          }
-          else {
+          );
+          if (Error::isOK(respErr)) {
             dev->mDmxDeviceRowID = mDb.db().last_insert_rowid();
             // confirm
             ApiValuePtr r = aRequest->newApiValue();

@@ -172,13 +172,14 @@ void EvaluatorDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectRes
 {
   // clear learn-in data from DB
   if (evaluatorDeviceRowID) {
-    if(getEvaluatorVdc().mDb.db().executef(getEvaluatorVdc().mDb.prefixedSql("DELETE FROM $PREFIX_evaluators WHERE rowid=%lld").c_str(), evaluatorDeviceRowID)==SQLITE_OK) {
+    ErrorPtr err = getEvaluatorVdc().mDb.prefixedExecute("DELETE FROM $PREFIX_evaluators WHERE rowid=%lld", evaluatorDeviceRowID);
+    if (Error::isOK(err)) {
       #if P44SCRIPT_FULL_SUPPORT
       if (aForgetParams) evaluatorSettings()->mAction.deleteSource(); // make sure script gets deleteds
       #endif
     }
     else {
-      OLOG(LOG_ERR, "Error deleting evaluator: %s", getEvaluatorVdc().mDb.db().error()->description().c_str());
+      OLOG(LOG_ERR, "Error deleting evaluator: %s", err->text());
     }
   }
   // disconnection is immediate, so we can call inherited right now

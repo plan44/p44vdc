@@ -81,7 +81,7 @@ string EldatPersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
-    // create DB from scratch
+    // create table group from scratch
 		// - use standard globs table for schema version
     sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
 		// - create my tables
@@ -139,8 +139,8 @@ void EldatVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // start with zero
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // - read learned-in ELDAT devices from DB
-    sqlite3pp::query qry(mDb.db());
-    if (qry.prepare(mDb.prefixedSql("SELECT eldatAddress, subdevice, deviceType FROM $PREFIX_knownDevices").c_str())==SQLITE_OK) {
+    SQLiteTGQuery qry(mDb);
+    if (Error::isOK(qry.prefixedPrepare("SELECT eldatAddress, subdevice, deviceType FROM $PREFIX_knownDevices"))) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         EldatSubDevice subDeviceIndex = i->get<int>(1);
         EldatDevicePtr newdev = EldatDevice::newDevice(
@@ -188,13 +188,14 @@ bool EldatVdc::addAndRememberDevice(EldatDevicePtr aEldatDevice)
   if (addKnownDevice(aEldatDevice)) {
     // save Eldat ID to DB
     // - check if this subdevice is already stored
-    if(mDb.db().executef(
-      mDb.prefixedSql("INSERT OR REPLACE INTO knownDevices (eldatAddress, subdevice, deviceType) VALUES (%d,%d,%d)").c_str(),
+    ErrorPtr err = mDb.prefixedExecute(
+      "INSERT OR REPLACE INTO $PREFIX_knownDevices (eldatAddress, subdevice, deviceType) VALUES (%d,%d,%d)",
       aEldatDevice->getAddress(),
       aEldatDevice->getSubDevice(),
       aEldatDevice->getEldatDeviceType()
-    )!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error saving device: %s", mDb.db().error()->description().c_str());
+    );
+    if (Error::notOK(err)) {
+      OLOG(LOG_ERR, "Error saving device: %s", err->text());
     }
     return true;
   }

@@ -2335,8 +2335,9 @@ void DaliInputDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectRes
   OLOG(LOG_DEBUG, "disconnecting DALI input device with rowid=%lld", mDaliInputDeviceRowID);
   // clear learn-in data from DB
   if (mDaliInputDeviceRowID) {
-    if(daliVdc().mDb.db().executef(daliVdc().mDb.prefixedSql("DELETE FROM $PREFIX_inputDevices WHERE rowid=%lld").c_str(), mDaliInputDeviceRowID)!=SQLITE_OK) {
-      OLOG(LOG_ERR, "deleting DALI input device: %s", daliVdc().mDb.db().error()->description().c_str());
+    ErrorPtr err = daliVdc().mDb.prefixedExecute("DELETE FROM $PREFIX_inputDevices WHERE rowid=%lld", mDaliInputDeviceRowID);
+    if (Error::notOK(err)) {
+      OLOG(LOG_ERR, "deleting DALI input device: %s", err->text());
     }
     for (int i=0; i<mNumAddresses; i++) {
       daliVdc().markUsed(mBaseAddress+i, false);

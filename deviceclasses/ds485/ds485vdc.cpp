@@ -148,16 +148,10 @@ ErrorPtr Ds485Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod
         mDs485Comm.mApiHost = host;
       }
       // save
-      if(mDb.db().executef(
-        mDb.prefixedSql("UPDATE $PREFIX_globs SET tunnelPw='%q', tunnelHost='%q'").c_str(),
+      respErr = Error::ok(mDb.prefixedExecute(
+        "UPDATE $PREFIX_globs SET tunnelPw='%q', tunnelHost='%q'",
         pw.c_str(), host.c_str()
-      )!=SQLITE_OK) {
-        respErr = mDb.db().error("saving dS485 params");
-      }
-      else {
-        // done
-        respErr = Error::ok();
-      }
+      ));
     }
   }
   else {
@@ -175,8 +169,8 @@ void Ds485Vdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   ErrorPtr err = initializePersistence(mDb,  DS485_SCHEMA_VERSION, DS485_SCHEMA_MIN_VERSION);
   if (Error::notOK(err)) aCompletedCB(err); // failed
   // get tunnel pw
-  sqlite3pp::query qry(mDb.db());
-  if (qry.prepare(mDb.prefixedSql("SELECT tunnelPw, tunnelHost FROM $PREFIX_globs").c_str())==SQLITE_OK) {
+  SQLiteTGQuery qry(mDb);
+  if (Error::isOK(qry.prefixedPrepare("SELECT tunnelPw, tunnelHost FROM $PREFIX_globs"))) {
     sqlite3pp::query::iterator i = qry.begin();
     if (i!=qry.end()) {
       mDs485Comm.setTunnelPw(nonNullCStr(i->get<const char *>(0)));

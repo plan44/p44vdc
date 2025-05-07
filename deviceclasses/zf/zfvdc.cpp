@@ -78,7 +78,7 @@ string ZfPersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
-    // create DB from scratch
+    // create table group from scratch
 		// - use standard globs table for schema version
     sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
 		// - create my tables
@@ -136,8 +136,8 @@ void ZfVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // start with zero
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // - read learned-in EnOcean button IDs from DB
-    sqlite3pp::query qry(mDb.db());
-    if (qry.prepare(mDb.prefixedSql("SELECT zfAddress, subdevice, deviceType FROM $PREFIX_knownDevices").c_str())==SQLITE_OK) {
+    SQLiteTGQuery qry(mDb);
+    if (Error::isOK(qry.prefixedPrepare("SELECT zfAddress, subdevice, deviceType FROM $PREFIX_knownDevices"))) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         ZfSubDevice subDeviceIndex = i->get<int>(1);
         ZfDevicePtr newdev = ZfDevice::newDevice(
@@ -185,13 +185,14 @@ bool ZfVdc::addAndRememberDevice(ZfDevicePtr aZfDevice)
   if (addKnownDevice(aZfDevice)) {
     // save ZF ID to DB
     // - check if this subdevice is already stored
-    if(mDb.db().executef(
-      mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_knownDevices (zfAddress, subdevice, deviceType) VALUES (%d,%d,%d)").c_str(),
+    ErrorPtr err = mDb.prefixedExecute(
+      "INSERT OR REPLACE INTO $PREFIX_knownDevices (zfAddress, subdevice, deviceType) VALUES (%d,%d,%d)",
       aZfDevice->getAddress(),
       aZfDevice->getSubDevice(),
       aZfDevice->getZfDeviceType()
-    )!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error saving device: %s", mDb.db().error()->description().c_str());
+    );
+    if (Error::notOK(err)) {
+      OLOG(LOG_ERR, "Error saving device: %s", err->text());
     }
     return true;
   }

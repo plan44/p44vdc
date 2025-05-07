@@ -140,11 +140,9 @@ void ScriptedDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResu
 {
   mImplementation.mScript.runCommand(stop);
   if (mScriptedDeviceRowID) {
-    if(getScriptedVdc().mDb.db().executef(getScriptedVdc().mDb.prefixedSql("DELETE FROM $PREFIX_scriptedDevices WHERE rowid=%lld").c_str(), mScriptedDeviceRowID)==SQLITE_OK) {
+    ErrorPtr err = getScriptedVdc().mDb.prefixedExecute("DELETE FROM $PREFIX_scriptedDevices WHERE rowid=%lld", mScriptedDeviceRowID);
+    if (Error::isOK(err)) {
       if (aForgetParams) mImplementation.mScript.deleteSource(); // make sure script gets deleted
-    }
-    else {
-      OLOG(LOG_ERR, "Error deleting scripted device: %s", getScriptedVdc().mDb.db().error()->description().c_str());
     }
   }
   // disconnection is immediate, so we can call inherited right now
@@ -487,7 +485,7 @@ string ScriptedDevicePersistence::schemaUpgradeSQL(int aFromVersion, int &aToVer
 {
   string sql;
   if (aFromVersion==0) {
-    // create DB from scratch
+    // create table group from scratch
     // - use standard globs table for schema version
     sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
     // - create my tables
@@ -584,8 +582,8 @@ void ScriptedVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // non-incremental, re-collect all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // create devices from initJSON in the database
-    sqlite3pp::query qry(mDb.db());
-    if (qry.prepare(mDb.prefixedSql("SELECT scptdevid, initJSON, rowid FROM $PREFIX_scriptedDevices").c_str())==SQLITE_OK) {
+    SQLiteTGQuery qry(mDb);
+    if (Error::isOK(qry.prefixedPrepare("SELECT scptdevid, initJSON, rowid FROM $PREFIX_scriptedDevices"))) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         string initTxt = i->get<string>(1);
         JsonObjectPtr init = JsonObject::objFromText(initTxt.c_str(), -1, &err, true);
@@ -640,14 +638,12 @@ ErrorPtr ScriptedVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
         ScriptedDevicePtr dev = addScriptedDevice(scptDevId, initJSON, respErr);
         if (dev) {
           // insert into database
-          if(mDb.db().executef(
-            mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_scriptedDevices (scptdevid,initJSON) VALUES ('%q','%q')").c_str(),
+          respErr = mDb.prefixedExecute(
+            "INSERT OR REPLACE INTO $PREFIX_scriptedDevices (scptdevid,initJSON) VALUES ('%q','%q')",
             scptDevId.c_str(),
             initMsg.c_str()
-          )!=SQLITE_OK) {
-            respErr = mDb.db().error("saving scripted device init message");
-          }
-          else {
+          );
+          if (Error::ok(respErr)) {
             dev->mScriptedDeviceRowID = mDb.db().last_insert_rowid();
             dev->mInitMessageText = initMsg;
             // confirm

@@ -113,7 +113,7 @@ string EnoceanPersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
     "  PRIMARY KEY (enoceanAddress)"
     ");";
   if (aFromVersion==0) {
-    // create DB from scratch
+    // create table group from scratch
 		// - use standard globs table for schema version
     sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
 		// - create my tables
@@ -197,8 +197,8 @@ void EnoceanVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // start with zero
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // - read learned-in EnOcean device IDs from DB
-    sqlite3pp::query qry(mDb.db());
-    if (qry.prepare(mDb.prefixedSql("SELECT enoceanAddress, subdevice, eeProfile, eeManufacturer FROM $PREFIX_knownDevices").c_str())==SQLITE_OK) {
+    SQLiteTGQuery qry(mDb);
+    if (Error::isOK(qry.prefixedPrepare("SELECT enoceanAddress, subdevice, eeProfile, eeManufacturer FROM $PREFIX_knownDevices"))) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         EnoceanSubDevice subDeviceIndex = i->get<int>(1);
         EnoceanDevicePtr newdev = EnoceanDevice::newDevice(
@@ -249,14 +249,15 @@ bool EnoceanVdc::addAndRememberDevice(EnoceanDevicePtr aEnoceanDevice)
 {
   if (addKnownDevice(aEnoceanDevice)) {
     // save enocean ID to DB
-    if(mDb.db().executef(
-      mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_knownDevices (enoceanAddress, subdevice, eeProfile, eeManufacturer) VALUES (%d,%d,%d,%d)").c_str(),
+    ErrorPtr err = mDb.prefixedExecute(
+      "INSERT OR REPLACE INTO $PREFIX_knownDevices (enoceanAddress, subdevice, eeProfile, eeManufacturer) VALUES (%d,%d,%d,%d)",
       aEnoceanDevice->getAddress(),
       aEnoceanDevice->getSubDevice(),
       aEnoceanDevice->getEEProfile(),
       aEnoceanDevice->getEEManufacturer()
-    )!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error saving device: %s", mDb.db().error()->description().c_str());
+    );
+    if (Error::notOK(err)) {
+      OLOG(LOG_ERR, "Error saving device: %s", err->text());
     }
     return true;
   }
@@ -526,8 +527,9 @@ bool EnoceanVdc::dropSecurityInfoForSender(EnoceanAddress aSender)
 {
   if (mSecurityInfos.erase(aSender)>0) {
     // also delete from db
-    if (mDb.db().executef(mDb.prefixedSql("DELETE FROM $PREFIX_secureDevices WHERE enoceanAddress=%d").c_str(), aSender)!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error deleting security info for device %08X: %s", aSender, mDb.db().error()->description().c_str());
+    ErrorPtr err = mDb.prefixedExecute("DELETE FROM $PREFIX_secureDevices WHERE enoceanAddress=%d", aSender);
+    if (Error::notOK(err)) {
+      OLOG(LOG_ERR, "Error deleting security info for device %08X: %s", aSender, err->text());
       return false;
     }
     OLOG(LOG_INFO, "Deleted security info for device %08X", aSender);
@@ -556,9 +558,9 @@ void EnoceanVdc::removeUnusedSecurity(EnoceanDevice &aDevice)
 void EnoceanVdc::loadSecurityInfos()
 {
   mSecurityInfos.clear();
-  sqlite3pp::query qry(mDb.db());
+  SQLiteTGQuery qry(mDb);
   MLMicroSeconds now = MainLoop::now();
-  if (qry.prepare(mDb.prefixedSql("SELECT enoceanAddress, slf, rlc, key, teachInInfo FROM $PREFIX_secureDevices").c_str())==SQLITE_OK) {
+  if (Error::isOK(qry.prefixedPrepare("SELECT enoceanAddress, slf, rlc, key, teachInInfo FROM $PREFIX_secureDevices"))) {
     for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
       EnOceanSecurityPtr sec = EnOceanSecurityPtr(new EnOceanSecurity);
       sec->setLogLevelOffset(getLogLevelOffset());
@@ -584,6 +586,7 @@ void EnoceanVdc::loadSecurityInfos()
 
 bool EnoceanVdc::saveSecurityInfo(EnOceanSecurityPtr aSecurityInfo, EnoceanAddress aEnoceanAddress, bool aRLCOnly, bool aOnlyIfNeeded)
 {
+  ErrorPtr err;
   if (!aSecurityInfo->mEstablished) {
     OLOG(LOG_INFO, "Not saving security info for %08X because not yet fully established", aEnoceanAddress);
   }
@@ -596,19 +599,21 @@ bool EnoceanVdc::saveSecurityInfo(EnOceanSecurityPtr aSecurityInfo, EnoceanAddre
     }
   }
   if (aRLCOnly) {
-    if (mDb.db().executef(
-      mDb.prefixedSql("UPDATE $PREFIX_secureDevices SET rlc=%d WHERE enoceanAddress=%d").c_str(),
+    err = mDb.prefixedExecute(
+      "UPDATE $PREFIX_secureDevices SET rlc=%d WHERE enoceanAddress=%d",
       aSecurityInfo->mRollingCounter,
       aEnoceanAddress
-    )!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error updating RLC for device %08X: %s", aEnoceanAddress, mDb.db().error()->description().c_str());
+    );
+    if (Error::notOK(err)) {
+      OLOG(LOG_ERR, "Error updating RLC for device %08X: %s", aEnoceanAddress, err->text());
       return false;
     }
   }
   else {
-    sqlite3pp::command cmd(mDb.db());
-    if (cmd.prepare(mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_secureDevices (enoceanAddress, slf, rlc, key, teachInInfo) VALUES (?,?,?,?,?)").c_str())!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error preparing SQL for device %08X: %s", aEnoceanAddress, mDb.db().error()->description().c_str());
+    SQLiteTGCommand cmd(mDb);
+    ErrorPtr err = cmd.prefixedPrepare("INSERT OR REPLACE INTO $PREFIX_secureDevices (enoceanAddress, slf, rlc, key, teachInInfo) VALUES (?,?,?,?,?)");
+    if (Error::notOK(err)) {
+      OLOG(LOG_ERR, "Error preparing SQL for device %08X: %s", aEnoceanAddress, err->text());
       return false;
     }
     else {

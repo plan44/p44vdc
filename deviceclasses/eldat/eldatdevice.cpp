@@ -144,8 +144,9 @@ bool EldatDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aReso
 void EldatDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
   // clear learn-in data from DB
-  if(getEldatVdc().mDb.db().executef(getEldatVdc().mDb.prefixedSql("DELETE FROM $PREFIX_knownDevices WHERE eldatAddress=%d AND subdevice=%d").c_str(), getAddress(), getSubDevice())!=SQLITE_OK) {
-    OLOG(LOG_ERR, "Error deleting device: %s", getEldatVdc().mDb.db().error()->description().c_str());
+  ErrorPtr err = getEldatVdc().mDb.prefixedExecute("DELETE FROM $PREFIX_knownDevices WHERE eldatAddress=%d AND subdevice=%d", getAddress(), getSubDevice());
+  if (Error::notOK(err)) {
+    OLOG(LOG_ERR, "Error deleting device: %s", err->text());
   }
   // disconnection is immediate, so we can call inherited right now
   inherited::disconnect(aForgetParams, aDisconnectResultHandler);

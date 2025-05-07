@@ -44,12 +44,12 @@ string LedChainDevicePersistence::schemaUpgradeSQL(int aFromVersion, int &aToVer
 {
   string sql;
   if (aFromVersion==0) {
-    // create DB from scratch
+    // create table group from scratch
     // - use standard globs table for schema version
     sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
     // - create my tables
     sql.append(
-      "DROP TABLE IF EXIST $PREFIX_devConfigs;"
+      "DROP TABLE IF EXISTS $PREFIX_devConfigs;"
       "CREATE TABLE $PREFIX_devConfigs ("
       " firstLED INTEGER," // now x
       " numLEDs INTEGER," // now dx
@@ -196,8 +196,8 @@ void LedChainVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // non-incremental, re-collect all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // then add those from the DB
-    sqlite3pp::query qry(mDb.db());
-    if (qry.prepare("SELECT rowid, firstLED, numLEDs, y, dy, zorder, deviceconfig FROM $PREFIX_devConfigs ORDER BY zorder,rowid")==SQLITE_OK) {
+    SQLiteTGQuery qry(mDb);
+    if (Error::isOK(qry.prefixedPrepare("SELECT rowid, firstLED, numLEDs, y, dy, zorder, deviceconfig FROM $PREFIX_devConfigs ORDER BY zorder,rowid"))) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         int zorder;
         long long rowid = i->get<int>(0);
@@ -266,13 +266,11 @@ ErrorPtr LedChainVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMet
             // set name
             if (name.size()>0) dev->setName(name);
             // insert into database
-            if(mDb.db().executef(
+            respErr = mDb.prefixedExecute(
               "INSERT OR REPLACE INTO $PREFIX_devConfigs (firstLED, numLEDs, y, dy, zorder, deviceconfig) VALUES (%d, %d, %d, %d, %d, '%q')",
               x, dx, y, dy, zorder, deviceConfig.c_str()
-            )!=SQLITE_OK) {
-              respErr = mDb.db().error("saving LED chain segment params");
-            }
-            else {
+            );
+            if (Error::isOK(respErr)) {
               dev->mLedChainDeviceRowID = mDb.db().last_insert_rowid();
               // confirm
               ApiValuePtr r = aRequest->newApiValue();

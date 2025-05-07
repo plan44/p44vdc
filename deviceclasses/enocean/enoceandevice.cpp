@@ -215,8 +215,9 @@ bool EnoceanDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aRe
 void EnoceanDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
 {
   // clear learn-in data from DB
-  if(getEnoceanVdc().mDb.db().executef(getEnoceanVdc().mDb.prefixedSql("DELETE FROM $PREFIX_knownDevices WHERE enoceanAddress=%d AND subdevice=%d").c_str(), getAddress(), getSubDevice())!=SQLITE_OK) {
-    OLOG(LOG_ERR, "Error deleting device: %s", getEnoceanVdc().mDb.db().error()->description().c_str());
+  ErrorPtr err = getEnoceanVdc().mDb.prefixedExecute("DELETE FROM $PREFIX_knownDevices WHERE enoceanAddress=%d AND subdevice=%d", getAddress(), getSubDevice());
+  if (Error::notOK(err)) {
+    OLOG(LOG_ERR, "Error deleting device: %s", err->text());
   }
   #if ENABLE_ENOCEAN_SECURE
   // clear security info if no subdevices are left

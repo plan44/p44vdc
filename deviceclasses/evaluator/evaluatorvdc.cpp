@@ -40,7 +40,7 @@ string EvaluatorDevicePersistence::schemaUpgradeSQL(int aFromVersion, int &aToVe
 {
   string sql;
   if (aFromVersion==0) {
-    // create DB from scratch
+    // create table group from scratch
     // - use standard globs table for schema version
     sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
     // - create my tables
@@ -104,8 +104,8 @@ void EvaluatorVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags
     // non-incremental, re-collect all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
     // add from the DB
-    sqlite3pp::query qry(mDb.db());
-    if (qry.prepare("SELECT evaluatorid, config, rowid FROM $PREFIX_evaluators")==SQLITE_OK) {
+    SQLiteTGQuery qry(mDb);
+    if (Error::isOK(qry.prefixedPrepare("SELECT evaluatorid, config, rowid FROM $PREFIX_evaluators"))) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         EvaluatorDevicePtr dev = EvaluatorDevicePtr(new EvaluatorDevice(this, i->get<string>(0), i->get<string>(1)));
         if (dev) {
@@ -146,13 +146,11 @@ ErrorPtr EvaluatorVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMe
           dev->setName(name);
         }
         // insert into database
-        if (mDb.db().executef(
+        respErr = mDb.prefixedExecute(
           "INSERT OR REPLACE INTO $PREFIX_evaluators (evaluatorId, config) VALUES ('%q','%q')",
           evaluatorId.c_str(), evaluatorType.c_str()
-        )!=SQLITE_OK) {
-          respErr = mDb.db().error("saving evaluator");
-        }
-        else {
+        );
+        if (Error::isOK(respErr)) {
           dev->evaluatorDeviceRowID = mDb.db().last_insert_rowid();
           simpleIdentifyAndAddDevice(dev); // includes load() which clears dirty status
           if (customized) dev->mDeviceSettings->markDirty(); // make sure customized name gets persisted

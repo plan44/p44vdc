@@ -67,8 +67,9 @@ void StaticDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResult
   OLOG(LOG_DEBUG, "disconnecting static device with rowid=%lld", mStaticDeviceRowID);
   // clear learn-in data from DB
   if (mStaticDeviceRowID) {
-    if(getStaticVdc().mDb.db().executef(getStaticVdc().mDb.prefixedSql("DELETE FROM $PREFIX_devConfigs WHERE rowid=%lld").c_str(), mStaticDeviceRowID)!=SQLITE_OK) {
-      OLOG(LOG_ERR, "Error deleting static device: %s", getStaticVdc().mDb.db().error()->description().c_str());
+    ErrorPtr err = getStaticVdc().mDb.prefixedExecute("DELETE FROM $PREFIX_devConfigs WHERE rowid=%lld", mStaticDeviceRowID);
+    if (Error::notOK(err)) {
+      OLOG(LOG_ERR, "Error deleting static device: %s", err->text());
     }
   }
   // disconnection is immediate, so we can call inherited right now
@@ -88,7 +89,7 @@ string StaticDevicePersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersi
 {
   string sql;
   if (aFromVersion==0) {
-    // create DB from scratch
+    // create table group from scratch
     // - use standard globs table for schema version
     sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
     // - create my tables
@@ -174,8 +175,8 @@ void StaticVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
       }
     }
     // then add those from the DB
-    sqlite3pp::query qry(mDb.db());
-    if (qry.prepare(mDb.prefixedSql("SELECT devicetype, deviceconfig, rowid FROM $PREFIX_devConfigs").c_str())==SQLITE_OK) {
+    SQLiteTGQuery qry(mDb);
+    if (Error::isOK(qry.prefixedPrepare("SELECT devicetype, deviceconfig, rowid FROM $PREFIX_devConfigs"))) {
       for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
         StaticDevicePtr dev = createStaticDevice(i->get<string>(0), i->get<string>(1));
         if (dev) {
@@ -217,13 +218,11 @@ ErrorPtr StaticVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
             customized = true;
           }
           // insert into database
-          if(mDb.db().executef(
-            mDb.prefixedSql("INSERT OR REPLACE INTO $PREFIX_devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')").c_str(),
+          respErr = mDb.prefixedExecute(
+            "INSERT OR REPLACE INTO $PREFIX_devConfigs (devicetype, deviceconfig) VALUES ('%q','%q')",
             deviceType.c_str(), deviceConfig.c_str()
-          )!=SQLITE_OK) {
-            respErr = mDb.db().error("saving static device params");
-          }
-          else {
+          );
+          if (Error::isOK(respErr)) {
             dev->mStaticDeviceRowID = mDb.db().last_insert_rowid();
             simpleIdentifyAndAddDevice(dev); // includes load() which clears dirty status
             if (customized) dev->mDeviceSettings->markDirty(); // make sure customized name gets persisted

@@ -468,7 +468,7 @@ string DsParamStore::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 {
   string sql;
   if (aFromVersion==0) {
-    // create DB from scratch
+    // create table group from scratch
 		// - use standard globs table for schema version
     sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
 		// - no vdchost level table to create at this time
