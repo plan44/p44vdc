@@ -260,6 +260,7 @@ void VdcHost::postEvent(VdchostEvent aEvent)
 void VdcHost::handleGlobalEvent(VdchostEvent aEvent)
 {
   if (aEvent==vdchost_devices_initialized) {
+    getPersistence().standby(); // probably all settings are loaded now, time to release memory
     #if P44SCRIPT_FULL_SUPPORT
     // after the first device initialisation run, it is the moment to start global scripts
     if (!mGlobalScriptsStarted) {
@@ -908,6 +909,7 @@ void VdcHost::periodicTask(MLMicroSeconds aNow)
       startAnnouncing();
       // do a save run as well
       save();
+      getPersistence().standby(); // release as much memory as possible
     }
   }
   if (mMainloopStatsInterval>0) {
