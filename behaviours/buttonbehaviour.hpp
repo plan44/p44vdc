@@ -252,6 +252,10 @@ namespace p44 {
     /// @return textual description of object, may contain LFs
     virtual string description() P44_OVERRIDE;
 
+    /// @param aClickType a click type
+    /// @return the click type as text
+    static string clickTypeName(DsClickType aClickType);
+
   protected:
 
     /// the behaviour type

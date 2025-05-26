@@ -1617,7 +1617,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour)
   }
   else {
     // actual click: determine what to do
-    FOCUSLOG("processButtonClick: actual click: %d", clickType);
+    FOCUSLOG("processButtonClick: actual click: %d (%s)", clickType, ButtonBehaviour::clickTypeName(clickType).c_str());
     switch (aButtonBehaviour.mButtonMode) {
       case buttonMode_standard:
       case buttonMode_turbo:

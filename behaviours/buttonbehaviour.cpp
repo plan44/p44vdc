@@ -798,7 +798,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     // - forward to upstream dS if not bridgeExclusive (except for ct_progress/ct_complete, which are for bridges only)
     // - forward to bridges (except for hold-repeat, which bridges don't need)
     if (pushBehaviourState(!isBridgeExclusive() && mClickType!=ct_progress && mClickType!=ct_complete, mClickType!=ct_hold_repeat)) {
-      OLOG(mClickType==ct_hold_repeat ? LOG_INFO : LOG_NOTICE, "successfully pushed state = %d, clickType %d", mButtonPressed, aClickType);
+      OLOG(mClickType==ct_hold_repeat ? LOG_INFO : LOG_NOTICE, "successfully pushed state=%d, clickType=%d (%s)", mButtonPressed, aClickType, clickTypeName(aClickType).c_str());
     }
     #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
     // send event
@@ -850,6 +850,23 @@ void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActio
     mDevice.getVdcHost().checkForLocalClickHandling(*this); // will check mButtonActionMode/mActionMode/mActionId
   }
 }
+
+
+string ButtonBehaviour::clickTypeName(DsClickType aClickType)
+{
+  if (aClickType<=ct_tip_1x) return string_format("tip_%dx", aClickType+1-ct_tip_1x);
+  if (aClickType==ct_hold_start) return "hold";
+  if (aClickType==ct_hold_repeat) return "keep_holding";
+  if (aClickType==ct_hold_end) return "release";
+  if (aClickType<=ct_click_3x) return string_format("click_%dx", aClickType+1-ct_click_1x);
+  if (aClickType==ct_progress) return "progress";
+  if (aClickType==ct_complete) return "complete";
+  if (aClickType==ct_none) return "none";
+  // all others: just numeric
+  return string_format("ct_%d", aClickType);
+}
+
+
 
 
 #if ENABLE_LOCALCONTROLLER
