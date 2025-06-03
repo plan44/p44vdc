@@ -38,6 +38,11 @@
   #include "httpcomm.hpp"
 #endif
 
+#if ENABLE_LVGL
+  #include "lvgl.hpp"
+#endif
+
+
 using namespace p44;
 
 
@@ -1184,6 +1189,9 @@ P44LoggingObj* P44VdcHost::getTopicLogObject(const string aTopic)
   #endif
   #if P44SCRIPT_REGISTERED_SOURCE
   if (aTopic=="scriptmanager") return mScriptManager.get();
+  #endif
+  #if ENABLE_LVGL
+  if (aTopic=="lvgl") return &LvGL::lvgl();
   #endif
   // unknown at this level
   return inherited::getTopicLogObject(aTopic);
