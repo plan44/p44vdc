@@ -234,12 +234,33 @@ bool VdcHost::canIdentifyToUser()
 }
 
 
+#if !REDUCED_FOOTPRINT
+const char* vdcHostEventNames[numVdcHostEvents] = {
+  "activitysignal", ///< user-relevant activity, can be used to trigger flashing an activity LED.
+  "identify",
+  "logstats",
+  "descriptionchanged",
+  "network_reconnected",
+  "network_lost",
+  "timeofday_changed",
+  "vdcapi_connected",
+  "vdcapi_disconnected",
+  "vdcs_initialized",
+  "devices_collected",
+  "devices_initialized",
+};
+#endif
+
 
 void VdcHost::postEvent(VdchostEvent aEvent)
 {
   if (aEvent>=vdchost_redistributed_events) {
     // let all vdcs (and their devices) know
+    #if !REDUCED_FOOTPRINT
+    LOG(LOG_INFO, ">>> vdcs start processing global event '%s' (%d)", vdcHostEventNames[aEvent], (int)aEvent);
+    #else
     LOG(LOG_INFO, ">>> vdcs start processing global event %d", (int)aEvent);
+    #endif
     for (VdcMap::iterator pos = mVdcs.begin(); pos != mVdcs.end(); ++pos) {
       pos->second->handleGlobalEvent(aEvent);
     }
@@ -254,6 +275,12 @@ void VdcHost::postEvent(VdchostEvent aEvent)
   if (mEventMonitorHandler) {
     mEventMonitorHandler(aEvent);
   }
+  #if P44SCRIPT_FULL_SUPPORT
+  // finally, let possible p44script event handlers know
+  if (aEvent>=vdchost_redistributed_events) {
+    sendEvent(new StringValue(vdcHostEventNames[aEvent]));
+  }
+  #endif
 }
 
 
@@ -2685,6 +2712,18 @@ static void nextversion_func(BuiltinFunctionContextPtr f)
   f->finish(new StringValue(VdcHost::sharedVdcHost()->nextModelVersion()));
 }
 
+
+// globalevent()
+static void globalevent_func(BuiltinFunctionContextPtr f)
+{
+  VdcHost* h = VdcHost::sharedVdcHost().get();
+  assert(h);
+  EventSource* es = dynamic_cast<EventSource*>(h);
+  assert(es);
+  f->finish(new OneShotEventNullValue(es, "global event"));
+}
+
+
 static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
   FUNC_DEF_W_ARG(vdcapi, executable|structured),
   FUNC_DEF_W_ARG(device, executable|anyvalid),
@@ -2692,6 +2731,7 @@ static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
   FUNC_DEF_NOARG(productversion, executable|text),
   FUNC_DEF_NOARG(nextversion, executable|text),
   FUNC_DEF_NOARG(macaddress, executable|text),
+  FUNC_DEF_NOARG(globalevent, executable|text),
   { NULL } // terminator
 };
 

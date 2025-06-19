@@ -1969,6 +1969,7 @@ static void webrequest_func(BuiltinFunctionContextPtr f)
 {
   // return API request event source place holder, actual value will be delivered via event
   P44VdcHost* h = dynamic_cast<P44VdcHost*>(VdcHost::sharedVdcHost().get());
+  assert(h);
   string ep, peer;
   if (f->arg(0)->defined()) ep = f->arg(0)->stringValue();
   if (f->arg(1)->defined()) peer = f->arg(1)->stringValue();

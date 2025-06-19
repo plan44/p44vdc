@@ -52,6 +52,7 @@ namespace p44 {
     vdchost_vdcs_initialized, ///< all vdcs are initialized now
     vdchost_devices_collected, ///< a device collection run is complete (initial or later)
     vdchost_devices_initialized, ///< a device initialisation run is complete (initial or later)
+    numVdcHostEvents
   } VdchostEvent;
 
 

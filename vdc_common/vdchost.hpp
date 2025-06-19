@@ -140,6 +140,9 @@ namespace p44 {
   /// - contains one or multiple vDC containers
   ///   (each representing a specific class of devices, e.g. different bus types etc.)
   class VdcHost : public DsAddressable, public PersistentParams
+    #if P44SCRIPT_FULL_SUPPORT
+    ,public EventSource // to publish global events to p44script
+    #endif
   {
     typedef DsAddressable inherited;
     typedef PersistentParams inheritedParams;
