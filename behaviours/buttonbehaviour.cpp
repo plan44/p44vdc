@@ -258,6 +258,16 @@ void ButtonBehaviour::setChannel(DsChannelType aChannel)
 }
 
 
+void ButtonBehaviour::setBridgeExclusive()
+{
+  #if ENABLE_JSONBRIDGEAPI
+  mBridgeExclusive = true;
+  #else
+  // no bridge -> NOP
+  #endif
+}
+
+
 bool ButtonBehaviour::isBridgeExclusive()
 {
   #if ENABLE_JSONBRIDGEAPI

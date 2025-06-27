@@ -178,7 +178,7 @@ namespace p44 {
     bool isBridgeExclusive();
 
     /// make button bridge exclusive, i.e. not causing any local or DS actions
-    void setBridgeExclusive() { mBridgeExclusive = true; };
+    void setBridgeExclusive();
 
     /// @name interface towards actual device hardware (or simulation)
     /// @{

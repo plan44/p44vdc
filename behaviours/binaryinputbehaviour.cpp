@@ -1,6 +1,6 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
-//  Copyright (c) 2013-2023 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2025 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -103,6 +103,16 @@ void BinaryInputBehaviour::setHardwareInputConfig(DsBinaryInputType aInputType, 
 string BinaryInputBehaviour::getAutoId()
 {
   return inputTypeIds[mHardwareInputType];
+}
+
+
+void BinaryInputBehaviour::setBridgeExclusive()
+{
+  #if ENABLE_JSONBRIDGEAPI
+  mBridgeExclusive = true;
+  #else
+  // no bridge -> NOP
+  #endif
 }
 
 

@@ -1,6 +1,6 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
-//  Copyright (c) 2024 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2024-2025 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -230,22 +230,30 @@ bool ProxyDevice::localPropertyOverride(JsonObjectPtr aProps, PropertyAccessMode
       aProps->add("x-p44-bridged", JsonObject::newBool(isBridged()));
     }
     if (aProps->get("x-p44-bridgeable", o)) {
+      #if ENABLE_JSONBRIDGEAPI
       aProps->add("x-p44-bridgeable", JsonObject::newBool(bridgeable()));
+      #endif
     }
     if (aProps->get("x-p44-allowBridging", o)) {
+      #if ENABLE_JSONBRIDGEAPI
       aProps->add("x-p44-allowBridging", JsonObject::newBool(mDeviceSettings->mAllowBridging));
+      #endif
     }
   }
   else {
     // for write
     if (aProps->get("x-p44-bridged", o)) {
+      #if ENABLE_JSONBRIDGEAPI
       mBridged = o->boolValue();
+      #endif
       aProps->del("x-p44-bridged"); // do not propagate write to proxy!
     }
     if (aProps->get("x-p44-allowBridging", o)) {
+      #if ENABLE_JSONBRIDGEAPI
       if (mDeviceSettings->setPVar(mDeviceSettings->mAllowBridging, o->boolValue())) {
         pushBridgeable();
       }
+      #endif
       aProps->del("x-p44-allowBridging"); // do not propagate write to proxy!
     }
   }

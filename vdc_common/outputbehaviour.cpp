@@ -305,8 +305,12 @@ bool OutputBehaviour::reportOutputState()
 
 MLMicroSeconds OutputBehaviour::outputReportInterval()
 {
+  #if ENABLE_JSONBRIDGEAPI
   if (mBridgePushInterval==Infinite || mBridgePushInterval==Never) return Never; // no regular updates
   return mBridgePushInterval; // bridges want regular updates in about this intervals when e.g. a transition is going on
+  #else
+  return Never; // no bridge API -> DS does not want to track output changes
+  #endif
 }
 
 
@@ -737,8 +741,10 @@ const PropertyDescriptorPtr OutputBehaviour::getDescDescriptorByIndex(int aPropI
 enum {
   mode_key,
   pushChangesToDs_key,
+  #if ENABLE_JSONBRIDGEAPI
   bridgePushInterval_key,
   minReportInterval_key,
+  #endif
   groups_key,
   numSettingsProperties
 };
@@ -750,8 +756,10 @@ const PropertyDescriptorPtr OutputBehaviour::getSettingsDescriptorByIndex(int aP
   static const PropertyDescription properties[numSettingsProperties] = {
     { "mode", apivalue_uint64, mode_key+settings_key_offset, OKEY(output_key) },
     { "pushChanges", apivalue_bool, pushChangesToDs_key+settings_key_offset, OKEY(output_key) },
+    #if ENABLE_JSONBRIDGEAPI
     { "x-p44-bridgePushInterval", apivalue_double, bridgePushInterval_key+settings_key_offset, OKEY(output_key) },
     { "x-p44-minReportInterval", apivalue_double, minReportInterval_key+settings_key_offset, OKEY(output_key) },
+    #endif
     { "groups", apivalue_bool+propflag_container, groups_key+settings_key_offset, OKEY(output_groups_key) }
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
@@ -826,6 +834,7 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           aPropValue->setBoolValue(mPushChangesToDS);
           return true;
         // Operational, non-persistent settings
+        #if ENABLE_JSONBRIDGEAPI
         case bridgePushInterval_key+settings_key_offset:
           if (mBridgePushInterval==Infinite) aPropValue->setNull();
           aPropValue->setDoubleValue((double)mBridgePushInterval/Second);
@@ -833,6 +842,7 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case minReportInterval_key+settings_key_offset:
           aPropValue->setDoubleValue((double)mMinReportInterval/Second);
           return true;
+        #endif // ENABLE_JSONBRIDGEAPI
         // State properties
         case localPriority_key+states_key_offset:
           aPropValue->setBoolValue(mLocalPriority);
@@ -853,12 +863,14 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           setPVar(mPushChangesToDS, aPropValue->boolValue());
           return true;
         // Operational, non-persistent settings
+        #if ENABLE_JSONBRIDGEAPI
         case bridgePushInterval_key+settings_key_offset:
           mBridgePushInterval = aPropValue->isNull() ? Infinite : aPropValue->doubleValue()*Second;
           return true;
         case minReportInterval_key+settings_key_offset:
           mMinReportInterval = aPropValue->doubleValue()*Second;
           return true;
+        #endif
         // State properties
         case localPriority_key+states_key_offset:
           mLocalPriority = aPropValue->boolValue();

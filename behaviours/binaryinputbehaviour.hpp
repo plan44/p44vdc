@@ -1,6 +1,6 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
-//  Copyright (c) 2013-2023 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2013-2025 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -119,7 +119,7 @@ namespace p44 {
     bool isBridgeExclusive();
 
     /// make button bridge exclusive, i.e. not causing any local or DS actions
-    void setBridgeExclusive() { mBridgeExclusive = true; };
+    void setBridgeExclusive();
 
     /// @name interface towards actual device hardware (or simulation)
     /// @{
