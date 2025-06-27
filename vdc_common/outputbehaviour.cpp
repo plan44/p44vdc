@@ -1105,7 +1105,7 @@ static const BuiltinMemberDescriptor outputMembers[] = {
   FUNC_DEF_C_ARG(channel_t, executable|numeric|objectvalue, channel),
   FUNC_DEF_C_ARG(dimchannel, executable|numeric|objectvalue, channel),
   FUNC_DEF_W_ARG(movechannel, executable|numeric|objectvalue),
-  { NULL } // terminator
+  BUILTINS_TERMINATOR
 };
 
 

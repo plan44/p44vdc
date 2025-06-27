@@ -2450,7 +2450,7 @@ static const BuiltinMemberDescriptor localControllerFuncs[] = {
   FUNC_DEF_C_ARG(sceneno, executable|numeric, sceneid_no),
   FUNC_DEF_W_ARG(savescene, executable|anyvalid),
   FUNC_DEF_W_ARG(set, executable|anyvalid),
-  { NULL } // terminator
+  BUILTINS_TERMINATOR
 };
 
 LocalControllerLookup::LocalControllerLookup() :

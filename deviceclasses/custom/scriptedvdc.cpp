@@ -68,7 +68,7 @@ static void message_func(BuiltinFunctionContextPtr f)
 
 static const BuiltinMemberDescriptor scriptedDeviceMembers[] = {
   FUNC_DEF_W_ARG(message, executable|text|null),
-  { NULL } // terminator
+  BUILTINS_TERMINATOR
 };
 
 ScriptedDeviceLookup::ScriptedDeviceLookup(ScriptedDevice& aScriptedDevice) :

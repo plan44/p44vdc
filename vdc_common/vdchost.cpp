@@ -2732,7 +2732,7 @@ static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
   FUNC_DEF_NOARG(nextversion, executable|text),
   FUNC_DEF_NOARG(macaddress, executable|text),
   FUNC_DEF_NOARG(globalevent, executable|text),
-  { NULL } // terminator
+  BUILTINS_TERMINATOR
 };
 
 VdcHostLookup::VdcHostLookup() :

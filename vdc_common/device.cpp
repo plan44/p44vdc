@@ -2749,7 +2749,7 @@ static const BuiltinMemberDescriptor deviceMembers[] = {
   { "sensor", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },
   { "input", executable|anyvalid, behaviour_numargs, behaviour_args, &inputValueSource_func },
   FUNC_DEF_W_ARG(logleveloffset, executable|numeric),
-  { NULL } // terminator
+  BUILTINS_TERMINATOR
 };
 
 

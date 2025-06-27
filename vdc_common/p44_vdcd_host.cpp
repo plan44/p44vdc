@@ -1978,7 +1978,7 @@ static void webrequest_func(BuiltinFunctionContextPtr f)
 
 static const BuiltinMemberDescriptor scriptApiGlobals[] = {
   FUNC_DEF_W_ARG(webrequest, executable|structured|null),
-  { NULL } // terminator
+  BUILTINS_TERMINATOR
 };
 
 
