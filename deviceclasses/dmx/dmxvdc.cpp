@@ -82,7 +82,7 @@ DmxVdc::DmxVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
 {
 }
 
-#define DMX_SERIAL_PARAMS "250000,8,N,2"
+#define DMX_SERIAL_PARAMS "250000,8,N,2,T"
 
 void DmxVdc::setDmxOutput(const string aDmxOutputSpec, uint16_t aDefaultPort)
 {
