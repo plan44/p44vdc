@@ -273,11 +273,11 @@ namespace p44 {
     /// @param aProductVersion product version string
     void setProductVersion(const string &aProductVersion) { mProductVersion = aProductVersion; }
 
-    /// set the the human readable hardware id (such as a serial number) of the vdc host product as a a whole
+    /// set the human readable hardware id (such as a serial number) of the vdc host product as a whole
     /// @param aDeviceHardwareId device serial number or similar id
     void setDeviceHardwareId(const string &aDeviceHardwareId) { mDeviceHardwareId = aDeviceHardwareId; }
 
-    /// set the template (or fixed string) for describing the vdc host product as a a whole (e.g. in network advertisements)
+    /// set the template (or fixed string) for describing the vdc host product as a whole (e.g. in network advertisements)
     /// @param aTemplate template how to create the description
     /// @note the following sequences will be substituted
     /// - %V : vendor name
@@ -587,7 +587,7 @@ namespace p44 {
     /// @note class containers and devices will inherit this (vdc host's) vendor name if not overridden
     virtual string vendorName() P44_OVERRIDE { return "plan44.ch"; };
 
-    /// @return Vendor ID in URN format to identify vendor as uniquely as possible
+    /// @return the human readable hardware id (such as a serial number) of the vdc host product as a whole
     string getDeviceHardwareId() const { return mDeviceHardwareId; };
 
     /// @return id identifying the context object (augmented with device hardware ID)

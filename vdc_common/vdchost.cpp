@@ -2700,6 +2700,12 @@ static void macaddress_func(BuiltinFunctionContextPtr f)
   f->finish(new StringValue(macAddressToString(macAddress(),0)));
 }
 
+// producthardwareid()
+static void producthardwareid_func(BuiltinFunctionContextPtr f)
+{
+  f->finish(new StringValue(VdcHost::sharedVdcHost()->getDeviceHardwareId()));
+}
+
 // productversion()
 static void productversion_func(BuiltinFunctionContextPtr f)
 {
@@ -2729,6 +2735,7 @@ static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
   FUNC_DEF_W_ARG(device, executable|anyvalid),
   FUNC_DEF_W_ARG(valuesource, executable|anyvalid),
   FUNC_DEF_NOARG(productversion, executable|text),
+  FUNC_DEF_NOARG(producthardwareid, executable|text),
   FUNC_DEF_NOARG(nextversion, executable|text),
   FUNC_DEF_NOARG(macaddress, executable|text),
   FUNC_DEF_NOARG(globalevent, executable|text),
