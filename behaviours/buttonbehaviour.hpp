@@ -65,7 +65,8 @@ namespace p44 {
     typedef enum {
       statemachine_standard, ///< Digital Strom standard button state machine
       statemachine_simple, ///< no dimming, only tips, tolerant to missing a pressed/released event sometimes
-      statemachine_dimmer ///< primarily dimming, does not generate single clicks (e.g. audio volume button)
+      statemachine_dimmer, ///< primarily dimming, does not generate single clicks (e.g. audio volume button)
+      statemachine_single, ///< no multi-clicks, only long click with dimming
     } ButtonStateMachineMode;
 
 

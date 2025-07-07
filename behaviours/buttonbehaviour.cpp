@@ -421,6 +421,7 @@ static const char *stateNames[] = {
 // - plan44 "turbo" state machine which can tolerate missing a "press" or a "release" event
 //   but cannot detect multi-clicks, only multi-tips, and cannot dim
 // - dim-only state machine
+// - single click, no-dim state machine
 // Note: must only be changed on receiving a press or release event (which however does NOT
 //   necessarily mean aStateChanged, in case of lost press or releases!)
 void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds aNow)
@@ -429,7 +430,37 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
   mTimerRef = aNow;
 
   mButtonStateMachineTicket.cancel();
-  if (mButtonMode==buttonMode_turbo || mStateMachineMode==statemachine_simple) {
+  if (mStateMachineMode==statemachine_single) {
+    FOCUSOLOG("single click only button state machine entered in state %s", stateNames[state]);
+    if (mButtonPressed) {
+      // the button was pressed right now
+      mState = S8_awaitrelease;
+      sendClick(ct_progress); // report getting pressed to bridges (not dS)
+    }
+    else {
+      // the button was released right now
+      if (mState==S0_idle) {
+        // we haven't seen a press before, assume the press got lost and act (late) on the release
+        // - simulate the button pressing (for bridges)
+        mButtonPressed = true;
+        sendClick(ct_progress); // report getting pressed to bridges (not dS)
+        mButtonPressed = false;
+      }
+      // report getting released to bridges (not dS)
+      sendClick(ct_progress);
+      mState = S0_idle;
+      // Note: we do not have other states but idle and awaitrelease
+      if (isLocalButtonEnabled()) {
+        // first tip switches local output if local button is enabled
+        localSwitchOutput();
+      }
+      else {
+        // other tips are sent upstream
+        sendClick(ct_tip_1x);
+      }
+    }
+  }
+  else if (mButtonMode==buttonMode_turbo || mStateMachineMode==statemachine_simple) {
     FOCUSOLOG("simple button state machine entered in state %s at reference time %d and clickCounter=%d", stateNames[state], (int)(timeSinceRef/MilliSecond), clickCounter);
     // reset click counter if tip timeout has passed since last event
     if (timeSinceRef>t_tip_timeout) {
@@ -451,14 +482,12 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
         // we haven't seen a press before, assume the press got lost and act (late) on the release
         // - simulate the button pressing (for bridges)
         mButtonPressed = true;
-        sendClick(ct_progress); // report getting released to bridges (not dS)
+        sendClick(ct_progress); // report getting pressed to bridges (not dS)
         mButtonPressed = false;
         // - process as tip
         isTip = true;
       }
-      else {
-        sendClick(ct_progress); // report getting released to bridges (not dS)
-      }
+      sendClick(ct_progress); // report getting released to bridges (not dS)
       // Note: we do not have other states but idle and awaitrelease
       mState = S0_idle;
       // complete the sequence if nothing happens within tip_timeout, anyway
