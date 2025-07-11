@@ -235,6 +235,7 @@ void SensorBehaviour::setHardwareSensorConfig(
 
 string SensorBehaviour::getAutoId()
 {
+  if (mSensorType>=numVdcSensorTypes) return string_format("type%d", mSensorType);
   return sensorTypeIds[mSensorType];
 }
 

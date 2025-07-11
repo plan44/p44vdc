@@ -102,6 +102,7 @@ void BinaryInputBehaviour::setHardwareInputConfig(DsBinaryInputType aInputType, 
 
 string BinaryInputBehaviour::getAutoId()
 {
+  if (mHardwareInputType>=numBinaryInputTypes) return string_format("type%d", mHardwareInputType);
   return inputTypeIds[mHardwareInputType];
 }
 
