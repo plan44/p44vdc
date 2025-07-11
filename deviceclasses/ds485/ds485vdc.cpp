@@ -574,7 +574,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           pli = 3;
           uint8_t numOPC;
           if ((pli = Ds485Comm::payload_get8(resp, pli, numOPC))==0) continue; // something is wrong, skip
-          OLOG(LOG_INFO, "device #%d: number of OPC channels = %d", j, numOPC);
+          POLOG(dev, LOG_INFO, "device #%d: number of OPC channels = %d", j, numOPC);
           dev->mNumOPC = numOPC;
           // - output mode and function
           VdcOutputMode mode = outputmode_disabled;
@@ -593,7 +593,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             pli = 3;
             uint8_t channelId;
             if ((pli = Ds485Comm::payload_get8(resp, pli, channelId))==0) continue; // something is wrong, skip
-            OLOG(LOG_INFO, "device #%d: channel #%d: channelId=%d", j, oi, channelId);
+            POLOG(dev, LOG_INFO, "device #%d: channel #%d: channelId=%d", j, oi, channelId);
             // check channelid, gives indication for output function
             if (channelId==channeltype_hue) func = outputFunction_colordimmer;
             if (channelId==channeltype_colortemp && func!=outputFunction_colordimmer) func = outputFunction_ctdimmer;
@@ -676,7 +676,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             uint8_t buttonchannel;
             if ((pli = Ds485Comm::payload_get8(resp, pli, buttonchannel))==0) goto nobutton; // something is wrong, skip
             pli++; // skip "unused"
-            OLOG(LOG_INFO,
+            POLOG(dev, LOG_INFO,
               "device #%d '%s': button: id/LTNUMGRP0=0x%02x, group=%d, flags=0x%02x, channel=%d",
               j, devName.c_str(),
               ltNumGrp0, buttongroup, buttonflags, buttonchannel
@@ -716,7 +716,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           pli = 3;
           uint8_t numBinInps;
           if ((pli = Ds485Comm::payload_get8(resp, pli, numBinInps))==0) continue; // something is wrong, skip
-          OLOG(LOG_INFO, "device #%d: number of binary inputs = %d", j, numBinInps);
+          POLOG(dev, LOG_INFO, "device #%d: number of binary inputs = %d", j, numBinInps);
           for (int bi=0; bi<numBinInps; bi++) {
             // - binary input info
             req.clear();
@@ -735,14 +735,27 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             if ((pli = Ds485Comm::payload_get8(resp, pli, inpButtonId))==0) continue; // something is wrong, skip
             uint8_t inpIndependent;
             if ((pli = Ds485Comm::payload_get8(resp, pli, inpIndependent))==0) continue; // something is wrong, skip
-            OLOG(LOG_INFO,
+            POLOG(dev, LOG_INFO,
               "- device #%d: binary input #%d: targetGroupType=%d, targetGroup=%d, type=%d, buttonId=0x%02x, independent=%d",
               j, bi, inpTargetGroupType, inpTargetGroup, inpType, inpButtonId, inpIndependent
             );
+            // sanity checking
             BinaryInputBehaviourPtr ib = new BinaryInputBehaviour(*dev, ""); // automatic ID
+            if (inpTargetGroupType==1) {
+              POLOG(dev, LOG_WARNING, "device #%d has TargetGroupType==1 (global groups), this is not yet implemented!", j);
+            }
+            if (inpType>=numBinaryInputTypes) {
+              POLOG(dev, LOG_WARNING, "device #%d has unknown type==0x%02x -> not mapped to a system function", j, inpType);
+              inpType=binInpType_none;
+            }
             ib->setHardwareInputConfig((DsBinaryInputType)inpType, usage_undefined, true, Never, Never);
-            // TODO: maybe need to model some inputs as buttons
-            ib->setGroup((DsGroup)inpTargetGroup);
+            if (inpTargetGroup==255) {
+              POLOG(dev, LOG_WARNING, "device #%d has targetGroup==0x%02x -> ignored", j, inpTargetGroup);
+            }
+            else {
+              // TODO: maybe need to model some inputs as buttons
+              ib->setGroup((DsGroup)inpTargetGroup);
+            }
             dev->addBehaviour(ib);
           }
           // - sensor info
@@ -753,7 +766,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           pli = 3;
           uint8_t numSensors;
           if ((pli = Ds485Comm::payload_get8(resp, pli, numSensors))==0) continue; // something is wrong, skip
-          OLOG(LOG_INFO, "device #%d: number of sensors = %d", j, numSensors);
+          POLOG(dev, LOG_INFO, "device #%d: number of sensors = %d", j, numSensors);
           for (int si=0; si<numSensors; si++) {
             // all sensors must have a corresponding info, even if null
             dev->setSensorInfoAtIndex(si, DsSensorInstanceInfo()); ///< we do not know it yet, if we fail getting details we still need this index position occupied
@@ -772,7 +785,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             if ((pli = Ds485Comm::payload_get8(resp, pli, sensorZone))==0) continue; // something is wrong, skip
             uint8_t sensorPushConvert;
             if ((pli = Ds485Comm::payload_get8(resp, pli, sensorPushConvert))==0) continue; // something is wrong, skip
-            OLOG(LOG_INFO,
+            POLOG(dev, LOG_INFO,
               "device #%d: sensor #%d: type=%d, pollinterval=%d, globalZone=%d, pushConvert=%d",
               j, si, sensorType, sensorPollinterval, sensorZone, sensorPushConvert
             );
