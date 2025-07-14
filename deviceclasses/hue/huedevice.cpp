@@ -143,7 +143,7 @@ void HueDevice::setName(const string &aName)
     JsonObjectPtr params = JsonObject::newObj();
     params->add("name", JsonObject::newString(getName()));
     string url = string_format("/lights/%s", mLightID.c_str());
-    hueComm().apiAction(httpMethodPUT, url.c_str(), params, NoOP);
+    hueComm().apiAction(HueApiOperation::PUT, url.c_str(), params, NoOP);
   }
 }
 
@@ -444,7 +444,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
                 onState->add("bri", JsonObject::newInt32(newBri)); // send it here already a first time
                 onState->add("transitiontime", JsonObject::newInt64(aTransitionTime/(100*MilliSecond)));
                 // just send, don't care about the answer
-                hueComm().apiAction(httpMethodPUT, url.c_str(), onState, NoOP);
+                hueComm().apiAction(HueApiOperation::PUT, url.c_str(), onState, NoOP);
                 // Note: hueComm will make sure next API command is paced in >=100mS distance,
                 // so we can go on creating the bri/color state change right now
                 newState->add("bri", JsonObject::newInt32(newBri));
@@ -561,7 +561,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
       newState->add("transitiontime", JsonObject::newInt64(aTransitionTime/(100*MilliSecond)));
     }
     // send the command
-    hueComm().apiAction(httpMethodPUT, url.c_str(), newState, boost::bind(&HueDevice::channelValuesSent, this, l, aDoneCB, _1, _2));
+    hueComm().apiAction(HueApiOperation::PUT, url.c_str(), newState, boost::bind(&HueDevice::channelValuesSent, this, l, aDoneCB, _1, _2));
   }
   return true;
 }

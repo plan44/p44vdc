@@ -399,7 +399,7 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
         learnedIn = no;
         // - delete it from the whitelist
         string url = "/config/whitelist/" + mHueComm.mUserName;
-        mHueComm.apiAction(httpMethodDELETE, url.c_str(), JsonObjectPtr(), NoOP);
+        mHueComm.apiAction(HueApiOperation::DELETE, url.c_str(), JsonObjectPtr(), NoOP);
         // - forget uuid + user name
         mBridgeIdentifier.clear();
         mBridgeUserName.clear();
@@ -632,7 +632,7 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
       //   if (devtt>maxtt) maxtt = devtt;
       // }
       // setGroupState->add("transitiontime", JsonObject::newInt64(maxtt*10/Second)); // 100mS resolution
-      mHueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
+      mHueComm.apiAction(HueApiOperation::PUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
       return;
     }
   }
@@ -677,7 +677,7 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
       if (dm!=dimmode_stop) {
         setGroupState->add("transitiontime", JsonObject::newInt32(tt));
       }
-      mHueComm.apiAction(httpMethodPUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
+      mHueComm.apiAction(HueApiOperation::PUT, "/groups/0/action", setGroupState, boost::bind(&HueVdc::nativeActionDone, this, aStatusCB, _1, _2));
       return;
     }
   }
@@ -687,7 +687,7 @@ void HueVdc::callNativeAction(StatusCB aStatusCB, const string aNativeActionId, 
 
 void HueVdc::groupDimRepeater(JsonObjectPtr aDimState, int aTransitionTime, MLTimer &aTimer)
 {
-  mHueComm.apiAction(httpMethodPUT, "/groups/0/action", aDimState, NoOP);
+  mHueComm.apiAction(HueApiOperation::PUT, "/groups/0/action", aDimState, NoOP);
   mGroupDimTicket.executeOnce(boost::bind(&HueVdc::groupDimRepeater, this, aDimState, aTransitionTime, _1), aTransitionTime*Second/10);
 }
 
@@ -743,7 +743,7 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       newScene->add("name", JsonObject::newString(sceneName)); // must be max 32 chars
       newScene->add("lights", lights);
       newScene->add("recycle", JsonObject::newBool(false));
-      mHueComm.apiAction(httpMethodPOST, "/scenes", newScene, boost::bind(&HueVdc::nativeActionCreated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
+      mHueComm.apiAction(HueApiOperation::POST, "/scenes", newScene, boost::bind(&HueVdc::nativeActionCreated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
       return;
     }
   }
@@ -771,7 +771,7 @@ void HueVdc::createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizer
       }
       newGroup->add("name", JsonObject::newString(groupName));
       newGroup->add("lights", lights);
-      mHueComm.apiAction(httpMethodPOST, "/groups", newGroup, boost::bind(&HueVdc::nativeActionCreated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
+      mHueComm.apiAction(HueApiOperation::POST, "/groups", newGroup, boost::bind(&HueVdc::nativeActionCreated, this, aStatusCB, aOptimizerEntry, aDeliveryState, _1, _2));
       return;
     }
 
@@ -861,7 +861,7 @@ void HueVdc::performNativeSceneUpdate(uint64_t aNewHash, string aSceneId, JsonOb
 {
   // actually post update
   string url = "/scenes/" + aSceneId;
-  mHueComm.apiAction(httpMethodPUT, url.c_str(), aSceneUpdate, boost::bind(&HueVdc::nativeActionUpdated, this, aNewHash, aOptimizerEntry, _1, _2));
+  mHueComm.apiAction(HueApiOperation::PUT, url.c_str(), aSceneUpdate, boost::bind(&HueVdc::nativeActionUpdated, this, aNewHash, aOptimizerEntry, _1, _2));
   return;
 }
 
@@ -888,11 +888,11 @@ void HueVdc::freeNativeAction(StatusCB aStatusCB, const string aNativeActionId)
   if (!(id = hueSceneIdFromActionId(aNativeActionId)).empty()) {
     // is a scene, delete it
     string url = "/scenes/" + id;
-    mHueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionFreed, this, aStatusCB, url, _1, _2));
+    mHueComm.apiAction(HueApiOperation::DELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionFreed, this, aStatusCB, url, _1, _2));
   }
   else if (!(id = hueGroupIdFromActionId(aNativeActionId)).empty()) {
     string url = "/groups/" + id;
-    mHueComm.apiAction(httpMethodDELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionFreed, this, aStatusCB, url, _1, _2));
+    mHueComm.apiAction(HueApiOperation::DELETE, url.c_str(), NULL, boost::bind(&HueVdc::nativeActionFreed, this, aStatusCB, url, _1, _2));
   }
 }
 

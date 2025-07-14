@@ -93,14 +93,6 @@ namespace p44 {
   };
 
 
-  typedef enum {
-    httpMethodGET,
-    httpMethodPOST,
-    httpMethodPUT,
-    httpMethodDELETE
-  } HttpMethods;
-
-
   class BridgeFinder;
   typedef boost::intrusive_ptr<BridgeFinder> BridgeFinderPtr;
 
@@ -121,6 +113,25 @@ namespace p44 {
   {
     typedef Operation inherited;
 
+  public:
+
+    typedef enum {
+      GET,
+      POST,
+      PUT,
+      DELETE
+    } HttpMethods;
+
+    HueApiOperation(HueComm &aHueComm, HttpMethods aMethod, const char* aUrl, JsonObjectPtr aData, HueApiResultCB aResultHandler);
+    virtual ~HueApiOperation();
+
+    virtual bool initiate();
+    virtual bool hasCompleted();
+    virtual OperationPtr finalize();
+    virtual void abortOperation(ErrorPtr aError);
+
+  private:
+
     HueComm &mHueComm;
     HttpMethods mMethod;
     string mUrl;
@@ -130,16 +141,6 @@ namespace p44 {
     HueApiResultCB mResultHandler;
 
     void processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError);
-
-  public:
-
-    HueApiOperation(HueComm &aHueComm, HttpMethods aMethod, const char* aUrl, JsonObjectPtr aData, HueApiResultCB aResultHandler);
-    virtual ~HueApiOperation();
-
-    virtual bool initiate();
-    virtual bool hasCompleted();
-    virtual OperationPtr finalize();
-    virtual void abortOperation(ErrorPtr aError);
 
   };
   typedef boost::intrusive_ptr<HueApiOperation> HueApiOperationPtr;
@@ -193,7 +194,7 @@ namespace p44 {
     /// @param aData the data for the action to perform (JSON body of the request)
     /// @param aResultHandler will be called with the result
     /// @param aNoAutoURL if set, aUrlSuffix must be the complete URL (baseURL and userName will not be used automatically)
-    void apiAction(HttpMethods aMethod, const char* aUrlSuffix, JsonObjectPtr aData, HueApiResultCB aResultHandler, bool aNoAutoURL = false);
+    void apiAction(HueApiOperation::HttpMethods aMethod, const char* aUrlSuffix, JsonObjectPtr aData, HueApiResultCB aResultHandler, bool aNoAutoURL = false);
 
     /// helper to get success from apiAction results
     /// @param aResult a result as delivered by apiAction

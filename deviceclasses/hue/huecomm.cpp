@@ -95,12 +95,12 @@ bool HueApiOperation::initiate()
   // initiate the web request
   const char *methodStr;
   switch (mMethod) {
-    case httpMethodPOST : methodStr = "POST"; break;
-    case httpMethodPUT : methodStr = "PUT"; break;
-    case httpMethodDELETE : methodStr = "DELETE"; break;
+    case POST : methodStr = "POST"; break;
+    case PUT : methodStr = "PUT"; break;
+    case DELETE : methodStr = "DELETE"; break;
     default : methodStr = "GET"; mData.reset(); break;
   }
-  if (mMethod==httpMethodPUT) {
+  if (mMethod==PUT) {
     SOLOG(mHueComm, LOG_INFO, "Sending API action (PUT) command: %s: %s", mUrl.c_str(), mData ? mData->c_strValue() : "<no data>");
   }
   mHueComm.mBridgeAPIComm.jsonRequest(mUrl.c_str(), boost::bind(&HueApiOperation::processAnswer, this, _1, _2), methodStr, mData);
@@ -116,7 +116,7 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
   if (Error::isOK(mError)) {
     SOLOG(mHueComm, LOG_INFO, "Receiving API response: %s", aJsonResponse ? aJsonResponse->c_strValue() : "<no data>");
     // pre-process response in case of non-GET
-    if (mMethod!=httpMethodGET) {
+    if (mMethod!=GET) {
       // Expected:
       //  [{"error":{"type":xxx,"address":"yyy","description":"zzz"}}]
       // or
@@ -280,7 +280,7 @@ public:
       // we have a pre-known base URL for the hue API, use this without any find operation
       // - do a check
       FOCUSSOLOG(mHueComm, "Using fixed API URL %s: %s -> testing if accessible...", mHueComm.mBridgeIdentifier.c_str(), mHueComm.mFixedBaseURL.c_str());
-      mHueComm.apiAction(httpMethodGET, mHueComm.mFixedBaseURL.c_str(), JsonObjectPtr(), boost::bind(&BridgeFinder::apiTested, this, _2), true); // no auto url = works w/o API ready
+      mHueComm.apiAction(HueApiOperation::GET, mHueComm.mFixedBaseURL.c_str(), JsonObjectPtr(), boost::bind(&BridgeFinder::apiTested, this, _2), true); // no auto url = works w/o API ready
     }
   };
 
@@ -669,7 +669,7 @@ public:
       FOCUSSOLOG(mHueComm, "Auth candidate: bridgeid=%s, baseURL=%s -> try creating user", mCurrentAuthCandidate->first.c_str(), mCurrentAuthCandidate->second.c_str());
       JsonObjectPtr request = JsonObject::newObj();
       request->add("devicetype", JsonObject::newString(mDeviceType));
-      mHueComm.apiAction(httpMethodPOST, mCurrentAuthCandidate->second.c_str(), request, boost::bind(&BridgeFinder::handleCreateUserAnswer, this, _1, _2), true);
+      mHueComm.apiAction(HueApiOperation::POST, mCurrentAuthCandidate->second.c_str(), request, boost::bind(&BridgeFinder::handleCreateUserAnswer, this, _1, _2), true);
     }
     else {
       // done with all candidates (or find aborted in hueComm)
@@ -749,11 +749,11 @@ HueComm::~HueComm()
 
 void HueComm::apiQuery(const char* aUrlSuffix, HueApiResultCB aResultHandler)
 {
-  apiAction(httpMethodGET, aUrlSuffix, JsonObjectPtr(), aResultHandler);
+  apiAction(HueApiOperation::GET, aUrlSuffix, JsonObjectPtr(), aResultHandler);
 }
 
 
-void HueComm::apiAction(HttpMethods aMethod, const char* aUrlSuffix, JsonObjectPtr aData, HueApiResultCB aResultHandler, bool aNoAutoURL)
+void HueComm::apiAction(HueApiOperation::HttpMethods aMethod, const char* aUrlSuffix, JsonObjectPtr aData, HueApiResultCB aResultHandler, bool aNoAutoURL)
 {
   if (!mApiReady && !aNoAutoURL) {
     if (aResultHandler) aResultHandler(JsonObjectPtr(), ErrorPtr(new HueCommError(HueCommError::ApiNotReady)));
