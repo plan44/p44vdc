@@ -101,7 +101,7 @@ bool HueApiOperation::initiate()
     default : methodStr = "GET"; mData.reset(); break;
   }
   if (mMethod==PUT) {
-    SOLOG(mHueComm, LOG_INFO, "Sending API action (PUT) command: %s: %s", mUrl.c_str(), mData ? mData->c_strValue() : "<no data>");
+    SOLOG(mHueComm, LOG_INFO, "Sending API action (PUT) command: %s: %s", mUrl.c_str(), JsonObject::text(mData));
   }
   mHueComm.mBridgeAPIComm.jsonRequest(mUrl.c_str(), boost::bind(&HueApiOperation::processAnswer, this, _1, _2), methodStr, mData);
   // executed
@@ -114,7 +114,7 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
 {
   mError = aError;
   if (Error::isOK(mError)) {
-    SOLOG(mHueComm, LOG_INFO, "Receiving API response: %s", aJsonResponse ? aJsonResponse->c_strValue() : "<no data>");
+    SOLOG(mHueComm, LOG_INFO, "Receiving API response: %s", JsonObject::text(aJsonResponse));
     // pre-process response in case of non-GET
     if (mMethod!=GET) {
       // Expected:
