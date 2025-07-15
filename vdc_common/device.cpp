@@ -2279,13 +2279,13 @@ int Device::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
     return numModelFeatures;
   }
   else if (aParentDescriptor->hasObjectKey(device_buttons_key)) {
-    return (int)mButtons.size();
+    return (int)numButtons();
   }
   else if (aParentDescriptor->hasObjectKey(device_inputs_key)) {
-    return (int)mInputs.size();
+    return (int)numInputs();
   }
   else if (aParentDescriptor->hasObjectKey(device_sensors_key)) {
-    return (int)mSensors.size();
+    return (int)numSensors();
   }
   else if (aParentDescriptor->hasObjectKey(device_channels_key)) {
     return numChannels(); // if no output, this returns 0
@@ -2631,9 +2631,9 @@ ErrorPtr Device::writtenProperty(PropertyAccessMode aMode, PropertyDescriptorPtr
 string Device::description()
 {
   string s = inherited::description(); // DsAdressable
-  if (mButtons.size()>0) string_format_append(s, "\n- Buttons: %lu", mButtons.size());
-  if (mInputs.size()>0) string_format_append(s, "\n- Binary Inputs: %lu", mInputs.size());
-  if (mSensors.size()>0) string_format_append(s, "\n- Sensors: %lu", mSensors.size());
+  if (numButtons()>0) string_format_append(s, "\n- Buttons: %lu", mButtons.size());
+  if (numInputs()>0) string_format_append(s, "\n- Binary Inputs: %lu", mInputs.size());
+  if (numSensors()>0) string_format_append(s, "\n- Sensors: %lu", mSensors.size());
   if (numChannels()>0) string_format_append(s, "\n- Output Channels: %d", numChannels());
   return s;
 }

@@ -576,6 +576,10 @@ namespace p44 {
     /// @return number of output channels in this device
     int numChannels();
 
+    int numButtons() { return (int)mButtons.size(); };
+    int numInputs() { return (int)mInputs.size(); };
+    int numSensors() { return (int)mSensors.size(); };
+
     /// @param aTransitionTimeP if set, will return the highest transition time among the changed channels
     /// @return true if any channel needs to be applied to hardware
     bool needsToApplyChannels(MLMicroSeconds* aTransitionTimeP = NULL);
