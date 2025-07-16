@@ -414,7 +414,7 @@ bool HueDevice::applyLightState(SimpleCB aDoneCB, bool aForDimming, bool aReappl
     // brightness is always re-applied unless it's dimming
     bool lightIsOn = mCurrentlyOn!=no; // assume on even if unknown
     if (aReapply || !aForDimming || l->mBrightness->needsApplying()) {
-      Brightness b = l->brightnessForHardware();
+      Brightness b = l->brightnessForHardware(true);
       lightIsOn = b>=DS_BRIGHTNESS_STEP;
       if (l->getOutputFunction()==outputFunction_switch) {
         // just on and off

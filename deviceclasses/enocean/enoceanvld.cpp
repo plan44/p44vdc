@@ -524,7 +524,7 @@ void EnoceanD201XXDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     if (l) {
       // light output
       if (l->brightnessNeedsApplying()) {
-        percentOn = l->brightnessForHardware();
+        percentOn = l->brightnessForHardware(true); // final value
         if (d201desc.features & dimming) {
           MLMicroSeconds tt = l->transitionTimeToNewBrightness();
   //        if (d201desc.features & dimmingConfigurable) {

@@ -174,7 +174,7 @@ void DigitalIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   if (lightBehaviour) {
     // light
     if (lightBehaviour->brightnessNeedsApplying()) {
-      mIndicatorOutput->set(lightBehaviour->brightnessForHardware());
+      mIndicatorOutput->set(lightBehaviour->brightnessForHardware(true)); // final value
       lightBehaviour->brightnessApplied(); // confirm having applied the value
     }
   }

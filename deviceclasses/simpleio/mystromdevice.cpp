@@ -208,7 +208,7 @@ void MyStromDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     if (l->brightnessNeedsApplying()) {
       // need to update switch state
       sendState = true;
-      newState = l->brightnessForHardware()>0;
+      newState = l->brightnessForHardware(true)>0;
     }
   }
   else {

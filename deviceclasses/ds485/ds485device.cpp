@@ -548,7 +548,7 @@ void Ds485Device::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     }
     else if (l && l->brightnessNeedsApplying()) {
       string payload;
-      Ds485Comm::payload_append8(payload, l->brightnessForHardware()*255/100);
+      Ds485Comm::payload_append8(payload, l->brightnessForHardware(true)*255/100);
       issueDeviceRequest(DEVICE_ACTION_REQUEST, DEVICE_ACTION_REQUEST_ACTION_SET_OUTVAL, payload);
       l->brightnessApplied();
     }
