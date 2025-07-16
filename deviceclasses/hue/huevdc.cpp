@@ -225,7 +225,7 @@ void HueVdc::refindBridge(StatusCB aCompletedCB)
 {
   if (!getVdcHost().isNetworkConnected()) {
     // TODO: checking IPv4 only at this time, need to add IPv6 later
-    OLOG(LOG_WARNING, "hue: device has no IP yet -> must wait ");
+    OLOG(LOG_WARNING, "device has no IP yet -> must wait ");
     mRefindTicket.executeOnce(boost::bind(&HueVdc::refindBridge, this, aCompletedCB), REFIND_RETRY_DELAY);
     return;
   }
