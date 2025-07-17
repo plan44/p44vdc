@@ -179,6 +179,8 @@ namespace p44 {
 
     bool addWbfDevice(WbfDevicePtr aNewDev);
 
+    void wbfapicallResponse(VdcApiRequestPtr aRequest, JsonObjectPtr aResult, ErrorPtr aError);
+
     static void unregisterBehaviourMap(PartIdToBehaviourMap &aMap, DsBehaviourPtr aBehaviour);
 
   };

@@ -25,6 +25,7 @@
 #if ENABLE_WBF
 
 #include "wbfdevice.hpp"
+#include "jsonvdcapi.hpp"
 
 using namespace p44;
 
@@ -335,11 +336,46 @@ ErrorPtr WbfVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       }
     }
   }
+  else if (aMethod=="wbfapicall") {
+    // direct wbf API call
+    ApiValuePtr a = aParams->get("websocketmsg");
+    if (a) {
+      JsonObjectPtr msg = JsonApiValue::getAsJson(a);
+      mWbfComm.sendWebSocketJsonMsg(msg);
+      return Error::ok();
+    }
+    string method;
+    respErr = checkStringParam(aParams, "httpmethod", method);
+    if (Error::notOK(respErr)) return respErr;
+    WbfApiOperation::HttpMethods m;
+    if (uequals(method, "POST")) m = WbfApiOperation::POST;
+    else if (uequals(method, "PUT")) m = WbfApiOperation::PUT;
+    else if (uequals(method, "PATCH")) m = WbfApiOperation::PATCH;
+    else if (uequals(method, "DELETE")) m = WbfApiOperation::DELETE;
+    else m = WbfApiOperation::GET;
+    string endpoint;
+    respErr = checkStringParam(aParams, "endpoint", endpoint);
+    if (Error::notOK(respErr)) return respErr;
+    JsonObjectPtr request;
+    a = aParams->get("request");
+    if (a) request = JsonApiValue::getAsJson(a); // request data
+    mWbfComm.apiAction(m, endpoint.c_str(), request, boost::bind(&WbfVdc::wbfapicallResponse, this, aRequest, _1, _2));
+  }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
   return respErr;
 }
+
+
+void WbfVdc::wbfapicallResponse(VdcApiRequestPtr aRequest, JsonObjectPtr aResult, ErrorPtr aError)
+{
+  ApiValuePtr v = aRequest->newApiValue();
+  JsonApiValue::setAsJson(v, aResult);
+  if (Error::isOK(aError)) aRequest->sendResult(v);
+  else aRequest->sendError(aError);
+}
+
 
 
 void WbfVdc::setLearnMode(bool aEnableLearning, bool aDisableProximityCheck, Tristate aOnlyEstablish)
