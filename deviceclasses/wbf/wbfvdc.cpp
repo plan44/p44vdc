@@ -131,7 +131,8 @@ void WbfVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   load();
   // load private data
   ErrorPtr err = initializePersistence(mDb, WBF_SCHEMA_VERSION, WBF_SCHEMA_MIN_VERSION);
-	aCompletedCB(err); // return status of DB init
+  if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
+  aCompletedCB(err); // return status of DB init
   // schedule rescans
   setPeriodicRecollection(WBF_RECOLLECT_INTERVAL, rescanmode_incremental);
 }
