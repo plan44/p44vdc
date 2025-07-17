@@ -189,6 +189,10 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
       }
     }
   } // output
+  if (!getOutput()) {
+    // no output, just install minimal settings without scenes
+    installSettings();
+  }
   // process inputs
   if (aInputsArr) {
     for (int iidx = 0; iidx<aInputsArr->arrayLength(); iidx++) {
@@ -267,27 +271,10 @@ WbfComm &WbfDevice::wbfComm()
 
 
 
-//void WbfDevice::setName(const string &aName)
-//{
-//  string oldname = getName();
-//  inherited::setName(aName);
-//  if (getName()!=oldname) {
-//    // really changed, propagate to hue
-//    JsonObjectPtr params = JsonObject::newObj();
-//    params->add("name", JsonObject::newString(getName()));
-//    string url = string_format("/lights/%s", mLightID.c_str());
-//    hueComm().apiAction(httpMethodPUT, url.c_str(), params, NoOP);
-//  }
-//}
-
-
 void WbfDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
-  // TODO: implement
+  // TODO: maybe we need stuff here?
   aCompletedCB(ErrorPtr());
-//
-//  string url = string_format("/lights/%s", mLightID.c_str());
-//  wbfComm().apiQuery(url.c_str(), boost::bind(&WbfDevice::deviceStateReceived, this, aCompletedCB, aFactoryReset, _1, _2));
 }
 
 
@@ -332,7 +319,7 @@ string WbfDevice::getOpStateText()
 
 
 
-#define PRESENT_WHEN_SEEN_EARLIER_THAN (5*Minute)
+#define PRESENT_WHEN_SEEN_EARLIER_THAN (10*Minute)
 
 void WbfDevice::checkPresence(PresenceCB aPresenceResultHandler)
 {
