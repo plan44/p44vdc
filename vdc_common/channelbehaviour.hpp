@@ -172,8 +172,8 @@ namespace p44 {
 
     /// start or stop moving channel value up or down
     /// @param aDirection 0 to stop moving, 1 to move up, -1 to move down
-    /// @param aTimePerUnit time in microseconds to be spent for one unit of the channel value
-    ///   if set to 0. rate is calculated from getDimPerMS().
+    /// @param aTimePerUnit time in microseconds to be spent for one unit of the channel value.
+    ///   if set to 0, rate is calculated from getDimPerMS().
     void moveChannelValue(int aDirection, MLMicroSeconds aTimePerUnit = 0);
 
     /// set/reset custom dimming per millisecond rate (0 = standard dimming rate)

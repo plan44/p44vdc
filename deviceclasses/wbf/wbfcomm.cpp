@@ -227,7 +227,11 @@ void WbfComm::webSocketStart(StatusCB aStartupCB)
   mGatewayWebsocket.setMessageHandler(mWebSocketCB);
   mGatewayWebsocket.connectTo(
     boost::bind(&WbfComm::webStocketStatus, this, aStartupCB, _1),
-    string_format("ws://%s/api", mResolvedHost.c_str()),
+    #ifdef __APPLE__
+    string_format("ws://%s/api", mResolvedHost.c_str()), // we don't have a SSL-enabled uwsc on macOS
+    #else
+    string_format("wss://%s/api", mResolvedHost.c_str()),
+    #endif
     PING_INTERVAL,
     string_format("Authorization: Bearer %s\r\n", mApiSecret.c_str())
   );
@@ -283,7 +287,7 @@ void WbfComm::apiAction(WbfApiOperation::HttpMethods aMethod, const char* aUrlSu
     url = aUrlSuffix;
   }
   else {
-    url = string_format("http://%s/api", mResolvedHost.c_str());
+    url = string_format("https://%s/api", mResolvedHost.c_str());
     url += nonNullCStr(aUrlSuffix);
   }
   WbfApiOperationPtr op = new WbfApiOperation(*this, aMethod, url.c_str(), aData, aResultHandler);
@@ -361,7 +365,7 @@ void WbfComm::claimAccount(StatusCB aPairingResultCB, const string aResolvedHost
   claimParams->add("user", JsonObject::newString("apiuser"));
   apiAction(
     WbfApiOperation::POST,
-    string_format("http://%s/api/account/claim", aResolvedHost.c_str()).c_str(),
+    string_format("https://%s/api/account/claim", aResolvedHost.c_str()).c_str(),
     claimParams,
     boost::bind(&WbfComm::claimResultHander, this, aPairingResultCB, aResolvedHost, aHostName, _1, _2),
     true // api not yet ready, full url, no auth
