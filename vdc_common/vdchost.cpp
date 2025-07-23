@@ -114,7 +114,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   mMainLoopStatsCounter(0),
   mPersistentChannels(aWithPersistentChannels),
   #if P44SCRIPT_FULL_SUPPORT
-  mMainScript(sourcecode|regular, "mainscript", "%O", this),
+  mMainScript(sourcecode|regular, "mainscript", "%O", &mMainScriptLogger),
   #endif
   #if P44SCRIPT_FULL_SUPPORT
   mGlobalScriptsStarted(false),
@@ -125,6 +125,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #if ENABLE_P44SCRIPT
   P44Script::StandardScriptingDomain::sharedDomain().setGeoLocation(&mGeolocation);
   #if P44SCRIPT_FULL_SUPPORT
+  mMainScriptLogger.isMemberVariable();
   // vdchost is the global context for this app, so register its members in the standard scripting
   // domain making them accessible in all scripts
   StandardScriptingDomain::sharedDomain().registerMemberLookup(VdcHostLookup::sharedLookup());
@@ -476,6 +477,7 @@ P44LoggingObj* VdcHost::getTopicLogObject(const string aTopic)
   #endif
   #if P44SCRIPT_FULL_SUPPORT
   if (aTopic=="p44script") return &StandardScriptingDomain::sharedDomain();
+  if (aTopic=="mainscript") return &mMainScriptLogger;
   #endif
   // unknown at this level
   return inherited::getTopicLogObject(aTopic);

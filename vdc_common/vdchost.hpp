@@ -133,6 +133,12 @@ namespace p44 {
   };
   typedef list<NotificationGroup> NotificationAudience;
 
+  #if P44SCRIPT_FULL_SUPPORT
+  class MainScriptLogger : public P44LoggingObj
+  {
+    virtual string contextType() const { return "mainscript"; };
+  };
+  #endif // P44SCRIPT_FULL_SUPPORT
 
   /// container for all devices hosted by this application
   /// In dS terminology, this object represents the vDC host (a program/daemon hosting one or multiple virtual device connectors).
@@ -218,9 +224,10 @@ namespace p44 {
 
     #if P44SCRIPT_FULL_SUPPORT
     ScriptHost mMainScript; ///< global init/main script stored in settings
+    MainScriptLogger mMainScriptLogger; ///< separate logging context from vdchost for mainscript
     ScriptMainContextPtr mVdcHostScriptContext; ///< context for global vdc scripts
     bool mGlobalScriptsStarted; ///< global scripts have been started
-    #endif
+    #endif // P44SCRIPT_FULL_SUPPORT
 
   public:
 
