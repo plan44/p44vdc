@@ -197,10 +197,14 @@ void ScriptedDeviceImplementation::implementationEnds(ScriptObjPtr aResult)
     mContext->clearVars(); // clear vars and (especially) context local handlers
     return; // fatal error, no auto-restart
   }
-  if (aResult && aResult->errorValue()->isOK() && mScriptedDevice.hasSinks()) return; // script ends w/o error, and monitors messages -> ok
-  if (aResult && aResult->hasType(numeric) && aResult->boolValue()) return; // returning explicit trueish means no restart needed, as well
-  // retry in a while
-  SOLOG(mScriptedDevice, LOG_NOTICE, "Will restart implementation in %lld seconds", IMPLEMENTATION_RESTART_DELAY/Second);
+  if (!aResult || aResult->undefined()) return; // no value -> ok
+  if (!aResult->isErr()) {
+    // no error
+    if (mScriptedDevice.hasSinks()) return; // script ends w/o error, and monitors messages -> ok
+    if (!aResult->hasType(numeric) || aResult->boolValue()) return; // not numeric or numeric trueis -> ok
+  }
+  // error or numeric falseish -> retry in a while
+  SOLOG(mScriptedDevice, LOG_WARNING, "Will restart implementation in %lld seconds", IMPLEMENTATION_RESTART_DELAY/Second);
   mRestartTicket.executeOnce(boost::bind(&ScriptedDeviceImplementation::restartImplementation, this), IMPLEMENTATION_RESTART_DELAY);
 }
 
