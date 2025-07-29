@@ -66,7 +66,8 @@ namespace p44 {
     string mWbfId; ///< the ID of the entire device
     int mLoadId; ///< the load ID
     uint8_t mSubDeviceIndex; ///< subdevice index when creating multiple p44 devices from one wbf device
-    string mWbfCommRefs; ///< the com ref (or c/a refs) of the device's module(s)
+    string mWbfCommNames; ///< the commerical name(s) of the device's module(s)
+    string mWbfCommRefs; ///< the commercial reference(s) of the device's module(s)
     string mSerialNos; ///< the serial no (or c/a serials) of the device's module(s)
     MLMicroSeconds mLastSeen; ///< when seen last time
     bool mHasWhiteChannel; ///< set when connected light is RGBW (vs. only RGB)
@@ -74,7 +75,13 @@ namespace p44 {
 
   public:
 
-    WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevDesc, JsonObjectPtr aOutDesc, JsonObjectPtr aInputsArr);
+    /// @param aDevDesc overall device descriptor which might be shared among more than one device if it has multiple outputs
+    /// @param aOutDesc output descriptor if this device instance should have an output
+    /// @param aInputsArr array of input descriptors that are available in the overall device. Implementation must
+    ///   pick some or all of them, AND DELETE those picked from the array. This allows for matching buttons with
+    ///   the corresponding outputs
+    /// @param aInputsUsed number of inputs actually used for this device. Can be 0 when no usable/mappable input is left in aInputsArr
+    WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevDesc, JsonObjectPtr aOutDesc, JsonObjectPtr aInputsArr, int& aInputsUsed);
     virtual ~WbfDevice();
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
@@ -182,6 +189,10 @@ namespace p44 {
 
     /// handle updated load state
     void handleLoadState(JsonObjectPtr aState, DsBehaviourPtr aBehaviour);
+
+    /// handle button event
+    void handleButtonCmd(JsonObjectPtr aCmd, DsBehaviourPtr aBehaviour);
+
 
   private:
 

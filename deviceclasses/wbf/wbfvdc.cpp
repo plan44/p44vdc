@@ -278,6 +278,7 @@ void WbfVdc::gatewayWebsocketHandler(const string aMessage, ErrorPtr aError)
   JsonObjectPtr part;
   if (msg->get("sensor", part)) {
     if (part->get("id", o)) {
+      // Note: sensor has no nested state or cmd
       PartIdToBehaviourMap::iterator pos = mSensorsMap.find(o->int32Value());
       if (pos!=mSensorsMap.end()) {
         WbfDevice& dev = static_cast<WbfDevice&>(pos->second->getDevice());
@@ -285,9 +286,19 @@ void WbfVdc::gatewayWebsocketHandler(const string aMessage, ErrorPtr aError)
       }
     }
   }
+  if (msg->get("button", part)) {
+    if (part->get("id", o)) {
+      part = part->get("cmd"); // unpack the cmd
+      PartIdToBehaviourMap::iterator pos = mButtonsMap.find(o->int32Value());
+      if (pos!=mButtonsMap.end()) {
+        WbfDevice& dev = static_cast<WbfDevice&>(pos->second->getDevice());
+        dev.handleButtonCmd(part, pos->second);
+      }
+    }
+  }
   else if (msg->get("load", part)) {
     if (part->get("id", o)) {
-      part = part->get("state");
+      part = part->get("state"); // unpack the state
       if (part) {
         PartIdToBehaviourMap::iterator pos = mLoadsMap.find(o->int32Value());
         if (pos!=mLoadsMap.end()) {
@@ -451,9 +462,13 @@ void WbfVdc::learnedInComplete(ErrorPtr aError)
 }
 
 
+// Note from uGateway docs: /api/devices/*: This service takes very long time at the first call!
+//   Approx. 1 second per device. So with 60 devices it takes 1 minute.
+#define WBFAPI_DEVICETREE_TIMEOUT (150*Second)
+
 void WbfVdc::queryDevices(StatusCB aCompletedCB)
 {
-  mWbfComm.apiQuery("/devices/*", boost::bind(&WbfVdc::devicesListHandler, this, aCompletedCB, _1, _2));
+  mWbfComm.apiQuery("/devices/*", boost::bind(&WbfVdc::devicesListHandler, this, aCompletedCB, _1, _2), WBFAPI_DEVICETREE_TIMEOUT);
 }
 
 
@@ -490,12 +505,28 @@ void WbfVdc::loadsStateHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArra
 
 void WbfVdc::sensorsListHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArray, JsonObjectPtr aLoadsArray, JsonObjectPtr aStatesArray, JsonObjectPtr aSensorsArray, ErrorPtr aError)
 {
+  if (Error::isOK(aError)) {
+    mWbfComm.apiQuery("/buttons", boost::bind(&WbfVdc::buttonsListHandler, this, aCompletedCB, aDevicesArray, aLoadsArray, aStatesArray, aSensorsArray, _1, _2));
+    return;
+  }
+  if (aCompletedCB) aCompletedCB(aError);
+}
+
+
+void WbfVdc::buttonsListHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArray, JsonObjectPtr aLoadsArray, JsonObjectPtr aStatesArray, JsonObjectPtr aSensorsArray, JsonObjectPtr aButtonsArray, ErrorPtr aError)
+{
+  if (Error::notOK(aError)) {
+    // could not get buttons list
+    OLOG(LOG_WARNING, "Could not get button list, needs uGateway Firmware >= 6.0.35: %s", aError->text());
+  }
+  // now process the lists
   for(int didx = 0; didx<aDevicesArray->arrayLength(); didx++) {
     JsonObjectPtr devDesc = aDevicesArray->arrayGet(didx);
     JsonObjectPtr o;
     if (!devDesc->get("id", o)) continue; // cannot process device w/o id
     string wbfId = o->stringValue();
-    // process the inputs (sensors, buttons) first, will be passed to first device
+    int subDeviceIndex = 0;
+    // process the inputs (sensors, buttons) first, will be passed to devices to pick from later
     JsonObjectPtr inpArr;
     if (devDesc->get("inputs", inpArr)) {
       for (int iidx = 0; iidx<inpArr->arrayLength(); iidx++) {
@@ -503,14 +534,29 @@ void WbfVdc::sensorsListHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArr
         if (inpDesc->get("sensor", o)) {
           // find the sensor
           long sensorId = o->int32Value();
-          bool foundSensor = false;
           for (int sidx = 0; sidx<aSensorsArray->arrayLength(); sidx++) {
             JsonObjectPtr sensorDesc = aSensorsArray->arrayGet(sidx);
             if (sensorDesc->get("id", o)) {
               if (o->int32Value()==sensorId) {
-                // found the corresponding load, add it to the output description
+                // found the corresponding sensor, add it to the input description
                 inpDesc->add("sensor_info", sensorDesc);
-                foundSensor = true;
+                break;
+              }
+            }
+          }
+        }
+        // Note: as of 6.0.35, buttons do not have a "button":id entry in inputs[],
+        //   need to search in reverse by matching device "id" and "channel"
+        if (aButtonsArray && inpDesc->get("type", o) && o->stringValue()=="button") {
+          // this input index (channel) describes a button
+          // find the button
+          for (int bidx = 0; bidx<aButtonsArray->arrayLength(); bidx++) {
+            JsonObjectPtr buttonDesc = aButtonsArray->arrayGet(bidx);
+            if (buttonDesc->get("device", o) && o->stringValue()==wbfId) {
+              // is a button in the current device, check channel
+              if (buttonDesc->get("channel", o) && o->int32Value()==iidx) {
+                // found the corresponding button, add it to the input description
+                inpDesc->add("button_info", buttonDesc);
                 break;
               }
             }
@@ -519,13 +565,19 @@ void WbfVdc::sensorsListHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArr
       }
     }
     // each output creates a separate device
+    // device decides which and how many inputs to consume
+    int inputsUsed;
     JsonObjectPtr outArr;
     if (devDesc->get("outputs", outArr)) {
       int numOutputs = outArr->arrayLength();
       if (numOutputs==0) {
-        // only inputs, create device for it
-        WbfDevicePtr newDev = new WbfDevice(this, 0, devDesc, nullptr, inpArr);
-        addWbfDevice(newDev);
+        // only inputs, create device(s) for it
+        while (inpArr->arrayLength()>0) {
+          WbfDevicePtr newDev = new WbfDevice(this, subDeviceIndex, devDesc, nullptr, inpArr, inputsUsed);
+          if (inputsUsed==0) break; // do not add devices w/o any input
+          addWbfDevice(newDev);
+          subDeviceIndex++;
+        }
       }
       else {
         for (int oidx = 0; oidx<numOutputs; oidx++) {
@@ -559,15 +611,24 @@ void WbfVdc::sensorsListHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArr
               }
             }
           }
-          if (!foundLoad) continue; // no load, ignore input
+          if (!foundLoad) continue; // no load, ignore output
           // create one device per output
-          WbfDevicePtr newDev = new WbfDevice(this, oidx, devDesc, outDesc, inpArr);
-          addWbfDevice(newDev);
-          // first device gets all inputs, subsequent subdevices (when wbf device has more than one output) get none
-          inpArr.reset();
+          // Device can pick inputs from inpArr, and must delete those it picks!
+          // more devices w/o output are created for additional inputs
+          do {
+            WbfDevicePtr newDev = new WbfDevice(this, subDeviceIndex, devDesc, outDesc, inpArr, inputsUsed);
+            if (inputsUsed==0 && !outDesc) break; // no more mappable inputs, input-only device -> do not add it
+            addWbfDevice(newDev);
+            outDesc.reset(); // forget the output, it is consumed
+            subDeviceIndex++;
+          } while (oidx+1>=numOutputs); // do not repeat (but let the next output pick inputs) when we're not on the last output
         } // for all outputs
       } // device(s) with output(s)
     } // output processing
+    // report unused inputs
+    for (int i=0; i<inpArr->arrayLength(); i++) {
+      OLOG(LOG_INFO, "- Unmapped input: %s", JsonObject::text(inpArr->arrayGet(i)));
+    }
   } // for all devices
   // now that all devices are set up, trigger a complete state update on the websocket
   mWbfComm.sendWebSocketTextMsg("{ \"command\": \"dump_loads\" }");

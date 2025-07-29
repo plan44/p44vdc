@@ -77,6 +77,7 @@ namespace p44 {
     MLTicket mRefindTicket;
     PartIdToBehaviourMap mLoadsMap;
     PartIdToBehaviourMap mSensorsMap;
+    PartIdToBehaviourMap mButtonsMap;
 
     /// @}
 
@@ -176,6 +177,7 @@ namespace p44 {
     void loadsListHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArray, JsonObjectPtr aLoadsArray, ErrorPtr aError);
     void loadsStateHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArray, JsonObjectPtr aLoadsArray, JsonObjectPtr aStatesArray, ErrorPtr aError);
     void sensorsListHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArray, JsonObjectPtr aLoadsArray, JsonObjectPtr aStatesArray, JsonObjectPtr aSensorsArray, ErrorPtr aError);
+    void buttonsListHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArray, JsonObjectPtr aLoadsArray, JsonObjectPtr aStatesArray, JsonObjectPtr aSensorsArray, JsonObjectPtr aButtonsArray, ErrorPtr aError);
 
     bool addWbfDevice(WbfDevicePtr aNewDev);
 

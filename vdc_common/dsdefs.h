@@ -519,7 +519,7 @@ typedef enum {
   sensorFunc_dimmer_area4_onoff = buttonFunc_area4_preset4x, ///< area4 dimmer turning on/off leaving/reaching 0
   sensorFunc_dimmer_room_onoff  = buttonFunc_room_preset1x, ///< room dimmer turning on/off leaving/reaching 0
   sensorFunc_dimmer_global = buttonFunc_apartment, ///< "global" dimmer
-  sensorFunc_app = buttonFunc_app, ///< application specific button
+  sensorFunc_app = buttonFunc_app, ///< application specific sensor/dial
 } VdcSensorFunc;
 
 
