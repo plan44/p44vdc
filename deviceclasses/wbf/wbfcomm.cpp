@@ -52,12 +52,15 @@ const char* WbfCommError::errorName() const
 
 // MARK: - WbfApiOperation
 
-WbfApiOperation::WbfApiOperation(WbfComm &aWbfComm, HttpMethods aMethod, const char* aUrl, JsonObjectPtr aData, WbfApiResultCB aResultHandler) :
+#define WBFAPI_DEFAULT_TIMEOUT (5*Second)
+
+WbfApiOperation::WbfApiOperation(WbfComm &aWbfComm, HttpMethods aMethod, const char* aUrl, JsonObjectPtr aData, WbfApiResultCB aResultHandler, MLMicroSeconds aTimeout) :
   mWbfComm(aWbfComm),
   mMethod(aMethod),
   mUrl(aUrl),
   mData(aData),
   mResultHandler(aResultHandler),
+  mTimeout(aTimeout),
   mCompleted(false)
 {
 }
@@ -82,6 +85,7 @@ bool WbfApiOperation::initiate()
     default : methodStr = "GET"; mData.reset(); break;
   }
   SOLOG(mWbfComm, LOG_INFO, "Sending API request (%s) command: %s: %s", methodStr, mUrl.c_str(), JsonObject::text(mData));
+  mWbfComm.mGatewayAPIComm.setTimeout(mTimeout<=-2 ? WBFAPI_DEFAULT_TIMEOUT : mTimeout);
   mWbfComm.mGatewayAPIComm.jsonRequest(mUrl.c_str(), boost::bind(&WbfApiOperation::processAnswer, this, _1, _2), methodStr, mData);
   // executed
   return inherited::initiate();
@@ -271,13 +275,13 @@ ErrorPtr WbfComm::sendWebSocketJsonMsg(JsonObjectPtr aJsonMessage)
 
 // MARK: - REST API
 
-void WbfComm::apiQuery(const char* aUrlSuffix, WbfApiResultCB aResultHandler)
+void WbfComm::apiQuery(const char* aUrlSuffix, WbfApiResultCB aResultHandler, MLMicroSeconds aTimeout)
 {
-  apiAction(WbfApiOperation::GET, aUrlSuffix, JsonObjectPtr(), aResultHandler);
+  apiAction(WbfApiOperation::GET, aUrlSuffix, JsonObjectPtr(), aResultHandler, aTimeout, false);
 }
 
 
-void WbfComm::apiAction(WbfApiOperation::HttpMethods aMethod, const char* aUrlSuffix, JsonObjectPtr aData, WbfApiResultCB aResultHandler, bool aNoAutoURL)
+void WbfComm::apiAction(WbfApiOperation::HttpMethods aMethod, const char* aUrlSuffix, JsonObjectPtr aData, WbfApiResultCB aResultHandler, MLMicroSeconds aTimeout, bool aNoAutoURL)
 {
   if (!mApiReady && !aNoAutoURL) {
     if (aResultHandler) aResultHandler(JsonObjectPtr(), ErrorPtr(new WbfCommError(WbfCommError::ApiNotReady)));
@@ -290,7 +294,7 @@ void WbfComm::apiAction(WbfApiOperation::HttpMethods aMethod, const char* aUrlSu
     url = string_format("https://%s/api", mResolvedHost.c_str());
     url += nonNullCStr(aUrlSuffix);
   }
-  WbfApiOperationPtr op = new WbfApiOperation(*this, aMethod, url.c_str(), aData, aResultHandler);
+  WbfApiOperationPtr op = new WbfApiOperation(*this, aMethod, url.c_str(), aData, aResultHandler, aTimeout);
   // op->setInitiationDelay(100*MilliSecond, true); // in case we need to tame access, hopefully not
   queueOperation(op);
   // process operations
@@ -359,6 +363,8 @@ bool WbfComm::dnsSdPairingResultHandler(ErrorPtr aError, DnsSdServiceInfoPtr aSe
 #endif // !DISABLE_DISCOVERY
 
 
+#define CLAIM_TIMEOUT (1*Minute)
+
 void WbfComm::claimAccount(StatusCB aPairingResultCB, const string aResolvedHost, const string aHostName)
 {
   JsonObjectPtr claimParams = JsonObject::newObj();
@@ -368,6 +374,7 @@ void WbfComm::claimAccount(StatusCB aPairingResultCB, const string aResolvedHost
     string_format("https://%s/api/account/claim", aResolvedHost.c_str()).c_str(),
     claimParams,
     boost::bind(&WbfComm::claimResultHander, this, aPairingResultCB, aResolvedHost, aHostName, _1, _2),
+    CLAIM_TIMEOUT,
     true // api not yet ready, full url, no auth
   );
 }

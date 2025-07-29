@@ -94,7 +94,7 @@ namespace p44 {
     } HttpMethods;
 
 
-    WbfApiOperation(WbfComm &aWbfComm, HttpMethods aMethod, const char* aUrl, JsonObjectPtr aData, WbfApiResultCB aResultHandler);
+    WbfApiOperation(WbfComm &aWbfComm, HttpMethods aMethod, const char* aUrl, JsonObjectPtr aData, WbfApiResultCB aResultHandler, MLMicroSeconds aTimeout);
     virtual ~WbfApiOperation();
 
     virtual bool initiate();
@@ -111,6 +111,7 @@ namespace p44 {
     bool mCompleted;
     ErrorPtr mError;
     WbfApiResultCB mResultHandler;
+    MLMicroSeconds mTimeout;
 
     void processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError);
 
@@ -157,7 +158,8 @@ namespace p44 {
     /// Query information from the API
     /// @param aUrlSuffix the suffix to append to the baseURL+userName (including leading slash)
     /// @param aResultHandler will be called with the result
-    void apiQuery(const char* aUrlSuffix, WbfApiResultCB aResultHandler);
+    /// @param aTimeout the timeout for the API request. If not set (<=-2), a default API timeout will be used.
+    void apiQuery(const char* aUrlSuffix, WbfApiResultCB aResultHandler, MLMicroSeconds aTimeout = -2);
 
     /// Send information to the API
     /// @param aMethod the HTTP method to use
@@ -165,7 +167,8 @@ namespace p44 {
     /// @param aData the data for the action to perform (JSON body of the request)
     /// @param aResultHandler will be called with the result
     /// @param aNoAutoURL if set, aUrlSuffix must be the complete URL (mResolvedBaseURL and mAPISecret will not be used automatically)
-    void apiAction(WbfApiOperation::HttpMethods aMethod, const char* aUrlSuffix, JsonObjectPtr aData, WbfApiResultCB aResultHandler, bool aNoAutoURL = false);
+    /// @param aTimeout the timeout for the API request. If not set (<=-2), a default API timeout will be used.
+    void apiAction(WbfApiOperation::HttpMethods aMethod, const char* aUrlSuffix, JsonObjectPtr aData, WbfApiResultCB aResultHandler, MLMicroSeconds aTimeout = -2, bool aNoAutoURL = false);
 
     /// @}
 
