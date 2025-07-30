@@ -523,12 +523,23 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
         // - make sure we get a ErrorOK for processed notification, web requests ALWAYS need an answer
         aError = processVdcRequest(mConfigApi, aJsonComm, request, reqid, true);
       }
+      #if P44SCRIPT_REGISTERED_SOURCE
+      else if (apiselector=="debugpoll" && mScriptManager) {
+        // poll debug essentials without this call visible in logs (to avoid log-displays-log loops)
+        JsonObjectPtr debuginfo = mScriptManager->debugPollInfo();
+        // send as JSON string without appearing in logs
+        string s = debuginfo->wrapAs("result")->json_str();
+        s += "\n"; // message terminator
+        aJsonComm->sendRaw(s);
+        return;
+      }
+      #endif // P44SCRIPT_REGISTERED_SOURCE
       #if ENABLE_LEGACY_P44CFGAPI
       else if (apiselector=="p44") {
         // process p44 specific requests
         aError = processP44Request(aJsonComm, request);
       }
-      #endif
+      #endif // ENABLE_LEGACY_P44CFGAPI
       #if ENABLE_P44FEATURES
       else if (apiselector=="featureapi") {
         // p44featured API wrapper
@@ -541,7 +552,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
           featureApi->handleRequest(req);
         }
       }
-      #endif
+      #endif // ENABLE_P44FEATURES
       #if ENABLE_LEDCHAIN
       else if (apiselector=="leddata") {
         // raw LED data for a LED chain
@@ -1311,6 +1322,21 @@ void P44ScriptManager::logCollectHandler(int aLevel, const char *aLinePrefix, co
     mCollectedLogText.erase(0,OVERFLOW_CUT_SIZE);
     mCollectedLogText.insert(0, "\n...overflow - some lines lost...\n");
   }
+}
+
+
+JsonObjectPtr P44ScriptManager::debugPollInfo()
+{
+  debuggerWatchdog(); // polling triggers debugger watchdog
+  JsonObjectPtr debugInfo = JsonObject::newObj();
+  // accumulated log text, clear accumulator
+  debugInfo->add("logtext", JsonObject::newString(mCollectedLogText));
+  mCollectedLogText.clear();
+  // current loglevel
+  debugInfo->add("loglevel", JsonObject::newInt32(LOGLEVEL));
+  // timestamp of latest paused thread
+  debugInfo->add("latestpaused", mPausedThreads.size()>0 ? JsonObject::newInt64(mPausedThreads[0].mPausedAt) : JsonObject::newNull());
+  return debugInfo;
 }
 
 

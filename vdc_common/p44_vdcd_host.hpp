@@ -374,6 +374,9 @@ namespace p44 {
     /// @param aCursor script cursor, if set overrides cursor associated with aResult
     static void setResultAndPosInfo(ApiValuePtr aIntoApiValue, ScriptObjPtr aResult, const SourceCursor* aCursorP = nullptr);
 
+    /// regularily to-be (silently) polled debug info
+    JsonObjectPtr debugPollInfo();
+
   protected:
 
     // property access implementation
