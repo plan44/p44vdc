@@ -78,6 +78,8 @@ namespace p44 {
     PartIdToBehaviourMap mLoadsMap;
     PartIdToBehaviourMap mSensorsMap;
     PartIdToBehaviourMap mButtonsMap;
+    MLTicket mButtonActivationTimeout;
+    VdcApiRequestPtr mButtonActivationRequest;
 
     /// @}
 
@@ -180,6 +182,14 @@ namespace p44 {
     void buttonsListHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArray, JsonObjectPtr aLoadsArray, JsonObjectPtr aStatesArray, JsonObjectPtr aSensorsArray, JsonObjectPtr aButtonsArray, ErrorPtr aError);
 
     bool addWbfDevice(WbfDevicePtr aNewDev);
+
+    void buttonActivationStarted(JsonObjectPtr aResult, ErrorPtr aError);
+    void endButtonActivation();
+
+    void requestButtonActivation(JsonObjectPtr aButtonInfo);
+    void buttonActivated(JsonObjectPtr aResult, ErrorPtr aError);
+    void activatedAndRescanned(ErrorPtr aError);
+
 
     void wbfapicallResponse(VdcApiRequestPtr aRequest, JsonObjectPtr aResult, ErrorPtr aError);
 

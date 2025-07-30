@@ -309,8 +309,20 @@ void WbfVdc::gatewayWebsocketHandler(const string aMessage, ErrorPtr aError)
       }
     }
   }
+  else if (msg->get("findme", part)) {
+    // {"findme":{"button":213}}
+    // {"findme":{"button":{"channel":1,"device":"00014929"}}}
+    if (part->get("button", o)) {
+      requestButtonActivation(o);
+    }
+  }
 }
 
+
+
+
+
+#define WBF_BUTTONACTIVATION_DEFAULT_MINS 2 // Minutes
 
 ErrorPtr WbfVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
@@ -373,6 +385,27 @@ ErrorPtr WbfVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
     if (a) request = JsonApiValue::getAsJson(a); // request data
     mWbfComm.apiAction(m, endpoint.c_str(), request, boost::bind(&WbfVdc::wbfapicallResponse, this, aRequest, _1, _2));
   }
+  else if (aMethod=="buttonActivation") {
+    bool turnOn;
+    respErr = checkBoolParam(aParams, "on", turnOn);
+    if (Error::isOK(respErr)) {
+      if (!turnOn) {
+        endButtonActivation();
+        return Error::ok();
+      }
+      int minutes = WBF_BUTTONACTIVATION_DEFAULT_MINS;
+      ApiValuePtr a = aParams->get("minutes");
+      if (a) minutes = a->int32Value();
+      JsonObjectPtr data = JsonObject::newObj();
+      data->add("on", JsonObject::newBool(turnOn));
+      data->add("color", JsonObject::newString("#FFCC00"));
+      data->add("time", JsonObject::newInt32(minutes));
+      mWbfComm.apiAction(WbfApiOperation::PUT, "/buttons/findme", data, boost::bind(&WbfVdc::buttonActivationStarted, this, _1, _2));
+      // auto-terminate
+      mButtonActivationRequest = aRequest;
+      mButtonActivationTimeout.executeOnce(boost::bind(&WbfVdc::endButtonActivation, this), minutes*Minute);
+    }
+  }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
@@ -387,6 +420,74 @@ void WbfVdc::wbfapicallResponse(VdcApiRequestPtr aRequest, JsonObjectPtr aResult
   if (Error::isOK(aError)) aRequest->sendResult(v);
   else aRequest->sendError(aError);
 }
+
+
+void WbfVdc::buttonActivationStarted(JsonObjectPtr aResult, ErrorPtr aError)
+{
+  if (Error::isOK(aError)) {
+    // mButtonActivationRequest set signals ongoing activation
+    OLOG(LOG_NOTICE, "started button activation");
+  }
+  else if (mButtonActivationRequest) {
+    mButtonActivationRequest->sendError(aError);
+    mButtonActivationRequest.reset();
+  }
+}
+
+
+void WbfVdc::endButtonActivation()
+{
+  mButtonActivationTimeout.cancel();
+  OLOG(LOG_NOTICE, "ending button activation");
+  if (mButtonActivationRequest) {
+    mButtonActivationRequest->sendError(TextError::err("no button activation performed"));
+    mButtonActivationRequest.reset();
+  }
+  mWbfComm.apiAction(WbfApiOperation::PUT, "/buttons/findme", JsonObject::newBool(false)->wrapAs("on"), NoOP);
+}
+
+
+void WbfVdc::requestButtonActivation(JsonObjectPtr aButtonInfo)
+{
+  if (mButtonActivationRequest) {
+    // we are actually waiting for a button activation
+    if (aButtonInfo->isType(json_type_int)) {
+      // {"findme":{"button":213}}
+      // button is already activated
+      mButtonActivationRequest->sendError(TextError::err("button is already activated"));
+      mButtonActivationRequest.reset();
+    }
+    else {
+      // button does not yet have an ID -> activate it
+      // {"findme":{"button":{"channel":1,"device":"00014929"}}}
+      mWbfComm.apiAction(WbfApiOperation::POST, "/smartbuttons", aButtonInfo, boost::bind(&WbfVdc::buttonActivated, this, _1, _2));
+    }
+  }
+}
+
+
+void WbfVdc::buttonActivated(JsonObjectPtr aResult, ErrorPtr aError)
+{
+  if (mButtonActivationRequest) {
+    OLOG(LOG_INFO, "button activation result: %s", JsonObject::text(aResult));
+    // report the status
+    mButtonActivationRequest->sendStatus(aError);
+    mButtonActivationRequest.reset();
+    // stop activation in Wiser
+    endButtonActivation();
+  }
+}
+
+
+void WbfVdc::activatedAndRescanned(ErrorPtr aError)
+{
+  if (mButtonActivationRequest) {
+    OLOG(LOG_INFO, "devices rescanned, status: %s", Error::text(aError));
+    mButtonActivationRequest->sendStatus(aError);
+    mButtonActivationRequest.reset();
+  }
+}
+
 
 
 
