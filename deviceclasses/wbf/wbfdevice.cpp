@@ -310,6 +310,7 @@ WbfDevice::~WbfDevice()
   wbfVdc().unregisterBehaviourMap(wbfVdc().mLoadsMap, getOutput());
   for (int i=0; i<numSensors(); i++) wbfVdc().unregisterBehaviourMap(wbfVdc().mSensorsMap, getSensor(i));
   for (int i=0; i<numInputs(); i++) wbfVdc().unregisterBehaviourMap(wbfVdc().mSensorsMap, getInput(i));
+  for (int i=0; i<numButtons(); i++) wbfVdc().unregisterBehaviourMap(wbfVdc().mButtonsMap, getButton(i));
 }
 
 
