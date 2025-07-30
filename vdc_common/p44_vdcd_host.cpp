@@ -449,7 +449,7 @@ void P44VdcHost::enableConfigApi(const char *aServiceOrPort, bool aNonLocalAllow
   if (!mConfigApi) {
     // can be enabled only once
     mConfigApi = new P44CfgApiConnection(new SocketComm(MainLoop::currentMainLoop()));
-    mConfigApi->setLogLevelOffset(-1); // a bit more quiet by default
+    mConfigApi->setLogLevelOffset(-3); // silent by default
     mConfigApi->mJsonApiServer->setConnectionParams(NULL, aServiceOrPort, SOCK_STREAM, aProtocolFamily);
     mConfigApi->mJsonApiServer->setAllowNonlocalConnections(aNonLocalAllowed);
   }
