@@ -39,6 +39,8 @@ WbfVdc::WbfVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
 
 WbfVdc::~WbfVdc()
 {
+  // release my devices before the maps they are registered in (via behaviours) are gone
+  mDevices.clear();
 }
 
 
