@@ -472,6 +472,8 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
   // when coming from mg44, requests have the following form (peer from mg44 3.9 onwards)
   // - for GET requests like http://localhost:8080/api/json/myuri?foo=bar&this=that
   //   {"method":"GET", "uri":"myuri", "peer":"ip_addr", "uri_params":{"foo":"bar", "this":"that"}}
+  // - for GET requests like http://localhost:8080/api/json/myuri?jsonrq={"foo":"bar","this":"that"}
+  //   {"method":"GET", "uri":"myuri", "peer":"ip_addr", "uri_params":{"jsonrq":"{\"foo\":\"bar\",\"this\":\"that\"}"}}
   // - for POST requests like
   //   curl "http://localhost:8080/api/json/myuri?foo=bar&this=that" --data-ascii "{ \"content\":\"data\", \"important\":false }"
   //   {"method":"POST", "uri":"myuri", "peer":"ip_addr", "uri_params":{"foo":"bar","this":"that"},"data":{"content":"data","important":false}}
@@ -491,10 +493,15 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
     if (!request) {
       // no POST data, try uri_params
       request = aJsonObject->get("uri_params");
+      JsonObjectPtr jsonrq;
+      if (request && request->get("jsonrq", jsonrq)) {
+        // parse JSON request body out of jsonrq cgi param
+        request = JsonObject::objFromText(jsonrq->stringValue().c_str(), -1, &aError);
+      }
     }
     if (!request) {
-      // empty query, that's an error
-      aError = Error::err<P44VdcError>(415, "empty request");
+      // empty request, that's an error (maybe from parsing, then use that)
+      if (Error::isOK(aError)) aError = Error::err<P44VdcError>(415, "empty request");
     }
     else {
       // include the peer into request if we have it
