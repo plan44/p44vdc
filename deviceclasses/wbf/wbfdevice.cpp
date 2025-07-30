@@ -690,22 +690,27 @@ void WbfDevice::handleLoadState(JsonObjectPtr aState, DsBehaviourPtr aBehaviour)
 
 bool WbfDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
+  const char *colorediconname = "wbf";
   const char *iconname = NULL;
   if (getOutput()) {
+    iconname = nullptr;
     switch (getOutput()->getOutputFunction()) {
-      case outputFunction_colordimmer: iconname = "wbf"; break;
+      case outputFunction_colordimmer: iconname = "wbf_color"; break;
       case outputFunction_ctdimmer: iconname = "wbf_ct"; break;
-      default: iconname = "wbf"; break;
+      case outputFunction_dimmer:
+        if (getOutput()->isMember(group_yellow_light)) iconname = "wbf_dim";
+        break;
+      case outputFunction_positional: iconname = "wbf_motor"; break;
+      default: break;
     }
   }
   else {
-    if (numButtons()>0) iconname = "wbf_btn";
+    if (numButtons()>0) colorediconname = "wbf_btn";
     else if (numSensors()>0 || numInputs()>0) iconname = "wbf_sens";
   }
-  if (iconname && getIcon(iconname, aIcon, aWithData, aResolutionPrefix))
-    return true;
-  else
-    return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
+  if (iconname && getIcon(iconname, aIcon, aWithData, aResolutionPrefix)) return true;
+  if (getClassColoredIcon(colorediconname, getDominantColorClass(), aIcon, aWithData, aResolutionPrefix)) return true;
+  return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
 }
 
 

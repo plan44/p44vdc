@@ -65,10 +65,8 @@ const char *WbfVdc::vdcClassIdentifier() const
 
 bool WbfVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (getIcon("vdc_wbf", aIcon, aWithData, aResolutionPrefix))
-    return true;
-  else
-    return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
+  if (getIcon("vdc_wbf", aIcon, aWithData, aResolutionPrefix)) return true;
+  return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
 }
 
 
