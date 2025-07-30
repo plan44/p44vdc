@@ -173,7 +173,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::DnsSdLookup);
   #endif
   #endif // P44SCRIPT_FULL_SUPPORT
-  #endif
+  #endif // ENABLE_P44SCRIPT
   // remember singleton's address
   assert(sharedVdcHostP==nullptr); // must not already exist!
   sharedVdcHostP = this;
@@ -184,7 +184,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
     // create it
     mLocalController = LocalControllerPtr(new LocalController(*this));
   }
-  #endif
+  #endif // ENABLE_LOCALCONTROLLER
   // initialize real time jump detection as early as possible (to catch changes happening during initialisation)
   mTimeOfDayDiff = Infinite;
   checkTimeOfDayChange(); // will not post a event when timeOfDayDiff is Infinite
@@ -198,6 +198,10 @@ VdcHost::~VdcHost()
   #if ENABLE_LOCALCONTROLLER
   if (mLocalController) mLocalController.reset();
   #endif
+  // release the devices first, for those that refer to their vdcs, but are not owned by them
+  mDSDevices.clear();
+  // then release the vdcs
+  mVdcs.clear();
 }
 
 
@@ -212,7 +216,7 @@ LocalControllerPtr VdcHost::getLocalController()
 {
   return mLocalController;
 }
-#endif
+#endif // ENABLE_LOCALCONTROLLER
 
 
 void VdcHost::setEventMonitor(VdchostEventCB aEventCB)
