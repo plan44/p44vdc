@@ -53,7 +53,7 @@ void WbfVdc::setLogLevelOffset(int aLogLevelOffset)
 
 P44LoggingObj* WbfVdc::getTopicLogObject(const string aTopic)
 {
-  if (aTopic=="wbfcomm") return &mWbfComm;
+  if (uequals(aTopic,"wbfcomm")) return &mWbfComm;
   // unknown at this level
   return inherited::getTopicLogObject(aTopic);
 }

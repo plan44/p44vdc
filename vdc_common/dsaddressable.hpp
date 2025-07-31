@@ -94,6 +94,7 @@ namespace p44 {
     virtual bool isPublicDS();
 
     #if ENABLE_JSONBRIDGEAPI
+
     /// @return true if addressable can and should be bridged
     virtual bool bridgeable() { return false; } // by default, bridging an addressable is not enabled
 
@@ -104,14 +105,14 @@ namespace p44 {
     /// @return non-empty string if there is a bridging hint keyword that will be exposed as x-p44-bridgeAs.
     virtual string bridgeAsHint() { return ""; } // by default, devices do not have a bridging hint
 
-    #endif
-
-    #if ENABLE_JSONBRIDGEAPI
     /// @return true if addressable is currently bridged
     bool isBridged() { return mBridged; }
+
     #else
+
     bool isBridged() { return false; } // for simplicity, this is available even if bridging support is not compiled in
-    #endif
+
+    #endif // !ENABLE_JSONBRIDGEAPI
 
     /// called when vdsm acknowledges announcement of this addressable. Can be used in subclasses to
     /// re-trigger pushing sensor values etc.

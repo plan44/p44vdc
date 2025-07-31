@@ -45,7 +45,7 @@ void ZfVdc::setLogLevelOffset(int aLogLevelOffset)
 
 P44LoggingObj* ZfVdc::getTopicLogObject(const string aTopic)
 {
-  if (aTopic=="zfcomm") return &mZfComm;
+  if (uequals(aTopic,"zfcomm")) return &mZfComm;
   // unknown at this level
   return inherited::getTopicLogObject(aTopic);
 }

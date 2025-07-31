@@ -60,7 +60,7 @@ Ds485Vdc::~Ds485Vdc()
 
 P44LoggingObj* Ds485Vdc::getTopicLogObject(const string aTopic)
 {
-  if (aTopic=="ds485comm") return &mDs485Comm;
+  if (uequals(aTopic,"ds485comm")) return &mDs485Comm;
   // unknown at this level
   return inherited::getTopicLogObject(aTopic);
 }

@@ -254,7 +254,7 @@ ErrorPtr DsAddressable::handleMethod(VdcApiRequestPtr aRequest, const string &aM
       P44LoggingObj* loggingobj = this; // default to myself
       if ((o = aParams->get("topic"))) {
         string topic = o->stringValue();
-        loggingobj = getTopicLogObject(topic);
+        loggingobj = Application::sharedApplication()->getTopicLogObject(topic);
         if (!loggingobj) respErr = Error::err<VdcApiError>(405, "unknown logging topic '%s'", topic.c_str());
       }
       if (Error::isOK(respErr)) {

@@ -1197,19 +1197,19 @@ ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMet
 P44LoggingObj* P44VdcHost::getTopicLogObject(const string aTopic)
 {
   #if ENABLE_JSONCFGAPI
-  if (aTopic=="cfgapi") return mConfigApi.get();
+  if (uequals(aTopic,"cfgapi")) return mConfigApi.get();
   #endif
   #if ENABLE_JSONBRIDGEAPI
-  if (aTopic=="bridgeapi") return mBridgeApi.get();
+  if (uequals(aTopic,"bridgeapi")) return mBridgeApi.get();
   #endif
   #if ENABLE_UBUS
-  if (aTopic=="ubusapi") return mUbusApiServer.get();
+  if (uequals(aTopic,"ubusapi")) return mUbusApiServer.get();
   #endif
   #if P44SCRIPT_REGISTERED_SOURCE
-  if (aTopic=="scriptmanager") return mScriptManager.get();
+  if (uequals(aTopic,"scriptmanager")) return mScriptManager.get();
   #endif
   #if ENABLE_LVGL
-  if (aTopic=="lvgl") return &LvGL::lvgl();
+  if (uequals(aTopic,"lvgl")) return &LvGL::lvgl();
   #endif
   // unknown at this level
   return inherited::getTopicLogObject(aTopic);

@@ -475,13 +475,13 @@ void VdcHost::checkTimeOfDayChange()
 
 P44LoggingObj* VdcHost::getTopicLogObject(const string aTopic)
 {
-  if (aTopic=="vdsmapi") return getVdsmSessionConnection().get();
+  if (uequals(aTopic,"vdsmapi")) return getVdsmSessionConnection().get();
   #if ENABLE_LOCALCONTROLLER
-  if (aTopic=="localcontroller") return mLocalController.get();
+  if (uequals(aTopic,"localcontroller")) return mLocalController.get();
   #endif
   #if P44SCRIPT_FULL_SUPPORT
-  if (aTopic=="p44script") return &StandardScriptingDomain::sharedDomain();
-  if (aTopic=="mainscript") return &mMainScriptLogger;
+  if (uequals(aTopic,"p44script")) return &StandardScriptingDomain::sharedDomain();
+  if (uequals(aTopic,"mainscript")) return &mMainScriptLogger;
   #endif
   // unknown at this level
   return inherited::getTopicLogObject(aTopic);

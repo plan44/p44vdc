@@ -71,7 +71,7 @@ void DaliVdc::setLogLevelOffset(int aLogLevelOffset)
 
 P44LoggingObj* DaliVdc::getTopicLogObject(const string aTopic)
 {
-  if (aTopic=="dalicomm") return &mDaliComm;
+  if (uequals(aTopic,"dalicomm")) return &mDaliComm;
   // unknown at this level
   return inherited::getTopicLogObject(aTopic);
 }

@@ -98,7 +98,7 @@ void LedChainVdc::setLogLevelOffset(int aLogLevelOffset)
 
 P44LoggingObj* LedChainVdc::getTopicLogObject(const string aTopic)
 {
-  if (aTopic=="ledarrangement") return mLedArrangement.get();
+  if (uequals(aTopic,"ledarrangement")) return mLedArrangement.get();
   // unknown at this level
   return inherited::getTopicLogObject(aTopic);
 }
