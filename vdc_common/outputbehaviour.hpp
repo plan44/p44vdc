@@ -401,6 +401,7 @@ namespace p44 {
     public:
       OutputObj(OutputBehaviourPtr aOutput);
       virtual string getAnnotation() const P44_OVERRIDE { return "device output"; };
+      virtual P44LoggingObj* loggingContext() const P44_OVERRIDE { return mOutput.get(); };
       OutputBehaviourPtr output() { return mOutput; }
     };
 

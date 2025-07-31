@@ -860,6 +860,7 @@ namespace p44 {
     public:
       DeviceObj(DevicePtr aDevice);
       virtual string getAnnotation() const P44_OVERRIDE { return "device"; };
+      virtual P44LoggingObj* loggingContext() const P44_OVERRIDE { return mDevice.get(); };
       DevicePtr device() { return mDevice; };
     };
 
