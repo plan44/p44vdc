@@ -483,6 +483,11 @@ P44LoggingObj* VdcHost::getTopicLogObject(const string aTopic)
   if (uequals(aTopic,"p44script")) return &StandardScriptingDomain::sharedDomain();
   if (uequals(aTopic,"mainscript")) return &mMainScriptLogger;
   #endif
+  // also look up in vdcs
+  for(VdcMap::iterator pos = mVdcs.begin(); pos!=mVdcs.end(); ++pos) {
+    P44LoggingObj* loggingObjP = pos->second->getTopicLogObject(aTopic);
+    if (loggingObjP) return loggingObjP;
+  }
   // unknown at this level
   return inherited::getTopicLogObject(aTopic);
 }
