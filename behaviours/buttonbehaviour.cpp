@@ -893,7 +893,7 @@ void ButtonBehaviour::sendAction(VdcButtonActionMode aActionMode, uint8_t aActio
 
 string ButtonBehaviour::clickTypeName(DsClickType aClickType)
 {
-  if (aClickType<=ct_tip_1x) return string_format("tip_%dx", aClickType+1-ct_tip_1x);
+  if (aClickType<=ct_tip_4x) return string_format("tip_%dx", aClickType+1-ct_tip_1x);
   if (aClickType==ct_hold_start) return "hold";
   if (aClickType==ct_hold_repeat) return "keep_holding";
   if (aClickType==ct_hold_end) return "release";
