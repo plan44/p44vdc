@@ -20,6 +20,13 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
+// File scope debugging options
+// - Set ALWAYS_DEBUG to 1 to enable DBGLOG output even in non-DEBUG builds of this file
+#define ALWAYS_DEBUG 0
+// - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
+//   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
+#define FOCUSLOGLEVEL 6
+
 #include "wbfdevice.hpp"
 
 #if ENABLE_WBF
@@ -207,6 +214,7 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
       }
       if (getOutput()) {
         aVdcP->mLoadsMap[mLoadId] = getOutput();
+        FOCUSOLOG("registered load id %d in loadsMap", mLoadId);
       }
     }
   } // output
@@ -552,6 +560,7 @@ void WbfDevice::syncChannelValues(SimpleCB aDoneCB)
 
 void WbfDevice::loadStateReceived(SimpleCB aDoneCB, JsonObjectPtr aLoadStateResult, ErrorPtr aError)
 {
+  FOCUSOLOG("received load state query result: error=%s, result=%s", Error::text(aError), JsonObject::text(aLoadStateResult));
   if (aLoadStateResult && Error::isOK(aError)) {
     mLastSeen = MainLoop::now(); // receiving state means seen now
     // extract the current channel values
@@ -567,7 +576,8 @@ void WbfDevice::loadStateReceived(SimpleCB aDoneCB, JsonObjectPtr aLoadStateResu
 
 void WbfDevice::handleSensorState(JsonObjectPtr aState, DsBehaviourPtr aBehaviour)
 {
-  mLastSeen = MainLoop::now(); // receiving state means seen now
+  FOCUSOLOG("received sensor state: %s for behaviour '%s'", JsonObject::text(aState), aBehaviour->behaviourTypeIdentifier());
+  mLastSeen = MainLoop::now(); // receiving sensor state means seen now
   JsonObjectPtr o;
   // {"id":177,"value":27.7}
   BinaryInputBehaviourPtr ib = dynamic_pointer_cast<BinaryInputBehaviour>(aBehaviour);
@@ -591,7 +601,8 @@ void WbfDevice::handleSensorState(JsonObjectPtr aState, DsBehaviourPtr aBehaviou
 
 void WbfDevice::handleButtonCmd(JsonObjectPtr aCmd, DsBehaviourPtr aBehaviour)
 {
-  OLOG(LOG_INFO, "received button cmd: %s", JsonObject::text(aCmd));
+  FOCUSOLOG("received button cmd: %s for behaviour '%s'", JsonObject::text(aCmd), aBehaviour->behaviourTypeIdentifier());
+  mLastSeen = MainLoop::now(); // receiving button command means seen now
   JsonObjectPtr o;
   if (aCmd->get("event", o)) {
     // TODO: maybe there are also multi-clicks and press&hold?
@@ -616,6 +627,7 @@ void WbfDevice::handleButtonCmd(JsonObjectPtr aCmd, DsBehaviourPtr aBehaviour)
 
 void WbfDevice::handleLoadState(JsonObjectPtr aState, DsBehaviourPtr aBehaviour)
 {
+  FOCUSOLOG("received load state: %s for behaviour '%s'", JsonObject::text(aState), aBehaviour->behaviourTypeIdentifier());
   mLastSeen = MainLoop::now(); // receiving state means seen now
   JsonObjectPtr o;
   // {"bri":500,"flags":{"short_circuit":0,"fading":1,"noise":0,"direction":0,"rx_error":0}}
@@ -624,6 +636,7 @@ void WbfDevice::handleLoadState(JsonObjectPtr aState, DsBehaviourPtr aBehaviour)
     ChannelBehaviourPtr mainChannel = ob->getChannelByType(channeltype_default);
     double mainValue = 0;
     if (aState->get("bri", o)) mainValue = o->doubleValue()/100; // value is in 0..10000 range for 0..100%
+    FOCUSOLOG("- mainvalue from 'bri' = %.1f, channel '%s' %s apply pending", mainValue, mainChannel->getName(), mainChannel->needsApplying() ? "HAS" : "no");
     // check details
     ShadowBehaviourPtr sb = dynamic_pointer_cast<ShadowBehaviour>(aBehaviour);
     if (sb) {
@@ -734,6 +747,7 @@ string WbfDevice::description()
 {
   string s = inherited::description();
   string_format_append(s, "\n- wiser device ID: %s", mWbfId.c_str());
+  if (mLoadId>=0) string_format_append(s, "\n- output load id: %d", mLoadId);
   return s;
 }
 

@@ -20,6 +20,13 @@
 //  along with p44vdc. If not, see <http://www.gnu.org/licenses/>.
 //
 
+// File scope debugging options
+// - Set ALWAYS_DEBUG to 1 to enable DBGLOG output even in non-DEBUG builds of this file
+#define ALWAYS_DEBUG 0
+// - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
+//   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
+#define FOCUSLOGLEVEL 6
+
 #include "wbfvdc.hpp"
 
 #if ENABLE_WBF
@@ -278,38 +285,50 @@ void WbfVdc::gatewayWebsocketHandler(const string aMessage, ErrorPtr aError)
   JsonObjectPtr part;
   if (msg->get("sensor", part)) {
     if (part->get("id", o)) {
+      int id = o->int32Value();
       // Note: sensor has no nested state or cmd
-      PartIdToBehaviourMap::iterator pos = mSensorsMap.find(o->int32Value());
+      PartIdToBehaviourMap::iterator pos = mSensorsMap.find(id);
       if (pos!=mSensorsMap.end()) {
         WbfDevice& dev = static_cast<WbfDevice&>(pos->second->getDevice());
         dev.handleSensorState(part, pos->second);
+      }
+      else {
+        OLOG(LOG_WARNING, "sensor id %d not found in sensorsMap[%zd] -> cannot report", id, mSensorsMap.size())
       }
     }
   }
   if (msg->get("button", part)) {
     if (part->get("id", o)) {
+      int id = o->int32Value();
       part = part->get("cmd"); // unpack the cmd
-      PartIdToBehaviourMap::iterator pos = mButtonsMap.find(o->int32Value());
+      PartIdToBehaviourMap::iterator pos = mButtonsMap.find(id);
       if (pos!=mButtonsMap.end()) {
         WbfDevice& dev = static_cast<WbfDevice&>(pos->second->getDevice());
         dev.handleButtonCmd(part, pos->second);
       }
+      else {
+        OLOG(LOG_WARNING, "button id %d not found in buttonsMap[%zd] -> cannot report", id, mButtonsMap.size())
+      }
     }
   }
-  else if (msg->get("load", part)) {
+  if (msg->get("load", part)) {
     if (part->get("id", o)) {
       part = part->get("state"); // unpack the state
       if (part) {
-        PartIdToBehaviourMap::iterator pos = mLoadsMap.find(o->int32Value());
+        int id = o->int32Value();
+        PartIdToBehaviourMap::iterator pos = mLoadsMap.find(id);
         if (pos!=mLoadsMap.end()) {
           WbfDevice& dev = static_cast<WbfDevice&>(pos->second->getDevice());
           dev.handleLoadState(part, pos->second);
           dev.getOutput()->reportOutputState();
         }
+        else {
+          OLOG(LOG_WARNING, "load id %d not found in loadsMap[%zd] -> cannot report", id, mLoadsMap.size())
+        }
       }
     }
   }
-  else if (msg->get("findme", part)) {
+  if (msg->get("findme", part)) {
     // {"findme":{"button":213}}
     // {"findme":{"button":{"channel":1,"device":"00014929"}}}
     if (part->get("button", o)) {
