@@ -212,10 +212,6 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
           addBehaviour(sb);
         }
       }
-      if (getOutput()) {
-        aVdcP->mLoadsMap[mLoadId] = getOutput();
-        FOCUSOLOG("registered load id %d in loadsMap", mLoadId);
-      }
     }
   } // output
   if (!getOutput()) {
@@ -248,7 +244,7 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
               sb->setGroup(sensorDesc->group);
               sb->setHardwareName(inputDesc);
               if (namesFound==0) { defaultName = inputDesc; namesFound++; }
-              aVdcP->mSensorsMap[sensorId] = sb;
+              mPendingInputMappings[sensorId] = sb;
               addBehaviour(sb);
               aInputsArr->arrayDel(iidx); // delete this input from the list
               aInputsUsed++; // count it
@@ -260,7 +256,7 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
               ib->setGroup(sensorDesc->group);
               ib->setHardwareName(inputDesc);
               if (namesFound==0) { defaultName = inputDesc; namesFound++; }
-              aVdcP->mSensorsMap[sensorId] = ib;
+              mPendingInputMappings[sensorId] = ib;
               addBehaviour(ib);
               aInputsArr->arrayDel(iidx); // delete this input from the list
               aInputsUsed++; // count it
@@ -285,7 +281,8 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
           bb->setFunction(buttonFunc_app); // ...but only as app button
           bb->setHardwareName(bty==buttonType_2way ? "up" : "button");
           if (namesFound==0) { defaultName = inputDesc; namesFound++; }
-          aVdcP->mButtonsMap[buttonId] = bb; // this is the primary behaviour, secondary button, if any, does not need to be registered
+          // this is the primary behaviour, secondary button, if any, does not need to be registered
+          mPendingInputMappings[buttonId] = bb;
           addBehaviour(bb);
           if (bty==buttonType_2way) {
             // need the other half, add the "down" element
@@ -352,7 +349,28 @@ WbfComm &WbfDevice::wbfComm()
 
 void WbfDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
-  // TODO: maybe we need stuff here?
+  // only now, when we are actually added to the vdc, register behaviours for websocket callbacks
+  // Note: we can't do that at creation, because when our device is later recognized as a duplicate
+  //   of an already existing device, it MUST NOT yet have overwritten that device's mappings!
+  //   (because then the duplicate will get discarded)
+  // - loads
+  if (getOutput()) {
+    wbfVdc().mLoadsMap[mLoadId] = getOutput();
+    FOCUSOLOG("registered load id %d in loadsMap", mLoadId);
+  }
+  // - inputs (sensors and buttons)
+  for (PartIdToBehaviourMap::iterator pos = mPendingInputMappings.begin(); pos!=mPendingInputMappings.end(); ++pos) {
+    DsBehaviour* bP = pos->second.get();
+    if (dynamic_cast<ButtonBehaviour*>(bP)) {
+      wbfVdc().mButtonsMap[pos->first] = bP;
+      FOCUSPOLOG(bP, "registered id %d in buttonsMap", pos->first);
+    }
+    if (dynamic_cast<SensorBehaviour*>(bP) || dynamic_cast<BinaryInputBehaviour*>(bP)) {
+      wbfVdc().mSensorsMap[pos->first] = bP;
+      FOCUSPOLOG(bP, "registered id %d in sensorsMap", pos->first);
+    }
+  }
+  mPendingInputMappings.clear();
   aCompletedCB(ErrorPtr());
 }
 

@@ -56,6 +56,9 @@ namespace p44 {
   } WbfSensorTypeInfo;
 
 
+  typedef std::map<int, DsBehaviourPtr> PartIdToBehaviourMap;
+
+
   typedef boost::intrusive_ptr<WbfDevice> WbfDevicePtr;
   class WbfDevice : public Device
   {
@@ -64,7 +67,7 @@ namespace p44 {
 
     // information from the device itself
     string mWbfId; ///< the ID of the entire device
-    int mLoadId; ///< the load ID
+    int mLoadId; ///< the load ID, -1 if none
     uint8_t mSubDeviceIndex; ///< subdevice index when creating multiple p44 devices from one wbf device
     string mWbfCommNames; ///< the commerical name(s) of the device's module(s)
     string mWbfCommRefs; ///< the commercial reference(s) of the device's module(s)
@@ -72,6 +75,8 @@ namespace p44 {
     MLMicroSeconds mLastSeen; ///< when seen last time
     bool mHasWhiteChannel; ///< set when connected light is RGBW (vs. only RGB)
     MLTicket mIdentifyTicket;
+
+    PartIdToBehaviourMap mPendingInputMappings; ///< temporary input mappings to be applied at initializeDevice()
 
   public:
 

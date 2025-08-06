@@ -32,6 +32,7 @@
 #include "wbfcomm.hpp"
 #include "vdc.hpp"
 #include "dsbehaviour.hpp"
+#include "wbfdevice.hpp"
 
 using namespace std;
 
@@ -57,8 +58,6 @@ namespace p44 {
   {
     typedef Vdc inherited;
     friend class WbfDevice;
-
-    typedef std::map<int, DsBehaviourPtr> PartIdToBehaviourMap;
 
     WbfPersistence mDb;
 

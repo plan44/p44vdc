@@ -31,7 +31,6 @@
 
 #if ENABLE_WBF
 
-#include "wbfdevice.hpp"
 #include "jsonvdcapi.hpp"
 
 using namespace p44;
