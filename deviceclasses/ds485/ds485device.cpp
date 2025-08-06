@@ -362,7 +362,7 @@ void Ds485Device::trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForD
 }
 
 
-#define SCENE_APPLY_RESULT_SAMPLE_DELAY (0.5*Second)
+#define SCENE_APPLY_RESULT_SAMPLE_DELAY (3*Second)
 
 void Ds485Device::traceSceneCall(SceneNo aSceneNo)
 {
