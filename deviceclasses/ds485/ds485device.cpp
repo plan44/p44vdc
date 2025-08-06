@@ -168,7 +168,7 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
         // forward to button, if any
         ButtonBehaviourPtr b = getButton(0);
         if (b) {
-          OLOG(LOG_NOTICE, "dS device button click received: clicktype=%d", aClickType);
+          OLOG(LOG_NOTICE, "dS device button click received: clicktype=%s", ButtonBehaviour::clickTypeName(aClickType).c_str());
           b->injectClick(aClickType);
         }
         break;
@@ -336,6 +336,7 @@ void Ds485Device::trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForD
     // update local scene's value
     SceneDeviceSettingsPtr scenes = getScenes();
     if (scenes && mTracedScene!=INVALID_SCENE_NO) {
+      OLOG(LOG_INFO, "tracing scene '%s' ongoing - store new channel value if applicable", VdcHost::sceneText(mTracedScene, false).c_str());
       DsScenePtr scene = scenes->getScene(mTracedScene);
       if (scene && !scene->isDontCare()) {
         SceneCmd c = scene->mSceneCmd;
@@ -346,11 +347,12 @@ void Ds485Device::trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForD
           c==scene_cmd_max
         ) {
           // traced channel value originates from this scene -> update local value
+          POLOG(aChannelOrNullForDefault, LOG_INFO, "updating value to %.1f in scene '%s'", newValue, VdcHost::sceneText(mTracedScene, false).c_str());
           scene->setSceneValue(aChannelOrNullForDefault->getChannelIndex(), newValue);
           mCachedScenes[mTracedScene] = true; // we are in sync now
           if (scene->isDirty()) {
             scenes->updateScene(scene);
-            POLOG(aChannelOrNullForDefault, LOG_NOTICE, "updated in scene %s to new value %.1f", VdcHost::sceneText(mTracedScene, false).c_str(), newValue);
+            POLOG(aChannelOrNullForDefault, LOG_NOTICE, "changed to new value %.1f in scene '%s'", newValue, VdcHost::sceneText(mTracedScene, false).c_str());
           }
         }
       }
@@ -365,6 +367,7 @@ void Ds485Device::trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForD
 void Ds485Device::traceSceneCall(SceneNo aSceneNo)
 {
   if (mCachedScenes[aSceneNo]) {
+    OLOG(LOG_INFO, "traceSceneCall '%s': taking scene value from cache to adjust local output channels", VdcHost::sceneText(aSceneNo, false).c_str());
     // we have the output value(s) cached that have been invoked with this scene
     // -> just simulate scene call to have our channel values adjusted
     mUpdatingCache = true; // prevent actual output update
@@ -374,6 +377,7 @@ void Ds485Device::traceSceneCall(SceneNo aSceneNo)
   else {
     // we do not yet have a cached value
     // -> wait a little for output to settle, then read back current value from device
+    OLOG(LOG_INFO, "traceSceneCall '%s': output values not yet cached, schedule output value sampling", VdcHost::sceneText(aSceneNo, false).c_str());
     mTracingTimer.executeOnce(boost::bind(&Ds485Device::startTracingFor, this, aSceneNo), SCENE_APPLY_RESULT_SAMPLE_DELAY);
   }
 }
@@ -437,7 +441,7 @@ void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string a
       if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, scene))==0) return;
       if (invalidate) {
         mCachedScenes[scene] = false;
-        OLOG(LOG_NOTICE, "scene %s saved -> trigger updating chache", VdcHost::sceneText(mTracedScene, false).c_str());
+        OLOG(LOG_NOTICE, "scene '%s' saved -> trigger updating chache", VdcHost::sceneText(mTracedScene, false).c_str());
         // traceSceneCall will need to actually trace down the current, now saved value
       }
       traceSceneCall(scene);
@@ -460,6 +464,7 @@ void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string a
 void Ds485Device::startTracingFor(SceneNo aSceneNo)
 {
   // trigger request for current value
+  OLOG(LOG_INFO, "query output values for updating scene '%s'", VdcHost::sceneText(aSceneNo, false).c_str());
   mTracedScene = aSceneNo;
   requestOutputValueUpdate();
   // - traceChannelChange will get the actual scene value
