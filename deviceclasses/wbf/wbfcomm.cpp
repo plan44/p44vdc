@@ -418,9 +418,11 @@ void WbfComm::refindGateway(StatusCB aFindingResultCB)
   }
   else {
     #if DISABLE_DISCOVERY
+    mSearchTicket.cancel();
     aFindingResultCB(Error::err<WbfCommError>(WbfCommError::NotPaired, "No DNS-SD, must specify fixed gateway IP or hostname"));
     #else
     if (mDNSSDHostName.empty()) {
+      mSearchTicket.cancel();
       aFindingResultCB(Error::err<WbfCommError>(WbfCommError::NotPaired, "No gateway paired"));
     }
     else {
@@ -454,6 +456,7 @@ bool WbfComm::dnsSdRefindResultHandler(ErrorPtr aError, DnsSdServiceInfoPtr aSer
     return false; // stop searching
   }
   else {
+    mSearchTicket.cancel();
     FOCUSOLOG("discovery ended, error = %s (usually: allfornow)", aError->text());
     return false; // do not continue DNS-SD search
   }
@@ -464,6 +467,7 @@ bool WbfComm::dnsSdRefindResultHandler(ErrorPtr aError, DnsSdServiceInfoPtr aSer
 
 void WbfComm::foundGateway(StatusCB aFindingResultCB)
 {
+  mSearchTicket.cancel();
   ErrorPtr err;
   if (mApiSecret.empty()) {
     err = Error::err<WbfCommError>(WbfCommError::NotPaired, "gateway @ %s is not paired", mResolvedHost.c_str());
