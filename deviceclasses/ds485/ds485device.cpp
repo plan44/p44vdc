@@ -45,11 +45,12 @@
 using namespace p44;
 
 
-Ds485Device::Ds485Device(Ds485Vdc *aVdcP, DsUid& aDsmDsUid, uint16_t aDevId) :
+Ds485Device::Ds485Device(Ds485Vdc *aVdcP, DsUid& aDsmDsUid, uint16_t aDevId, DsZoneID aZoneId) :
   inherited((Vdc *)aVdcP),
   mDs485Vdc(*aVdcP),
   mDsmDsUid(aDsmDsUid),
   mDevId(aDevId),
+  mDS485ZoneId(aZoneId),
   mIsPresent(false),
   mNumOPC(0),
   mUpdatingCache(false),
@@ -126,6 +127,11 @@ bool Ds485Device::getDeviceIcon(string &aIcon, bool aWithData, const char *aReso
 
 void Ds485Device::addedAndInitialized()
 {
+  // re-apply the zoneID we got from DS now, overriding possibly different zoneID from local persistence
+  if (mDS485ZoneId!=getZoneID()) {
+    OLOG(LOG_WARNING, "ds485 scanning changes zoneId from %d to %d", getZoneID(), mDS485ZoneId);
+    setZoneID(mDS485ZoneId);
+  }
   updatePresenceState(mIsPresent);
   // request output states
   requestOutputValueUpdate();

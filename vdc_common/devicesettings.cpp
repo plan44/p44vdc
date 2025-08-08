@@ -84,7 +84,7 @@ void DeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
   inherited::loadFromRow(aRow, aIndex, aCommonFlagsP);
   // get the field value
   uint64_t flags = aRow->getCastedWithDefault<uint64_t, long long int>(aIndex++, 0);
-  mDevice.initializeName(nonNullCStr(aRow->get<const char *>(aIndex++))); // do not propagate to HW!
+  mDevice.initializeName(nonNullCStr(aRow->get<const char *>(aIndex++)), true); // do not propagate to HW! do not clear already set names!
   aRow->getCastedIfNotNull<DsZoneID, int>(aIndex++, mZoneID);
   // decode my own flags
   #if ENABLE_JSONBRIDGEAPI

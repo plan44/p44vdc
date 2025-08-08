@@ -144,9 +144,11 @@ namespace p44 {
     virtual void setName(const string &aName);
 
     /// initialize user assignable name with a default name or a name obtained from hardware
+    /// @param aName the name to set
+    /// @param aNoClear if set, and aName is empty, do not overwrite a possibly already existing name
     /// @note use setName to change a name from the API or UI, as initializeName() does not
     ///   propagate to hardware
-    void initializeName(const string &aName);
+    void initializeName(const string &aName, bool aNoClear = false);
 
     /// report that this addressable has vanished (temporarily or permanently disconnected)
     /// @note only addressables that have been announced on the vDC API will send a vanish message

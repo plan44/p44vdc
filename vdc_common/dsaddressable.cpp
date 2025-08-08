@@ -82,10 +82,11 @@ void DsAddressable::setName(const string &aName)
 }
 
 
-void DsAddressable::initializeName(const string &aName)
+void DsAddressable::initializeName(const string &aName, bool aNoClear)
 {
-  // just assign
-  mName = aName;
+  if (!aName.empty() || !aNoClear) {
+    mName = aName;
+  }
 }
 
 

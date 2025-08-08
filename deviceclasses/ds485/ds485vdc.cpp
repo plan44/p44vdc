@@ -561,7 +561,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             outMode, ltMode,
             groups, activeGroup, defaultGroup
           );
-          Ds485DevicePtr dev = new Ds485Device(this, dsmDsuid, devId);
+          Ds485DevicePtr dev = new Ds485Device(this, dsmDsuid, devId, zoneId);
           dev->mIsPresent = active;
           // make a real dSUID out of it
           dev->mDSUID.setAsDSId(dSUID.getBinary().substr(12, 4));
@@ -649,8 +649,11 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           else {
             dev->installSettings();
           }
-          // - zoneid (needs instantiated settings)
-          dev->setZoneID(zoneId);
+          // - propagate initial zoneid (needs instantiated settings)
+          //   Note: provisionally only to have the right ID from start,
+          //   will be overwritten with zone as set in DB if devices is already known,
+          //   so we need to update it later again
+          dev->setZoneID(dev->mDS485ZoneId);
           // - button info
           //   Note: DS does have terminal blocks with multiple button inputs, but these are represented as multiple devices on the bus
           bool hasButton = true; // most dS blocks do

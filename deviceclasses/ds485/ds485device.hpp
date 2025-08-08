@@ -71,6 +71,7 @@ namespace p44 {
 
     DsUid mDsmDsUid;
     uint16_t mDevId;
+    DsZoneID mDS485ZoneId; ///< the zoneID as found via dS485 scanning, must always take precedence!
     bool mIsPresent;
     int mNumOPC;
     Ds485Vdc& mDs485Vdc;
@@ -85,7 +86,7 @@ namespace p44 {
 
   public:
 
-    Ds485Device(Ds485Vdc *aVdcP, DsUid& aDsmDsUid, uint16_t aDevId);
+    Ds485Device(Ds485Vdc *aVdcP, DsUid& aDsmDsUid, uint16_t aDevId, DsZoneID aZoneId);
 
     virtual ~Ds485Device();
 
