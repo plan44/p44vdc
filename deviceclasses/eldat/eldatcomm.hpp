@@ -80,8 +80,8 @@ namespace p44 {
     MLTicket aliveCheckTicket; ///< checking for interface being alive
 
     // Eldat module product identification and version
-    uint16_t usbPid;
-    uint16_t appVersion;
+    uint16_t mUsbPid;
+    uint16_t mAppVersion;
 
 	public:
 		
@@ -117,6 +117,8 @@ namespace p44 {
     /// @param aResponseCB callback to deliver command response to
     void sendCommand(string aCommand, EldatMessageCB aResponseCB);
 
+    /// @return true when the transceiver is the older RX09 (not the RX10)
+    bool isRX09();
 
   protected:
 

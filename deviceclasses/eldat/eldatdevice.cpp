@@ -41,13 +41,13 @@ using namespace p44;
 
 EldatDevice::EldatDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceType) :
   Device(aVdcP),
-  eldatDeviceType(aDeviceType),
-  lastMessageTime(Never),
-  lastRSSI(INVALID_RSSI)
+  mEldatDeviceType(aDeviceType),
+  mLastMessageTime(Never),
+  mLastRSSI(INVALID_RSSI)
 {
-  iconBaseName = "eldat";
-  groupColoredIcon = true;
-  lastMessageTime = MainLoop::now(); // consider packet received at time of creation (to avoid devices starting inactive)
+  mIconBaseName = "eldat";
+  mGroupColoredIcon = true;
+  mLastMessageTime = MainLoop::now(); // consider packet received at time of creation (to avoid devices starting inactive)
 }
 
 
@@ -68,13 +68,13 @@ EldatVdc &EldatDevice::getEldatVdc()
 
 EldatAddress EldatDevice::getAddress()
 {
-  return eldatAddress;
+  return mEldatAddress;
 }
 
 
 EldatSubDevice EldatDevice::getSubDevice()
 {
-  return subDevice;
+  return mSubDevice;
 }
 
 
@@ -96,16 +96,10 @@ string EldatDevice::hardwareGUID()
 }
 
 
-//string EldatDevice::hardwareModelGUID()
-//{
-//  return string_format("eldat:%06X", EEP_PURE(getEEProfile()));
-//}
-
-
 string EldatDevice::modelName()
 {
   // base class "model", derived classes might have nicer model names
-  return string_format("ELDAT device type %d", eldatDeviceType);
+  return string_format("ELDAT device type %d", mEldatDeviceType);
 }
 
 
@@ -117,8 +111,8 @@ string EldatDevice::vendorName()
 
 void EldatDevice::setAddressingInfo(EldatAddress aAddress, EldatSubDevice aSubDeviceIndex)
 {
-  eldatAddress = aAddress;
-  subDevice = aSubDeviceIndex;
+  mEldatAddress = aAddress;
+  mSubDevice = aSubDeviceIndex;
   deriveDsUid();
 }
 
@@ -128,11 +122,11 @@ void EldatDevice::setAddressingInfo(EldatAddress aAddress, EldatSubDevice aSubDe
 bool EldatDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   bool iconFound = false;
-  if (iconBaseName) {
-    if (groupColoredIcon)
-      iconFound = getClassColoredIcon(iconBaseName, getDominantColorClass(), aIcon, aWithData, aResolutionPrefix);
+  if (mIconBaseName) {
+    if (mGroupColoredIcon)
+      iconFound = getClassColoredIcon(mIconBaseName, getDominantColorClass(), aIcon, aWithData, aResolutionPrefix);
     else
-      iconFound = getIcon(iconBaseName, aIcon, aWithData, aResolutionPrefix);
+      iconFound = getIcon(mIconBaseName, aIcon, aWithData, aResolutionPrefix);
   }
   if (iconFound)
     return true;
@@ -176,11 +170,16 @@ void EldatDevice::checkPresence(PresenceCB aPresenceResultHandler)
 int EldatDevice::opStateLevel()
 {
   int opState = -1;
-  if (lastRSSI>INVALID_RSSI) {
+  if (mLastRSSI>INVALID_RSSI) {
     // first judge from last RSSI
-    opState = 1+(lastRSSI-WORST_RSSI)*99/(BEST_RSSI-WORST_RSSI); // 1..100 range
-    if (opState<1) opState = 1;
-    else if (opState>100) opState = 100;
+    if (mLastRSSI==0) {
+      opState = 80; // simply 80%, not optimal because no RSSI known
+    }
+    else {
+      opState = 1+(mLastRSSI-WORST_RSSI)*99/(BEST_RSSI-WORST_RSSI); // 1..100 range
+      if (opState<1) opState = 1;
+      else if (opState>100) opState = 100;
+    }
   }
   return opState;
 }
@@ -189,9 +188,14 @@ int EldatDevice::opStateLevel()
 string EldatDevice::getOpStateText()
 {
   string t;
-  if (lastRSSI>INVALID_RSSI) {
-    string_format_append(t, "%ddBm (", lastRSSI);
-    format_duration_append(t, (MainLoop::now()-lastMessageTime)/Second, 2);
+  if (mLastRSSI>INVALID_RSSI) {
+    if (mLastRSSI==0) {
+      t.append("unknown dBm (");
+    }
+    else {
+      string_format_append(t, "%ddBm (", mLastRSSI);
+    }
+    format_duration_append(t, (MainLoop::now()-mLastMessageTime)/Second, 2);
     t += " ago)";
   }
   else {
@@ -205,8 +209,8 @@ string EldatDevice::getOpStateText()
 void EldatDevice::handleMessage(EldatMode aMode, int aRSSI, string aData)
 {
   // remember last message time
-  lastMessageTime = MainLoop::now();
-  lastRSSI = aRSSI;
+  mLastMessageTime = MainLoop::now();
+  mLastRSSI = aRSSI; // can be 0 for RX09 which does not report RSSI
   if (aMode==0 && aData.size()==1) {
     handleFunction(aData[0]);
   }
@@ -218,8 +222,8 @@ void EldatDevice::handleMessage(EldatMode aMode, int aRSSI, string aData)
 string EldatDevice::description()
 {
   string s = inherited::description();
-  string_format_append(s, "\n- ELDAT Address = 0x%08X, subDevice=%d", eldatAddress, subDevice);
-  string_format_append(s, "\n- device type %d", eldatDeviceType);
+  string_format_append(s, "\n- ELDAT Address = 0x%08X, subDevice=%d", mEldatAddress, mSubDevice);
+  string_format_append(s, "\n- device type %d", mEldatDeviceType);
   return s;
 }
 
@@ -277,17 +281,17 @@ bool EldatDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         case messageage_key:
-          // Note lastMessageTime is set to now at startup, so additionally check lastRSSI
-          if (lastMessageTime==Never || lastRSSI<=INVALID_RSSI)
+          // Note lastMessageTime is set to now at startup, so additionally check lastRSSI (which still can be 0 with RX09)
+          if (mLastMessageTime==Never || mLastRSSI<=INVALID_RSSI)
             aPropValue->setNull();
           else
-            aPropValue->setDoubleValue((double)(MainLoop::now()-lastMessageTime)/Second);
+            aPropValue->setDoubleValue((double)(MainLoop::now()-mLastMessageTime)/Second);
           return true;
         case rssi_key:
-          if (lastRSSI<=INVALID_RSSI)
+          if (mLastRSSI<=INVALID_RSSI || mLastRSSI==0)
             aPropValue->setNull();
           else
-            aPropValue->setInt32Value(lastRSSI);
+            aPropValue->setInt32Value(mLastRSSI);
           return true;
       }
     }
@@ -468,7 +472,7 @@ EldatButtonDevice::EldatButtonDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceTyp
 
 string EldatButtonDevice::modelName()
 {
-  if (eldatDeviceType==eldat_rocker)
+  if (mEldatDeviceType==eldat_rocker)
     return "ELDAT two-way button";
   else
     return "ELDAT single button";
@@ -482,22 +486,22 @@ void EldatButtonDevice::handleFunction(EldatFunction aFunction)
 {
   // device responsible for this function?
   int funcIndex = aFunction-'A';
-  if (eldatDeviceType==eldat_button) {
+  if (mEldatDeviceType==eldat_button) {
     // single button
-    if (funcIndex!=subDevice)
+    if (funcIndex!=mSubDevice)
       return; // not my function
   }
   else {
     // rocker
-    if (funcIndex!=subDevice && funcIndex!=subDevice+1)
+    if (funcIndex!=mSubDevice && funcIndex!=mSubDevice+1)
       return; // not my function
   }
   // select behaviour
   int buttonNo = 0; // 0=down or single, 1=up
   bool funcAC = aFunction=='A' || aFunction=='C';
   if (
-    (eldatDeviceType==eldat_rocker && funcAC) ||
-    (eldatDeviceType==eldat_rocker_reversed && !funcAC)
+    (mEldatDeviceType==eldat_rocker && funcAC) ||
+    (mEldatDeviceType==eldat_rocker_reversed && !funcAC)
   ) {
     buttonNo = 1;
   }
@@ -572,7 +576,7 @@ void EldatWindowContact::handleFunction(EldatFunction aFunction)
   // eldat_windowcontact_offon: B = contact/window opened, A = contact/window closed
   BinaryInputBehaviourPtr ib = getInput(0);
   if (ib) {
-    ib->updateInputState(aFunction==(eldatDeviceType==eldat_windowcontact_onoff || eldatDeviceType==eldat_windowcontact_onoff_s ? 'A' : 'B') ? 0 : 1);
+    ib->updateInputState(aFunction==(mEldatDeviceType==eldat_windowcontact_onoff || mEldatDeviceType==eldat_windowcontact_onoff_s ? 'A' : 'B') ? 0 : 1);
   }
 }
 
@@ -601,7 +605,7 @@ void EldatWindowHandle::handleFunction(EldatFunction aFunction)
   // eldat_windowhandle_offon: B = handle in opened position, A = handle in closed position
   BinaryInputBehaviourPtr ib = getInput(0);
   if (ib) {
-    ib->updateInputState(aFunction==(eldatDeviceType==eldat_windowhandle_onoff || eldatDeviceType==eldat_windowhandle_onoff_s  ? 'A' : 'B') ? 1 : 0);
+    ib->updateInputState(aFunction==(mEldatDeviceType==eldat_windowhandle_onoff || mEldatDeviceType==eldat_windowhandle_onoff_s  ? 'A' : 'B') ? 1 : 0);
   }
 }
 
@@ -619,7 +623,7 @@ EldatRemoteControlDevice::EldatRemoteControlDevice(EldatVdc *aVdcP, EldatDeviceT
 
 string EldatRemoteControlDevice::modelName()
 {
-  if (eldatDeviceType==eldat_ABlight)
+  if (mEldatDeviceType==eldat_ABlight)
     return "ELDAT on/off light";
   else
     return "ELDAT on/off relay";

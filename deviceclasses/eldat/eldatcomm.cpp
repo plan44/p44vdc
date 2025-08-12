@@ -107,7 +107,8 @@ public:
 // baudrate for communication with ELDAT TX10 interface
 #define ELDAT_COMMAPARMS "57600,8,N,1"
 #define ELDAT_VID 0x155A
-#define ELDAT_PID 0x1009
+#define ELDAT_PID_RX09 0x1006
+#define ELDAT_PID_RX10 0x1009
 
 #define ELDAT_MAX_MESSAGE_SIZE 100
 
@@ -123,8 +124,8 @@ public:
 
 EldatComm::EldatComm(MainLoop &aMainLoop) :
 	inherited(aMainLoop),
-  usbPid(0),
-  appVersion(0)
+  mUsbPid(0),
+  mAppVersion(0)
 {
   // serialqueue needs a buffer as we use NOT_ENOUGH_BYTES mechanism
   setAcceptBuffer(ELDAT_MAX_MESSAGE_SIZE);
@@ -186,14 +187,14 @@ void EldatComm::versionReceived(StatusCB aCompletedCB, int aRetriesLeft, string 
   // extract versions
   if (Error::isOK(aError)) {
     uint16_t vid;
-    if (sscanf(aAnswer.c_str(), "ID,%hX,%hX,%hX", &vid, &usbPid, &appVersion)==3) {
-      OLOG(LOG_INFO, "module info (ID): vid=0x%04hX, usbPid=0x%04hX, version=0x%04hX", vid, usbPid, appVersion);
+    if (sscanf(aAnswer.c_str(), "ID,%hX,%hX,%hX", &vid, &mUsbPid, &mAppVersion)==3) {
+      OLOG(LOG_INFO, "module info (ID): vid=0x%04hX, usbPid=0x%04hX, version=0x%04hX", vid, mUsbPid, mAppVersion);
       if (vid!=ELDAT_VID) {
         initError(aCompletedCB, 0, Error::err<EldatCommError>(EldatCommError::Compatibility, "Invalid Vendor ID 0x%04hX", vid));
         return;
       }
-      if (usbPid!=ELDAT_PID) {
-        initError(aCompletedCB, 0, Error::err<EldatCommError>(EldatCommError::Compatibility, "Unsupported Product ID 0x%04hX", usbPid));
+      if (mUsbPid!=ELDAT_PID_RX10 && mUsbPid!=ELDAT_PID_RX09) {
+        initError(aCompletedCB, 0, Error::err<EldatCommError>(EldatCommError::Compatibility, "Unsupported Product ID 0x%04hX", mUsbPid));
         return;
       }
     }
@@ -209,6 +210,11 @@ void EldatComm::versionReceived(StatusCB aCompletedCB, int aRetriesLeft, string 
   aliveCheckTicket.executeOnce(boost::bind(&EldatComm::aliveCheck, this), 2*Second);
 }
 
+
+bool EldatComm::isRX09()
+{
+  return mUsbPid==ELDAT_PID_RX09;
+}
 
 
 void EldatComm::aliveCheck()

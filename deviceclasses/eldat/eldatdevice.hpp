@@ -78,18 +78,18 @@ namespace p44 {
   {
     typedef Device inherited;
 
-    MLMicroSeconds lastMessageTime; ///< time when device received last message (or device was created)
-    int16_t lastRSSI; ///< RSSI of last packet received
+    MLMicroSeconds mLastMessageTime; ///< time when device received last message (or device was created)
+    int16_t mLastRSSI; ///< RSSI of last packet received
 
   protected:
 
-    EldatAddress eldatAddress; ///< the eldat device address
-    EldatDeviceType eldatDeviceType; ///< the type of device
-    EldatSubDevice subDevice; ///< the subdevice number (relevant when one physical Eldat device is represented as multiple vdSDs)
+    EldatAddress mEldatAddress; ///< the eldat device address
+    EldatDeviceType mEldatDeviceType; ///< the type of device
+    EldatSubDevice mSubDevice; ///< the subdevice number (relevant when one physical Eldat device is represented as multiple vdSDs)
 
-    string functionDesc; ///< short functional description (like: button, windowhandle, sensor...)
-    const char *iconBaseName; ///< icon base name
-    bool groupColoredIcon; ///< if set, use color suffix with icon base name
+    string mFunctionDesc; ///< short functional description (like: button, windowhandle, sensor...)
+    const char *mIconBaseName; ///< icon base name
+    bool mGroupColoredIcon; ///< if set, use color suffix with icon base name
 
 
   public:
@@ -115,7 +115,7 @@ namespace p44 {
 
     /// return time when last packet was received for this device
     /// @return time when last packet was received or Never
-    MLMicroSeconds getLastMessageTime() { return lastMessageTime; };
+    MLMicroSeconds getLastMessageTime() { return mLastMessageTime; };
 
     /// check presence of this addressable
     /// @param aPresenceResultHandler will be called to report presence status
@@ -158,11 +158,11 @@ namespace p44 {
     virtual void setAddressingInfo(EldatAddress aAddress, EldatSubDevice aSubDeviceIndex);
 
     /// set the icon info for the eldat device
-    void setIconInfo(const char *aIconBaseName, bool aGroupColored) { iconBaseName = aIconBaseName; groupColoredIcon = aGroupColored; };
+    void setIconInfo(const char *aIconBaseName, bool aGroupColored) { mIconBaseName = aIconBaseName; mGroupColoredIcon = aGroupColored; };
 
     /// set short functional description for this device (explaining the EEP in short, like "button", "sensor", "window handle")
     /// @param aString the description string
-    void setFunctionDesc(string aString) { functionDesc = aString; };
+    void setFunctionDesc(string aString) { mFunctionDesc = aString; };
 
 
     /// disconnect device. For Eldat, this means breaking the pairing (learn-in) with the device
@@ -199,7 +199,7 @@ namespace p44 {
 
     /// get the Eldat device type
     /// @return Eldat device type
-    EldatDeviceType getEldatDeviceType() { return eldatDeviceType; }
+    EldatDeviceType getEldatDeviceType() { return mEldatDeviceType; }
 
     /// mark send channels used by this device
     /// @param aUsedSendChannelsMap must be passed a string with 128 chars of '0' or '1'.

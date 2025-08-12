@@ -155,7 +155,7 @@ void EldatVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
           addKnownDevice(newdev);
         }
         else {
-          LOG(LOG_ERR,
+          OLOG(LOG_ERR,
             "ELDAT device could not be created for addr=%08X, subdevice=%d, deviceType=%d",
             i->get<int>(0), // address
             subDeviceIndex, // subdeviceIndex
@@ -254,9 +254,20 @@ void EldatVdc::handleMessage(string aEldatMessage, ErrorPtr aError)
     // try to scan Mode 0
     int rssi;
     int mode;
-    if (sscanf(aEldatMessage.c_str(),"REC%2d,-%X,%X,%99s", &mode, &rssi, &senderAddress, data)==4) {
+    bool msgok = false;
+    if (mEldatComm.isRX09()) {
+      // simpler RX09 format, only mode0
+      mode = 0; // always mode0
+      rssi = 0; // no real RSSI, but certainly > MIN_LEARN_DBM
+      msgok = sscanf(aEldatMessage.c_str(),"REC,%X,%99s", &senderAddress, data)==2;
+    }
+    else {
+      // assume RX10 format with mode and RSSI
+      msgok = sscanf(aEldatMessage.c_str(),"REC%2d,-%X,%X,%99s", &mode, &rssi, &senderAddress, data)==4;
+    }
+    if (msgok) {
       rssi = -rssi;
-      LOG(LOG_INFO, "processing REC message mode=%d, sender=0x%08X, RSSI=%d", mode, senderAddress, rssi);
+      OLOG(LOG_INFO, "processing REC message mode=%d, sender=0x%08X, RSSI=%d", mode, senderAddress, rssi);
       if (mLearningMode) {
         processLearn(senderAddress, (EldatMode)mode, rssi, data);
       }
@@ -265,7 +276,7 @@ void EldatVdc::handleMessage(string aEldatMessage, ErrorPtr aError)
       }
     }
     else {
-      LOG(LOG_INFO, "received unknown ELDAT message: %s", aEldatMessage.c_str());
+      OLOG(LOG_INFO, "received unknown ELDAT message: %s", aEldatMessage.c_str());
     }
   }
 }
@@ -306,7 +317,7 @@ Tristate EldatVdc::processLearn(EldatAddress aSenderAddress, EldatMode aMode, in
   for (EldatDeviceMap::iterator pos = mEldatDevices.lower_bound(aSenderAddress); pos!=mEldatDevices.upper_bound(aSenderAddress); ++pos) {
     EldatSubDevice i = pos->second->getSubDevice();
     if (numSubDevices==0 || (subdevice>=i && subdevice<i+numSubDevices)) {
-      // always delete all subdevices or unlearn comes from specified subdevice range
+      // always delete all subdevices, or unlearn comes from specified subdevice range
       learnIn = false;
       break;
     }
@@ -339,12 +350,11 @@ void EldatVdc::dispatchMessage(EldatAddress aSenderAddress, EldatMode aMode, int
 {
   bool reachedDevice = false;
   for (EldatDeviceMap::iterator pos = mEldatDevices.lower_bound(aSenderAddress); pos!=mEldatDevices.upper_bound(aSenderAddress); ++pos) {
-    // handle regularily (might be RPS switch which does not have separate learn/action packets
     pos->second->handleMessage(aMode, aRSSI, aData);
     reachedDevice = true;
   }
   if (!reachedDevice) {
-    LOG(LOG_INFO, "Received Eldat message with sender-ID=%08X not directed to any known device -> ignored", aSenderAddress);
+    OLOG(LOG_INFO, "Received Eldat message with sender-ID=%08X not directed to any known device -> ignored", aSenderAddress);
   }
 }
 
@@ -469,9 +479,20 @@ void EldatVdc::handleTestMessage(StatusCB aCompletedCB, string aEldatMessage, Er
     // try to scan Mode 0
     int rssi;
     int mode;
-    if (sscanf(aEldatMessage.c_str(),"REC%2d,-%X,%X,%99s", &mode, &rssi, &senderAddress, data)==4) {
+    bool msgok = false;
+    if (mEldatComm.isRX09()) {
+      // simpler RX09 format, only mode0
+      mode = 0; // always mode0
+      rssi = 0; // no real RSSI, but certainly > MIN_LEARN_DBM
+      msgok = sscanf(aEldatMessage.c_str(),"REC,%X,%99s", &senderAddress, data)==2;
+    }
+    else {
+      // assume RX10 format with mode and RSSI
+      msgok = sscanf(aEldatMessage.c_str(),"REC%2d,-%X,%X,%99s", &mode, &rssi, &senderAddress, data)==4;
+    }
+    if (msgok) {
       rssi = -rssi;
-      LOG(LOG_NOTICE, "Received REC message mode=%d, sender=0x%08X, RSSI=%d", mode, senderAddress, rssi);
+      OLOG(LOG_NOTICE, "Received REC message mode=%d, sender=0x%08X, RSSI=%d", mode, senderAddress, rssi);
       if (rssi>=MIN_LEARN_DBM) {
         // uninstall handler
         mEldatComm.setReceivedMessageHandler(NoOP);
@@ -483,7 +504,7 @@ void EldatVdc::handleTestMessage(StatusCB aCompletedCB, string aEldatMessage, Er
     }
   }
   // - still waiting
-  LOG(LOG_NOTICE, "- ELDAT test: still waiting for REC message with sufficient (>%d) RSSI", MIN_LEARN_DBM);
+  OLOG(LOG_NOTICE, "- ELDAT test: still waiting for REC message with sufficient (>%d) RSSI", MIN_LEARN_DBM);
 }
 
 #endif // SELFTESTING_ENABLED
