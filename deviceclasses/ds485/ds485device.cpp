@@ -170,6 +170,15 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
           o->reportOutputState();
         }
       }
+      case ct_local_stop: {
+        // TODO: not 100% clear when DS uses this
+        // local stop (of blinds movement? - for sure not of dimming, dim stop is not reported)
+        OutputBehaviourPtr o = getOutput();
+        if (o) {
+          OLOG(LOG_NOTICE, "dS device output locally stopped -> request actual output state");
+          requestOutputValueUpdate();
+        }
+      }
       default: {
         // forward to button, if any
         ButtonBehaviourPtr b = getButton(0);
