@@ -898,6 +898,9 @@ string ButtonBehaviour::clickTypeName(DsClickType aClickType)
   if (aClickType==ct_hold_repeat) return "keep_holding";
   if (aClickType==ct_hold_end) return "release";
   if (aClickType<=ct_click_3x) return string_format("click_%dx", aClickType+1-ct_click_1x);
+  if (aClickType==ct_local_on) return "local_on";
+  if (aClickType==ct_local_off) return "local_off";
+  if (aClickType==ct_local_stop) return "local_stop";
   if (aClickType==ct_progress) return "progress";
   if (aClickType==ct_complete) return "complete";
   if (aClickType==ct_none) return "none";
