@@ -161,14 +161,8 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
     switch (aClickType) {
       case ct_local_off:
       case ct_local_on: {
-        // device has been operated locally
-        OutputBehaviourPtr o = getOutput();
-        if (o) {
-          OLOG(LOG_NOTICE, "dS device output locally switched, update output state");
-          ChannelBehaviourPtr ch = o->getChannelByType(channeltype_default);
-          if (ch) ch->syncChannelValueBool(aClickType==ct_local_on);
-          o->reportOutputState();
-        }
+        // device has been operated locally and has invoked LOCAL_ON or OFF scene on the device
+        traceSceneCall(aClickType==ct_local_on ? LOCAL_ON : LOCAL_OFF);
         break;
       }
       case ct_local_stop: {
@@ -484,7 +478,7 @@ void Ds485Device::startTracingFor(SceneNo aSceneNo)
   OLOG(LOG_INFO, "query output values for updating scene '%s'", VdcHost::sceneText(aSceneNo, false).c_str());
   mTracedScene = aSceneNo;
   requestOutputValueUpdate();
-  // - traceChannelChange will get the actual scene value
+  // - traceXXXChannelChange will get the actual scene value
 }
 
 

@@ -270,7 +270,7 @@ static const DefaultSceneParams defaultScenes[NUMDEFAULTSCENES+1] = {
   {   0, scene_effect_smooth, true,  false, scene_cmd_increment,     3 }, // 47 : Area 3 Increment - T3_INC
   {   0, scene_effect_smooth, true,  false, scene_cmd_decrement,     4 }, // 48 : Area 4 Decrement - T4_DEC
   {   0, scene_effect_smooth, true,  false, scene_cmd_increment,     4 }, // 49 : Area 4 Increment - T4_INC
-  {   0, scene_effect_smooth, true,  false, scene_cmd_off,           0 }, // 50 : Device (Local Button) on : LOCAL_OFF
+  {   0, scene_effect_smooth, true,  false, scene_cmd_off,           0 }, // 50 : Device (Local Button) off : LOCAL_OFF
   { 100, scene_effect_smooth, true,  false, scene_cmd_invoke,        0 }, // 51 : Device (Local Button) on : LOCAL_ON
   {   0, scene_effect_smooth, true,  false, scene_cmd_stop,          1 }, // 52 : Area 1 Stop - T1_STOP_S
   {   0, scene_effect_smooth, true,  false, scene_cmd_stop,          2 }, // 53 : Area 2 Stop - T2_STOP_S
