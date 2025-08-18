@@ -154,6 +154,24 @@ ErrorPtr Ds485Vdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod
       ));
     }
   }
+  else if (aMethod=="ds485request") {
+    ApiValuePtr o;
+    respErr = checkParam(aParams, "dest", o);
+    if (Error::notOK(respErr)) return respErr;
+    DsUid dest(o->stringValue());
+    respErr = checkParam(aParams, "cmd", o);
+    if (Error::notOK(respErr)) return respErr;
+    uint8_t cmd = o->uint8Value();
+    respErr = checkParam(aParams, "mod", o);
+    if (Error::notOK(respErr)) return respErr;
+    uint8_t mod = o->uint8Value();
+    string payload;
+    o = aParams->get("payload");
+    if (o) {
+      payload = hexToBinaryString(o->stringValue().c_str(), true);
+    }
+    return mDs485Comm.issueRequest(dest, cmd, mod, payload);
+  }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
