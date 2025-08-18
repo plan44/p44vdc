@@ -406,11 +406,11 @@ void WbfComm::claimResultHander(StatusCB aPairingResultCB, const string aResolve
 
 
 
-#define REFIND_TIMEOUT (10*Second)
+#define REFIND_TIMEOUT (30*Second)
 
 void WbfComm::refindGateway(StatusCB aFindingResultCB)
 {
-  mSearchTicket.executeOnce(boost::bind(&WbfComm::refindTimeout, this, aFindingResultCB), PAIRING_TIMEOUT);
+  mSearchTicket.executeOnce(boost::bind(&WbfComm::refindTimeout, this, aFindingResultCB), REFIND_TIMEOUT);
   if (!mFixedHostName.empty()) {
     // we have a fixed address, no finding needed
     mResolvedHost = mFixedHostName; // just use this one
@@ -434,9 +434,9 @@ void WbfComm::refindGateway(StatusCB aFindingResultCB)
 }
 
 
-void WbfComm::refindTimeout(StatusCB aClaimStatusCB)
+void WbfComm::refindTimeout(StatusCB aFindingResultCB)
 {
-  aClaimStatusCB(new WbfCommError(WbfCommError::FindTimeout));
+  aFindingResultCB(Error::err<WbfCommError>(WbfCommError::FindTimeout, "re-find timeout"));
 }
 
 
@@ -458,6 +458,7 @@ bool WbfComm::dnsSdRefindResultHandler(ErrorPtr aError, DnsSdServiceInfoPtr aSer
   else {
     mSearchTicket.cancel();
     FOCUSOLOG("discovery ended, error = %s (usually: allfornow)", aError->text());
+    aFindingResultCB(Error::err<WbfCommError>(WbfCommError::FindTimeout, "dnssd ends: %s", aError->text()));
     return false; // do not continue DNS-SD search
   }
 }
