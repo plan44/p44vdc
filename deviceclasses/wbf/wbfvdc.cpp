@@ -193,10 +193,11 @@ void WbfVdc::handleGlobalEvent(VdchostEvent aEvent)
 
 
 
-#define REFIND_RETRY_DELAY (30*Second)
+#define REFIND_RETRY_DELAY (1*Minute)
 
 void WbfVdc::connectGateway(StatusCB aCompletedCB)
 {
+  mRefindTicket.cancel(); // stop other scheduled refinds
   if (!getVdcHost().isNetworkConnected()) {
     OLOG(LOG_WARNING, "device has no IP yet -> must wait");
     mRefindTicket.executeOnce(boost::bind(&WbfVdc::connectGateway, this, aCompletedCB), REFIND_RETRY_DELAY);
@@ -217,8 +218,15 @@ void WbfVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
   }
   else {
     // not found (usually timeout)
-    OLOG(LOG_WARNING, "Error refinding gateway '%s', error = %s", mWbfComm.mDNSSDHostName.c_str(), aError->text());
-    if (aCompletedCB) aCompletedCB(ErrorPtr()); // no gateway (but this is not a collect error)
+    OLOG(LOG_INFO, "Error refinding gateway '%s', error = %s", mWbfComm.mDNSSDHostName.c_str(), aError->text());
+    if (aError->isError(WbfCommError::domain(), WbfCommError::FindTimeout)) {
+      // timeout, retry later
+      OLOG(LOG_WARNING, "Could not find gateway now, will retry later...");
+      mRefindTicket.executeOnce(boost::bind(&WbfVdc::connectGateway, this, static_cast<StatusCB>(NoOP)), REFIND_RETRY_DELAY);
+      aError.reset(); // do not report as error
+    }
+    // always report scan completion so rest of system can go on
+    if (aCompletedCB) aCompletedCB(aError);
   }
 }
 
@@ -227,6 +235,7 @@ void WbfVdc::refindResultHandler(StatusCB aCompletedCB, ErrorPtr aError)
 void WbfVdc::startupGatewayApi(StatusCB aCompletedCB)
 {
   // make sure it is not already up
+  mRefindTicket.cancel();
   mWbfComm.stopApi(boost::bind(&WbfVdc::apiIsStopped, this, aCompletedCB));
 }
 
