@@ -169,6 +169,7 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
           if (ch) ch->syncChannelValueBool(aClickType==ct_local_on);
           o->reportOutputState();
         }
+        break;
       }
       case ct_local_stop: {
         // TODO: not 100% clear when DS uses this
@@ -178,6 +179,7 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
           OLOG(LOG_NOTICE, "dS device output locally stopped -> request actual output state");
           requestOutputValueUpdate();
         }
+        break;
       }
       default: {
         // forward to button, if any
