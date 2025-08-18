@@ -162,6 +162,7 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
       case ct_local_off:
       case ct_local_on: {
         // device has been operated locally and has invoked LOCAL_ON or OFF scene on the device
+        OLOG(LOG_NOTICE, "dS device locally switched %s -> trace new output state", aClickType==ct_local_on ? "ON" : "OFF");
         traceSceneCall(aClickType==ct_local_on ? LOCAL_ON : LOCAL_OFF);
         break;
       }
@@ -170,7 +171,7 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
         // local stop (of blinds movement? - for sure not of dimming, dim stop is not reported)
         OutputBehaviourPtr o = getOutput();
         if (o) {
-          OLOG(LOG_NOTICE, "dS device output locally stopped -> request actual output state");
+          OLOG(LOG_NOTICE, "dS device output locally stopped -> trace actual output state");
           requestOutputValueUpdate();
         }
         break;
