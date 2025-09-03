@@ -93,7 +93,7 @@ using namespace p44;
   #define DEFAULT_DESCRIPTION_TEMPLATE "%V %M%N #%S"
 #endif
 
-static VdcHost *sharedVdcHostP = nullptr;
+static VdcHost *gSharedVdcHostP = nullptr;
 
 VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   inheritedParams(mDSParamStore),
@@ -175,8 +175,8 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #endif // P44SCRIPT_FULL_SUPPORT
   #endif // ENABLE_P44SCRIPT
   // remember singleton's address
-  assert(sharedVdcHostP==nullptr); // must not already exist!
-  sharedVdcHostP = this;
+  assert(gSharedVdcHostP==nullptr); // must not already exist!
+  gSharedVdcHostP = this;
   // obtain default MAC address (might be changed by setIdMode())
   mac = macAddress();
   #if ENABLE_LOCALCONTROLLER
@@ -207,7 +207,7 @@ VdcHost::~VdcHost()
 
 VdcHostPtr VdcHost::sharedVdcHost()
 {
-  return VdcHostPtr(sharedVdcHostP);
+  return VdcHostPtr(gSharedVdcHostP);
 }
 
 

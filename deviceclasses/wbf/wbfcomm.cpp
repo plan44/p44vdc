@@ -312,7 +312,7 @@ void WbfComm::pairGateway(StatusCB aPairingResultCB)
   mSearchTicket.executeOnce(boost::bind(&WbfComm::pairingTimeout, this, aPairingResultCB), PAIRING_TIMEOUT);
   if (!mFixedHostName.empty()) {
     // just try to claim on this gateway
-    claimAccount(aPairingResultCB, mFixedHostName, "");
+    claimAccount(aPairingResultCB, mFixedHostName, "", mApiUserName);
   }
   else {
     #if DISABLE_DISCOVERY
@@ -351,7 +351,7 @@ bool WbfComm::dnsSdPairingResultHandler(ErrorPtr aError, DnsSdServiceInfoPtr aSe
     DnsSdServiceInfo::TxtRecordsMap::iterator b = aServiceInfo->txtRecords.find("type");
     if (b==aServiceInfo->txtRecords.end()) return true; // ignore, is not a wyser gateway, continue searching
     // now this IS most probably a wiser gateway, try to claim the account
-    claimAccount(aPairingResultCB, aServiceInfo->hostaddress, aServiceInfo->hostname);
+    claimAccount(aPairingResultCB, aServiceInfo->hostaddress, aServiceInfo->hostname, mApiUserName);
     return true; // look for others
   }
   else {
@@ -365,10 +365,12 @@ bool WbfComm::dnsSdPairingResultHandler(ErrorPtr aError, DnsSdServiceInfoPtr aSe
 
 #define CLAIM_TIMEOUT (1*Minute)
 
-void WbfComm::claimAccount(StatusCB aPairingResultCB, const string aResolvedHost, const string aHostName)
+void WbfComm::claimAccount(StatusCB aPairingResultCB, const string aResolvedHost, const string aHostName, const string aUserName)
 {
   JsonObjectPtr claimParams = JsonObject::newObj();
-  claimParams->add("user", JsonObject::newString("apiuser"));
+  claimParams->add("user", JsonObject::newString(aUserName));
+  // clone the account (and device names) from installer setup (eSetup app)
+  claimParams->add("source", JsonObject::newString("installer"));
   apiAction(
     WbfApiOperation::POST,
     string_format("https://%s/api/account/claim", aResolvedHost.c_str()).c_str(),

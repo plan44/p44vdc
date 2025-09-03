@@ -161,7 +161,9 @@ void WbfVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     // full collect, remove all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);
   }
-  // load hue bridge uuid and token
+  // fixed user name
+  mWbfComm.mApiUserName = string_format("p44_%s", getVdcHost().getDeviceHardwareId().c_str());
+  // load gateway host and api token
   SQLiteTGQuery qry(mDb);
   if (Error::isOK(qry.prefixedPrepare("SELECT fixedHost, dnssdHost, apisecret FROM $PREFIX_globs"))) {
     sqlite3pp::query::iterator i = qry.begin();

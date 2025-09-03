@@ -145,6 +145,7 @@ namespace p44 {
     string mFixedHostName; ///< if empty, DNSSD will be used to find potential gateways. Otherwise, fixed hostname or IP
     string mDNSSDHostName; ///< DNSSD host name (must be set for re-finding paired gateway without fixed host name, will be set at pairing)
     string mApiSecret; ///< the API secret (must be set for re-finding paired gateway, will be set at pairing)
+    string mApiUserName; ///< the API user name
 
     // volatile state
     string mResolvedHost; ///< host name for REST API and websocket, IP address resolved or regular DNS name
@@ -205,7 +206,7 @@ namespace p44 {
 
     void pairingTimeout(StatusCB aPairingResultCB);
 
-    void claimAccount(StatusCB aPairingResultCB, const string aResolvedHost, const string aHostName);
+    void claimAccount(StatusCB aPairingResultCB, const string aResolvedHost, const string aHostName, const string aUserName);
     void claimResultHander(StatusCB aPairingResultCB, const string aResolvedHost, const string aHostName, JsonObjectPtr aResult, ErrorPtr aError);
 
     #if !DISABLE_DISCOVERY
