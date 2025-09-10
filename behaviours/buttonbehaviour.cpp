@@ -342,6 +342,7 @@ void ButtonBehaviour::injectClick(DsClickType aClickType)
       }
       break;
     case ct_hold_start:
+      mButtonPressed = true;
       if (mClickType==ct_hold_start) {
         aClickType = ct_hold_repeat; // already started before -> treat as repeat
       }
@@ -350,6 +351,7 @@ void ButtonBehaviour::injectClick(DsClickType aClickType)
       mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::holdRepeat, this), t_dim_repeat_time);
       break;
     case ct_hold_end:
+      mButtonPressed = false;
       if (mClickType!=ct_hold_start && mClickType!=ct_hold_repeat) break; // suppress hold end when not in hold start
       sendClick(aClickType);
       injectedOpComplete(false);
@@ -842,7 +844,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
     #if ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
     // send event
     if (mClickType!=ct_hold_repeat && mClickType!=ct_progress) {
-      OLOG(LOG_INFO, "sent value event for clicktype=%d, state=%d", aClickType, mButtonPressed);
+      OLOG(LOG_INFO, "sending value event for clicktype=%s, state=%d", clickTypeName(aClickType).c_str(), mButtonPressed);
       sendValueEvent();
     }
     #endif
