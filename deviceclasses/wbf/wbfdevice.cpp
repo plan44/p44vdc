@@ -103,7 +103,7 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
       string cr = o->stringValue();
       if (cr.size()>0 && mWbfCommRefs!=cr) mWbfCommRefs += "/" + cr;
     }
-    if (blockA->get("serial_nr", o)) mSerialNos += "/" + o->stringValue(); // second name only if not same as first one
+    if (blockA->get("serial_nr", o)) mSerialNos += "/" + o->stringValue();
   }
   // initialize last seen
   if (aDevDesc->get("last_seen", o)) mLastSeen = MainLoop::now()-(o->doubleValue()*Second);
@@ -273,23 +273,23 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
           if (buttonInfo->get("name", o) && namesFound==0) { defaultName = o->stringValue(); namesFound++; }
           int buttonId = o->int32Value();
           VdcButtonType bty = buttonType_single;
-          if (buttonInfo->get("subtype", o) && o->stringValue()=="up down") bty = buttonType_2way;
+          if (buttonInfo->get("sub_type", o) && o->stringValue()=="up down") bty = buttonType_2way;
           // non-null ID, is a smart button, pick it
           ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, "")); // automatic id if not specified
-          bb->setHardwareButtonConfig(0, bty, bty==buttonType_2way ? buttonElement_up : buttonElement_center, false, 1, 0);
+          bb->setHardwareButtonConfig(0, bty, bty==buttonType_2way ? buttonElement_down : buttonElement_center, false, 1, 0);
           bb->setGroup(group_yellow_light); // pre-configure for light...
           bb->setFunction(buttonFunc_app); // ...but only as app button
-          bb->setHardwareName(bty==buttonType_2way ? "up" : "button");
+          bb->setHardwareName(bty==buttonType_2way ? "down" : "button");
           if (namesFound==0) { defaultName = inputDesc; namesFound++; }
           // this is the primary behaviour, secondary button, if any, does not need to be registered
           mPendingInputMappings[buttonId] = bb;
           addBehaviour(bb);
           if (bty==buttonType_2way) {
-            // need the other half, add the "down" element
+            // need the other half, add the "up" element
             bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, "")); // automatic id if not specified
-            bb->setHardwareButtonConfig(0, buttonType_2way, buttonElement_down, false, 0, 0);
+            bb->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, 0);
             bb->setGroup(group_yellow_light); // pre-configure for light
-            bb->setHardwareName("down");
+            bb->setHardwareName("up");
             addBehaviour(bb);
           }
           buttonsTaken++; // we've taken one
@@ -297,7 +297,7 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
           aInputsUsed++; // count it
           continue; // same index now has another input (or array exhausted)
         }
-      }
+      } // if buttoninfo
       // input not eaten up, check next
       iidx++;
     } // while unprocessed inputs
@@ -623,20 +623,30 @@ void WbfDevice::handleButtonCmd(JsonObjectPtr aCmd, DsBehaviourPtr aBehaviour)
   mLastSeen = MainLoop::now(); // receiving button command means seen now
   JsonObjectPtr o;
   if (aCmd->get("event", o)) {
-    // TODO: maybe there are also multi-clicks and press&hold?
-    if (o->stringValue()=="click") {
-      int targetButton = 0;
-      if (numButtons()>1) {
-        // could be the other button
-        if (aCmd->get("type", o)) {
-          #warning "Assumption, need to check with up/down smart button that actually sends events"
-          if (o->stringValue()=="down") {
-            targetButton = 1;
-          }
+    string evtype = o->stringValue();
+    int targetButton = 0;
+    if (numButtons()>1) {
+      // could be the other button (0=down, 1=up in case of rockers)
+      if (aCmd->get("type", o)) {
+        if (o->stringValue()=="up") {
+          targetButton = 1;
         }
       }
-      // inform the button
-      getButton(targetButton)->injectClick(ct_tip_1x);
+    }
+    ButtonBehaviourPtr bb = getButton(targetButton);
+    if (bb) {
+      if (evtype=="click") {
+        // this is an already evaluated click (short press/release sequence)
+        bb->injectClick(ct_click_1x);
+      }
+      else if (evtype=="press") {
+        // start of holding button for longer
+        bb->injectClick(ct_hold_start);
+      }
+      else if (evtype=="release") {
+        // end of holding button for longer
+        bb->injectClick(ct_hold_end);
+      }
     }
   }
 }
