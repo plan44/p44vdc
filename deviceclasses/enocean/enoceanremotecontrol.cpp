@@ -183,7 +183,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         aSubDeviceIndex++;
       }
       #if ENABLE_ENOCEAN_SHADOW
-      else if (EEP_TYPE(aEEProfile)==PSEUDO_TYPE_BLIND) {
+      else if (EEP_TYPE(aEEProfile)==PSEUDO_TYPE_JALOUSIE || EEP_TYPE(aEEProfile)==PSEUDO_TYPE_COVERING) {
         // full-featured blind controller
         newDev = EnoceanDevicePtr(new EnoceanBlindControlDevice(aVdcP));
         // standard single-value scene table (SimpleScene) with Shadow defaults
@@ -202,7 +202,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         ShadowBehaviourPtr sb = ShadowBehaviourPtr(new ShadowBehaviour(*newDev.get()));
         sb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_undefined, false, -1);
         sb->setHardwareName("blind");
-        sb->setDeviceParams(shadowdevice_jalousie, false, MIN_MOVE_TIME, MAX_SHORT_MOVE_TIME, MIN_LONG_MOVE_TIME);
+        sb->setDeviceParams(EEP_TYPE(aEEProfile)==PSEUDO_TYPE_JALOUSIE ? shadowdevice_jalousie : shadowdevice_rollerblind, false, MIN_MOVE_TIME, MAX_SHORT_MOVE_TIME, MIN_LONG_MOVE_TIME);
         sb->mPosition->syncChannelValue(100, false, true); // assume fully up at beginning
         sb->mAngle->syncChannelValue(100, false, true); // assume fully open at beginning
         // does not need a channel handler at all, just add behaviour
@@ -210,7 +210,7 @@ EnoceanDevicePtr EnoceanRemoteControlDevice::newDevice(
         // count it
         aSubDeviceIndex++;
       }
-      #endif
+      #endif // ENABLE_ENOCEAN_SHADOW
     }
     else if (EEP_FUNC(aEEProfile)==PSEUDO_FUNC_SYSTEMELECTRONIC && aSubDeviceIndex<1) {
       // SystemElectronic.de proprietary devices

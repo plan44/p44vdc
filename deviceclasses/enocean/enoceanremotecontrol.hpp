@@ -44,9 +44,10 @@ namespace p44 {
   // - switch controls
   #define PSEUDO_FUNC_SWITCHCONTROL 0xF6
   #define PSEUDO_TYPE_SIMPLEBLIND 0xFF // simplistic Fully-Up/Fully-Down blind controller
-  #define PSEUDO_TYPE_BLIND 0xFE // time controlled blind with angle support
+  #define PSEUDO_TYPE_JALOUSIE 0xFE // time controlled blind with angle support
   #define PSEUDO_TYPE_ON_OFF 0xFD // simple relay switched on by key up and switched off by key down
   #define PSEUDO_TYPE_SWITCHED_LIGHT 0xFC // switched light (with full light behaviour)
+  #define PSEUDO_TYPE_COVERING 0xFB // time controlled covering/blind/rollo without angle support
   // - proprietary
   #define PSEUDO_FUNC_SYSTEMELECTRONIC 0x50 // SystemElectronic.de specific profiles
   #define PSEUDO_TYPE_SE_HEATTUBE 0x01 // Heat tube protocol
