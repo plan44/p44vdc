@@ -107,6 +107,7 @@ namespace p44 {
 
     MLTicket mInvalidatorTicket;
     MLTicket mUpdateTicket;
+    MLTicket mReEvaluationTicket;
 
   protected:
 
@@ -370,6 +371,7 @@ namespace p44 {
 
     void armInvalidator();
     void reportFinalValue();
+    void reEvaluateSensorValue(double aValue, double aMinChange);
     #if ENABLE_RRDB
     void prepareLogging();
     void logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue);

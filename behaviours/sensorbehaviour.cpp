@@ -325,8 +325,16 @@ void SensorBehaviour::armInvalidator()
 }
 
 
+void SensorBehaviour::reEvaluateSensorValue(double aValue, double aMinChange)
+{
+  OLOG(LOG_INFO, "re-evaluating last received sensor value to update filter");
+  updateSensorValue(aValue, aMinChange);
+}
+
+
 void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool aPush, int32_t aContextId, const char *aContextMsg)
 {
+  mReEvaluationTicket.cancel();
   if (mLimitToMinMax) {
     if (aValue>mMax) aValue = mMax;
     if (aValue<mMin) aValue = mMin;
@@ -353,25 +361,29 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   if (mContextId>=0 || !mContextMsg.empty()) {
     OLOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", mContextId, mContextMsg.c_str());
   }
-  if (changedValue) {
-    // check for filtering
-    if (mFilter || (mProfileP && mProfileP->evalType!=eval_none)) {
-      // process values through filter
-      if (!mFilter) {
-        // no filter exists yet, but profile needs a filter, create it now
-        mFilter = WindowEvaluatorPtr(new WindowEvaluator(mProfileP->evalWin, mProfileP->collWin, mProfileP->evalType));
-      }
-      mFilter->addValue(aValue, now);
-      double v = mFilter->evaluate();
-      // re-evaluate changed flag after filtering
-      if (fabs(v - prevValue) > mResolution/2) changedValue = true;
-      OLOG(changedValue ? LOG_NOTICE : LOG_INFO, "calculates %s filtered value = %0.3f %s", changedValue ? "NEW" : "same", v, getSensorUnitText().c_str());
-      mCurrentValue = v;
+  // prossibly process for filtering (no matter if value changed or not)
+  if (mFilter || (mProfileP && mProfileP->evalType!=eval_none)) {
+    // need filtering
+    if (!mFilter) {
+      // no filter exists yet, but profile needs a filter, create it now
+      mFilter = WindowEvaluatorPtr(new WindowEvaluator(mProfileP->evalWin, mProfileP->collWin, mProfileP->evalType));
     }
-    else {
-      // just assign new current value
-      mCurrentValue = aValue;
+    // create filtered value
+    mFilter->addValue(aValue, now);
+    double v = mFilter->evaluate();
+    // filter output might change while input value does not
+    if (fabs(v - prevValue) > mResolution/2) changedValue = true; // filter output has changed
+    OLOG(changedValue ? LOG_NOTICE : LOG_INFO, "calculates %s filtered value = %0.3f %s", changedValue ? "NEW" : "same", v, getSensorUnitText().c_str());
+    mCurrentValue = v;
+    // as long as filter output is not stable, we must re-evaluate it
+    if (changedValue && mProfileP && mProfileP->collWin>0) {
+      // re-run same value within collection window time frame (ticket will be cancelled if real sensor value arrives sooner)
+      mReEvaluationTicket.executeOnce(boost::bind(&SensorBehaviour::reEvaluateSensorValue, this, aValue, aMinChange), mProfileP->collWin);
     }
+  }
+  else {
+    // just assign new current value
+    mCurrentValue = aValue;
   }
   // possibly let localcontroller process it
   #if ENABLE_LOCALCONTROLLER
