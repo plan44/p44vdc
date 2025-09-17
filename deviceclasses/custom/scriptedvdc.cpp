@@ -189,11 +189,8 @@ void ScriptedDeviceImplementation::implementationEnds(ScriptObjPtr aResult)
     return;
   }
   SOLOG(mScriptedDevice, aResult && aResult->isErr() ? LOG_WARNING : LOG_NOTICE, "device implementation script finished running, result=%s", ScriptObj::describe(aResult).c_str());
-  if (
-    aResult &&
-    Error::isDomain(aResult->errorValue(), ScriptError::domain()) &&
-    aResult->errorValue()->getErrorCode()>=ScriptError::FatalErrors
-  ) {
+  ErrorValuePtr errval = dynamic_pointer_cast<ErrorValue>(aResult);
+  if (errval && errval->isFatal()) {
     mContext->clearVars(); // clear vars and (especially) context local handlers
     return; // fatal error, no auto-restart
   }
@@ -201,7 +198,7 @@ void ScriptedDeviceImplementation::implementationEnds(ScriptObjPtr aResult)
   if (!aResult->isErr()) {
     // no error
     if (mScriptedDevice.hasSinks()) return; // script ends w/o error, and monitors messages -> ok
-    if (!aResult->hasType(numeric) || aResult->boolValue()) return; // not numeric or numeric trueis -> ok
+    if (!aResult->hasType(numeric) || aResult->boolValue()) return; // not numeric or numeric trueish -> ok
   }
   // error or numeric falseish -> retry in a while
   SOLOG(mScriptedDevice, LOG_WARNING, "Will restart implementation in %lld seconds", IMPLEMENTATION_RESTART_DELAY/Second);
