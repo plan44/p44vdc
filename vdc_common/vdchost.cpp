@@ -1056,7 +1056,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour)
             // - minimum scene if not already there
             if (mLocalDimDirection>0 && l->mBrightness->getChannelValue()==0) {
               // starting dimming up from minimum
-              l->mBrightness->setChannelValue(l->mBrightness->getMinDim(), 0, true);
+              l->mBrightness->setChannelValue(l->mBrightness->getMinDim(), 0, true, true); // always apply, coupling enabled
             }
             // now dim (safety timeout after 10 seconds)
             dev->dimChannelForArea(channel, mLocalDimDirection>0 ? dimmode_up : dimmode_down, 0, 10*Second);

@@ -410,7 +410,7 @@ bool ChannelBehaviour::syncChannelValueBool(bool aValue, bool aAlwaysSync)
 
 void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply)
 {
-  setChannelValue(aNewValue, aNewValue>getChannelValue(true) ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply);
+  setChannelValue(aNewValue, aNewValue>getChannelValue(true) ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply, true); // with coupling
 }
 
 
@@ -418,12 +418,12 @@ bool ChannelBehaviour::setChannelValueIfNotDontCare(DsScenePtr aScene, double aN
 {
   if (aScene->isSceneValueFlagSet(getChannelIndex(), valueflags_dontCare))
     return false; // don't care, don't set
-  setChannelValue(aNewValue, aNewValue>getChannelValue(true) ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply);
+  setChannelValue(aNewValue, aNewValue>getChannelValue(true) ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply, true); // with coupling
   return true; // actually set
 }
 
 
-void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransitionTime, bool aAlwaysApply)
+void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransitionTime, bool aAlwaysApply, bool aWithCoupling)
 {
   // round to resolution
   if (enforceResolution() && getResolution()>0) {
@@ -466,13 +466,13 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     mTransitionDirection = 0; // automatic, shortest way
     mChannelUpdatePending = true; // pending to be sent to the device
     // possibly coupled channels can adjust to this change
-    adjustCoupledChannels();
+    if (aWithCoupling) adjustCoupledChannels();
   }
   setPVar(mIsVolatileValue, false); // channel actively set, is not volatile
 }
 
 
-void ChannelBehaviour::moveChannelValue(int aDirection, MLMicroSeconds aTimePerUnit)
+void ChannelBehaviour::moveChannelValue(int aDirection, MLMicroSeconds aTimePerUnit, bool aWithCoupling)
 {
   if (getDimPerMS()==0) return; // non-dimmable channel -> NOP
   if (aDirection==0) {
@@ -495,13 +495,13 @@ void ChannelBehaviour::moveChannelValue(int aDirection, MLMicroSeconds aTimePerU
       dist = (aDirection>0 ? getMax() : getMinDim()) - mCachedChannelValue;
     }
     MLMicroSeconds tt = aTimePerUnit*fabs(dist);
-    dimChannelValue(dist, tt);
+    dimChannelValue(dist, tt, aWithCoupling);
   }
 }
 
 
 
-double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime)
+double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime, bool aWithCoupling)
 {
   if (aIncrement==0) return mCachedChannelValue; // no change
   double newValue = mCachedChannelValue+aIncrement;
@@ -542,7 +542,7 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     mTransitionDirection = aIncrement>0 ? 1 : -1;
     mChannelUpdatePending = true; // pending to be sent to the device
     // possibly coupled channels can adjust to this change
-    adjustCoupledChannels();
+    if (aWithCoupling) adjustCoupledChannels();
   }
   setPVar(mIsVolatileValue, false); // channel actively dimmed, is not volatile
   return newValue;
@@ -849,7 +849,7 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         // - none for now
         // States properties
         case value_key+states_key_offset:
-          setChannelValue(aPropValue->doubleValue(), mOutput.mTransitionTime, true); // always apply, default transition time (normally 0, unless set in outputState)
+          setChannelValue(aPropValue->doubleValue(), mOutput.mTransitionTime, true, false); // default transition time (normally 0, unless set in outputState), always apply, no coupling
           return true;
       }
     }

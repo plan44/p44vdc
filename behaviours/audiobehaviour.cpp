@@ -462,10 +462,10 @@ bool AudioBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSc
     switch (aSceneCmd) {
       case scene_cmd_audio_mute:
         unmuteVolume = volume->getChannelValue(); ///< save current volume
-        volume->setChannelValue(0); // mute
+        volume->setChannelValue(0, 0, false, false); // mute, immediately, no coupling, only if changed
         return true; // don't let inherited load channels, just request apply
       case scene_cmd_audio_unmute:
-        volume->setChannelValue(unmuteVolume>0 ? unmuteVolume : 1); // restore value known before last mute, but at least non-zero
+        volume->setChannelValue(unmuteVolume>0 ? unmuteVolume : 1, 0, false, false); // restore value known before last mute, but at least non-zero
         return true; // don't let inherited load channels, just request apply
       case scene_cmd_slow_off:
         // TODO: %%% implement it. For now, just invoke

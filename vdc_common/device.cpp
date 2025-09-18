@@ -896,6 +896,8 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
     ApiValuePtr o;
     ChannelBehaviourPtr channel;
     bool suppress = false;
+    bool withCoupling = true; // enabled by default
+    if ((o = aParams->get("coupling"))) withCoupling = o->boolValue();
     if (Error::isOK(err = checkChannel(aParams, channel))) {
       if ((o = aParams->get("move"))) {
         // start/stop moving
@@ -904,7 +906,7 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
         if ((o = aParams->get("rate"))) {
           timePerUnit = o->doubleValue()*Second;
         }
-        channel->moveChannelValue(dir, timePerUnit);
+        channel->moveChannelValue(dir, timePerUnit, withCoupling);
       }
       else if (Error::isOK(err = checkParam(aParams, "value", o))) {
         // move to specific value
@@ -969,7 +971,7 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
           MLMicroSeconds transitionTime = getOutput()->mTransitionTime;
           o = aParams->get("transitionTime");
           if (o) transitionTime = o->doubleValue()*Second;
-          channel->setChannelValue(newValue, transitionTime, true); // always apply precise value
+          channel->setChannelValue(newValue, transitionTime, true, withCoupling); // always apply precise value
         }
       }
       if (!suppress && Error::isOK(err)) {
@@ -1644,7 +1646,7 @@ void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool 
 void Device::dimHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNow)
 {
   // increment channel value
-  aChannel->dimChannelValue(aIncrement, DIM_STEP_INTERVAL);
+  aChannel->dimChannelValue(aIncrement, DIM_STEP_INTERVAL, true); // use coupling if defined in the output
   // apply to hardware
   requestApplyingChannels(boost::bind(&Device::dimDoneHandler, this, aChannel, aIncrement, aNow+DIM_STEP_INTERVAL), true); // apply in dimming mode
 }
@@ -1657,7 +1659,7 @@ void Device::dimDoneHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLM
   while (aNextDimAt<now) {
     // missed this step - simply increment channel and target time, but do not cause re-apply
     OLOG(LOG_DEBUG, "dimChannel: applyChannelValues() was too slow while dimming channel=%d -> skipping next dim step", aChannel->getChannelType());
-    aChannel->dimChannelValue(aIncrement, DIM_STEP_INTERVAL);
+    aChannel->dimChannelValue(aIncrement, DIM_STEP_INTERVAL, true); // use coupling if defined in the output
     aNextDimAt += DIM_STEP_INTERVAL;
   }
   if (mIsDimming) {

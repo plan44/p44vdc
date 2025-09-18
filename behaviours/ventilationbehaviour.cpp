@@ -397,7 +397,7 @@ bool VentilationBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneC
     case scene_cmd_increment:
     case scene_cmd_decrement:
       // these always end automatic airflow intensity mode
-      airflowAuto->setChannelValue(0);
+      airflowAuto->setChannelValue(0, 0, false, false); // no coupling
       break;
     default:
       // all other scene calls are processed normally

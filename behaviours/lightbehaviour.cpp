@@ -258,7 +258,7 @@ void LightBehaviour::onAtMinBrightness(DsScenePtr aScene)
       // - load scene values for channels
       loadChannelsFromScene(lightScene); // Note: causes log message because channel is set to new value
       // - override brightness with minDim
-      mBrightness->setChannelValue(mBrightness->getMinDim(), transitionTimeFromScene(lightScene, true));
+      mBrightness->setChannelValue(mBrightness->getMinDim(), transitionTimeFromScene(lightScene, true), false, true);
     }
   }
 }
@@ -418,12 +418,12 @@ void LightBehaviour::blinkHandler(MLMicroSeconds aEndTime, bool aState, MLMicroS
   }
   else if (!aState) {
     // turn on
-    mBrightness->setChannelValue(mBrightness->getMax(), 0);
+    mBrightness->setChannelValue(mBrightness->getMax(), 0, false, false); // no coupling
     mBrightness->markClean(); // do not save blink states
   }
   else {
     // turn off
-    mBrightness->setChannelValue(mBrightness->getMinDim(), 0);
+    mBrightness->setChannelValue(mBrightness->getMinDim(), 0, false, false); // no coupling
     mBrightness->markClean(); // do not save blink states
   }
   // apply to hardware

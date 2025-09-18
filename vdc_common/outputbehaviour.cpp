@@ -1029,6 +1029,7 @@ static void syncchannels_func(BuiltinFunctionContextPtr f)
 // channel_t(channelid)             - return the transitional value of the specified channel
 // [dim]channel(channelid, value)   - set the channel value to the specified value or dim it relatively
 // [dim]channel(channelid, value, transitiontime)
+// [dim]channel(channelid, value, transitiontime, coupling)
 FUNC_ARG_DEFS(channel, { text }, { numeric|optionalarg }, { numeric|optionalarg } );
 static void channel_funcImpl(bool aDim, bool aTransitional, BuiltinFunctionContextPtr f)
 {
@@ -1050,7 +1051,7 @@ static void channel_funcImpl(bool aDim, bool aTransitional, BuiltinFunctionConte
         f->finish(new ValueSourceObj(vs));
       }
       else
-      #endif
+      #endif // P44SCRIPT_FULL_SUPPORT
       {
         // is not a value source, return numeric value only
         f->finish(new NumericValue(channel->getChannelValueCalculated(aTransitional)));
@@ -1060,13 +1061,17 @@ static void channel_funcImpl(bool aDim, bool aTransitional, BuiltinFunctionConte
     else {
       // set value
       MLMicroSeconds transitionTime = 0; // default to immediate
+      bool withCoupling = true; // default to apply coupled channel changes
       if (f->numArgs()>2) {
         transitionTime = f->arg(2)->doubleValue()*Second;
       }
+      if (f->numArgs()>3) {
+        withCoupling = f->arg(3)->boolValue();
+      }
       if (aDim)
-        channel->dimChannelValue(f->arg(1)->doubleValue(), transitionTime);
+        channel->dimChannelValue(f->arg(1)->doubleValue(), transitionTime, withCoupling);
       else
-        channel->setChannelValue(f->arg(1)->doubleValue(), transitionTime, true); // always apply
+        channel->setChannelValue(f->arg(1)->doubleValue(), transitionTime, true, withCoupling); // always apply
     }
   }
   f->finish(o); // allow chaining
@@ -1087,6 +1092,7 @@ static void dimchannel_func(BuiltinFunctionContextPtr f)
 
 // movechannel(channelid, direction)   - start or stop moving the channel value in the specified direction
 // movechannel(channelid, direction, timePerUnit)
+// movechannel(channelid, direction, timePerUnit, coupling)
 FUNC_ARG_DEFS(movechannel, { text }, { numeric }, { numeric|optionalarg } );
 static void movechannel_func(BuiltinFunctionContextPtr f)
 {
@@ -1099,10 +1105,14 @@ static void movechannel_func(BuiltinFunctionContextPtr f)
   }
   else {
     MLMicroSeconds timePerUnit = 0; // default to standard dimming rate of the channel
+    bool withCoupling = true; // default to apply coupled channel changes
     if (f->numArgs()>2) {
       timePerUnit = f->arg(2)->doubleValue()*Second;
     }
-    channel->moveChannelValue(f->arg(1)->intValue(), timePerUnit);
+    if (f->numArgs()>3) {
+      withCoupling = f->arg(3)->boolValue();
+    }
+    channel->moveChannelValue(f->arg(1)->intValue(), timePerUnit, withCoupling);
   }
   f->finish(o); // allow chaining
 }

@@ -371,7 +371,7 @@ bool ClimateControlBehaviour::processControlValue(const string &aName, double aV
           aValue = fabs(aValue);
         }
         // apply now
-        cb->setChannelValue(aValue, 0, true); // always apply
+        cb->setChannelValue(aValue, 0, true, false); // always apply, no coupling
         return true; // needs apply
       }
     }

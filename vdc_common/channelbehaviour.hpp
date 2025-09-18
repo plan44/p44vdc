@@ -145,7 +145,7 @@ namespace p44 {
     /// @param aNewValue the new output value
     /// @param aTransitionTime time in microseconds to be spent on transition from current to new channel value
     /// @param aAlwaysApply if set, new value will be applied to hardware even if not different from currently known value
-    void setChannelValue(double aNewValue, MLMicroSeconds aTransitionTime=0, bool aAlwaysApply=false);
+    void setChannelValue(double aNewValue, MLMicroSeconds aTransitionTime /* =0 */, bool aAlwaysApply /* = false */, bool aWithCoupling /* = true */);
 
     /// set new channel value and separate transition times for increasing/decreasing value at applyChannelValues()
     /// @param aNewValue the new output value
@@ -168,13 +168,14 @@ namespace p44 {
     /// @param aIncrement how much to increment/decrement the value
     /// @param aTransitionTime time in microseconds to be spent on transition from current to new channel value
     /// @return new channel value after increment/decrement
-    double dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime);
+    double dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime, bool aWithCoupling);
 
     /// start or stop moving channel value up or down
     /// @param aDirection 0 to stop moving, 1 to move up, -1 to move down
-    /// @param aTimePerUnit time in microseconds to be spent for one unit of the channel value.
+    /// @param aTimePerUnit time in microseconds to be spent for one unit of the channel value. 0=default
+    /// @param aWithCoupling if set, channel coupling will be performed while/after changing the output
     ///   if set to 0, rate is calculated from getDimPerMS().
-    void moveChannelValue(int aDirection, MLMicroSeconds aTimePerUnit = 0);
+    void moveChannelValue(int aDirection, MLMicroSeconds aTimePerUnit, bool aWithCoupling);
 
     /// set/reset custom dimming per millisecond rate (0 = standard dimming rate)
     void setCustomDimPerMS(double aDimPerMS = 0) { mCustomDimPerMS = aDimPerMS; };

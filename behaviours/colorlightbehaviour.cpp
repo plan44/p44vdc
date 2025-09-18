@@ -651,7 +651,7 @@ void ColorLightBehaviour::adjustChannelsCoupledTo(ChannelBehaviourPtr aChannel)
     ChannelBehaviourPtr ct = getChannelByType(channeltype_colortemp);
     if (!ct) return;
     double mired = ct->getMax()+(ct->getMin()-ct->getMax())*::pow(aChannel->getChannelValue()/aChannel->getMax(), mChannelCouplingParam);
-    ct->setChannelValue(mired, aChannel->transitionTimeToNewValue());
+    ct->setChannelValue(mired, aChannel->transitionTimeToNewValue(), false, false); // no secondary coupling races!
   }
   #if P44SCRIPT_FULL_SUPPORT
   else if (
