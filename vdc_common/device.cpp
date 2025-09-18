@@ -778,12 +778,6 @@ ErrorPtr Device::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, 
       respErr = WebError::webErr(400, "device cannot send teach in signal of requested variant");
     }
   }
-  else if (aMethod=="x-p44-stopSceneActions") {
-    // we want everything to stop
-    stopTransitions(); // channel transitions
-    stopSceneActions(); // actions such as blinking, scene scripts, animations on views
-    respErr = Error::ok();
-  }
   else if (aMethod=="x-p44-syncChannels") {
     requestUpdatingChannels(boost::bind(&Device::syncedChannels, this, aRequest));
     return ErrorPtr(); // no response now
@@ -916,6 +910,7 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
         // move to specific value
         double newValue = o->doubleValue();
         double mindim = channel->getMinDim();
+        // TODO: implement "direction" (as sent by p44mbrd) with  "up", "down", "shortest", "longest"
         // check input -> output value sync modes
         VdcDialSyncMode syncmode = syncMode_jump; // default,
         o = aParams->get("sync");
@@ -991,6 +986,15 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
     if (Error::notOK(err)) {
       OLOG(LOG_WARNING, "setOutputChannelValue error: %s", err->text());
     }
+  }
+  else if (aNotification=="stopOutput") {
+    // formerly this was the "x-p44-stopSceneActions" method
+    // stop output activity
+    ApiValuePtr o;
+    o = aParams->get("transitions");
+    if (!o || o->boolValue()) stopTransitions(); // channel transitions
+    o = aParams->get("sceneactions");
+    if (!o || o->boolValue()) stopSceneActions(); // actions such as blinking, scene scripts, animations on views
   }
   else {
     inherited::handleNotification(aNotification, aParams, aExaminedCB);

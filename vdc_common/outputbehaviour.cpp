@@ -420,6 +420,7 @@ void OutputBehaviour::sceneScriptDone(SimpleCB aDoneCB, ScriptObjPtr aResult)
 void OutputBehaviour::stopSceneActions()
 {
   #if ENABLE_SCENE_SCRIPT
+  OLOG(LOG_INFO, "stopping scene actions");
   ScriptMainContextPtr dsc = mDevice.getDeviceScriptContext(false);
   if (dsc) {
     dsc->abort(stopall, new ErrorValue(ScriptError::Aborted, "scene actions stopped"));
