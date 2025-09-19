@@ -429,7 +429,7 @@ void WbfComm::refindGateway(StatusCB aFindingResultCB)
     }
     else {
       // use DNSSD to find candidates
-      DnsSdManager::sharedDnsSdManager().browse("_http._tcp", boost::bind(&WbfComm::dnsSdRefindResultHandler, this, _1, _2, aFindingResultCB));
+      DnsSdManager::sharedDnsSdManager().browse("_lisa._tcp", boost::bind(&WbfComm::dnsSdRefindResultHandler, this, _1, _2, aFindingResultCB));
     }
     #endif
   }
