@@ -417,7 +417,10 @@ namespace p44 {
     #if ENABLE_JSONBRIDGEAPI
     /// @return true if addressable can be bridged
     virtual bool bridgeable() P44_OVERRIDE;
-    #endif
+
+    /// @return the bridging flags
+    DeviceSettings::BridgingFlags bridgingFlags();
+    #endif // ENABLE_JSONBRIDGEAPI
 
     /// report that device has vanished (disconnected without being told so via vDC API)
     /// This will call disconnect() on the device, and remove it from all vDC container lists

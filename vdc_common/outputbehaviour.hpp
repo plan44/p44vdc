@@ -305,6 +305,11 @@ namespace p44 {
     /// @return string, really short, intended to be shown as a narrow column in a list
     virtual string getStatusText() P44_OVERRIDE;
 
+    #if ENABLE_JSONBRIDGEAPI
+    /// instruction for bridges to bridge this behaviour or not
+    /// @return true if the behaviour is meant to be bridged
+    virtual bool wantsBridging() P44_OVERRIDE { return mDevice.bridgingFlags() & DeviceSettings::bridge_output; };
+    #endif
 
   protected:
 

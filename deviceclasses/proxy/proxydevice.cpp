@@ -234,9 +234,9 @@ bool ProxyDevice::localPropertyOverride(JsonObjectPtr aProps, PropertyAccessMode
       aProps->add("x-p44-bridgeable", JsonObject::newBool(bridgeable()));
       #endif
     }
-    if (aProps->get("x-p44-allowBridging", o)) {
+    if (aProps->get("x-p44-bridgingFlags", o)) {
       #if ENABLE_JSONBRIDGEAPI
-      aProps->add("x-p44-allowBridging", JsonObject::newBool(mDeviceSettings->mAllowBridging));
+      aProps->add("x-p44-bridgingFlags", JsonObject::newInt32(mDeviceSettings->mBridgingFlags));
       #endif
     }
   }
@@ -248,13 +248,13 @@ bool ProxyDevice::localPropertyOverride(JsonObjectPtr aProps, PropertyAccessMode
       #endif
       aProps->del("x-p44-bridged"); // do not propagate write to proxy!
     }
-    if (aProps->get("x-p44-allowBridging", o)) {
+    if (aProps->get("x-p44-bridgingFlags", o)) {
       #if ENABLE_JSONBRIDGEAPI
-      if (mDeviceSettings->setPVar(mDeviceSettings->mAllowBridging, o->boolValue())) {
+      if (mDeviceSettings->setPVar(mDeviceSettings->mBridgingFlags, (DeviceSettings::BridgingFlags)o->int32Value())) {
         pushBridgeable();
       }
       #endif
-      aProps->del("x-p44-allowBridging"); // do not propagate write to proxy!
+      aProps->del("x-p44-bridgingFlags"); // do not propagate write to proxy!
     }
   }
   return aProps->numKeys()>0; // non-empty properties object

@@ -155,7 +155,7 @@ BridgeDevice::BridgeDevice(BridgeVdc *aVdcP, const string &aBridgeDeviceId, cons
     // pseudo-output (to capture scenes)
     // - standard scene device settings
     DeviceSettingsPtr s = DeviceSettingsPtr(new SceneDeviceSettings(*this));
-    s->mAllowBridging = aAllowBridging; // bridging allowed from start?
+    s->mBridgingFlags = aAllowBridging ? DeviceSettings::bridge_all : DeviceSettings::bridge_none; // bridging allowed from start?
     installSettings(s);
     // - but we do not need a light behaviour, simple output will do
     OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*this));

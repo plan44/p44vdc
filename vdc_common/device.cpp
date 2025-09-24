@@ -237,17 +237,26 @@ void Device::setZoneID(DsZoneID aZoneId)
         pushNotification(api, q, ApiValuePtr());
       }
     }
-    #endif
+    #endif // ENABLE_JSONBRIDGEAPI
   }
 }
 
 
 #if ENABLE_JSONBRIDGEAPI
+
+DeviceSettings::BridgingFlags Device::bridgingFlags()
+{
+  if (!mDeviceSettings) return DeviceSettings::bridge_none;
+  return mDeviceSettings->mBridgingFlags;
+}
+
+
 bool Device::bridgeable()
 {
-  return mDeviceSettings && mDeviceSettings->mAllowBridging;
+  return bridgingFlags()!=DeviceSettings::bridge_none;
 }
-#endif
+
+#endif // ENABLE_JSONBRIDGEAPI
 
 
 string Device::vendorName()
@@ -276,7 +285,7 @@ void Device::setName(const string &aName)
         pushNotification(api, q, ApiValuePtr());
       }
     }
-    #endif
+    #endif // ENABLE_JSONBRIDGEAPI
   }
 }
 
@@ -2248,7 +2257,7 @@ enum {
   zoneName_key,
   #endif
   #if ENABLE_JSONBRIDGEAPI
-  allowBridging_key,
+  bridgingFlags_key,
   #endif
   numDeviceFieldKeys
 };
@@ -2354,7 +2363,7 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
     { "x-p44-zonename", apivalue_string, zoneName_key, OKEY(device_obj) },
     #endif
     #if ENABLE_JSONBRIDGEAPI
-    { "x-p44-allowBridging", apivalue_bool, allowBridging_key, OKEY(device_obj) },
+    { "x-p44-bridgingFlags", apivalue_uint64, bridgingFlags_key, OKEY(device_obj) },
     #endif
   };
   // C++ object manages different levels, check aParentDescriptor
@@ -2568,8 +2577,10 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
         } else return false;
         #endif // ENABLE_LOCALCONTROLLER
         #if ENABLE_JSONBRIDGEAPI
-        case allowBridging_key:
-          aPropValue->setBoolValue(mDeviceSettings && mDeviceSettings->mAllowBridging); return true;
+        case bridgingFlags_key:
+          if (!mDeviceSettings) return false;
+          aPropValue->setUint32Value(mDeviceSettings->mBridgingFlags);
+          return true;
         #endif // ENABLE_JSONBRIDGEAPI
       }
     }
@@ -2580,13 +2591,14 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
           setZoneID(aPropValue->int32Value());
           return true;
         #if ENABLE_JSONBRIDGEAPI
-        case allowBridging_key:
-          if (mDeviceSettings->setPVar(mDeviceSettings->mAllowBridging, aPropValue->boolValue())) {
-            // bridgeability changed, push to bridge
+        case bridgingFlags_key:
+          if (!mDeviceSettings) return false;
+          if(mDeviceSettings->setPVar(mDeviceSettings->mBridgingFlags, (DeviceSettings::BridgingFlags)aPropValue->int32Value())) {
+            // bridge flags changed, push to bridge
             pushBridgeable();
           }
           return true;
-        #endif
+        #endif // ENABLE_JSONBRIDGEAPI
       }
     }
   }

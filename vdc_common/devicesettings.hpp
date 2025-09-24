@@ -57,9 +57,22 @@ namespace p44 {
     DsZoneID mZoneID;
 
     #if ENABLE_JSONBRIDGEAPI
+    // IMPORTANT: these are mapped to bits0..3 of device global flags, with all input flags inverted such that
+    //   old settings which had only a single flag at bit 0 keep the meaning of "bridge everything".
+    //   So THESE BIT POSITIONS ARE PART OF PERSISTENT SETTINGS, DO NOT CHANGE!
+    typedef enum {
+      bridge_none = 0,
+      bridge_output = 0x01, // stored 1:1 as bit 0 in device global flag word
+      bridge_sensors = 0x02, // stored inverted as bit 1 in device global flag word
+      bridge_inputs = 0x04, // stored inverted as bit 2 in device global flag word
+      bridge_buttons = 0x08, // stored inverted as bit 3 in device global flag word
+      bridge_all = 0x0F, // bridge all behaviours
+      bridge_flags_mask = 0x0F // all flags mask
+    } BridgingFlags;
+
     /// allow bridging via bridge API
-    bool mAllowBridging;
-    #endif
+    BridgingFlags mBridgingFlags;
+    #endif // ENABLE_JSONBRIDGEAPI
 
     // persistence implementation
     virtual const char *tableName();

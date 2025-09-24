@@ -181,6 +181,12 @@ namespace p44 {
     /// @return textual description of object, may contain LFs
     virtual string description() P44_OVERRIDE;
 
+    #if ENABLE_JSONBRIDGEAPI
+    /// instruction for bridges to bridge this behaviour or not
+    /// @return true if the behaviour is meant to be bridged
+    virtual bool wantsBridging() P44_OVERRIDE { return mDevice.bridgingFlags() & DeviceSettings::bridge_inputs; };
+    #endif
+
   protected:
 
     /// the behaviour type

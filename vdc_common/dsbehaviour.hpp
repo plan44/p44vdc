@@ -156,6 +156,12 @@ namespace p44 {
     /// @return true if selected API was connected and push could be sent
     bool pushBehaviourState(bool aDS, bool aBridges);
 
+    #if ENABLE_JSONBRIDGEAPI
+    /// instruction for bridges to bridge this behaviour or not
+    /// @return true if the behaviour is meant to be bridged
+    virtual bool wantsBridging() = 0;
+    #endif
+
     /// check for defined state
     /// @return true if behaviour has a defined (non-NULL) state
     virtual bool hasDefinedState() { return false; };

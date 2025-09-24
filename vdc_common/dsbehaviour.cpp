@@ -211,6 +211,9 @@ enum {
   type_key,
   dsIndex_key,
   behaviourType_key,
+  #if ENABLE_JSONBRIDGEAPI
+  wantsBridging_key,
+  #endif
   numDsBehaviourDescProperties
 };
 
@@ -261,6 +264,9 @@ PropertyDescriptorPtr DsBehaviour::getDescriptorByIndex(int aPropIndex, int aDom
     { "type", apivalue_string, type_key+descriptions_key_offset, OKEY(dsBehaviour_Key) },
     { "dsIndex", apivalue_uint64, dsIndex_key+descriptions_key_offset, OKEY(dsBehaviour_Key) },
     { "x-p44-behaviourType", apivalue_string, behaviourType_key+descriptions_key_offset, OKEY(dsBehaviour_Key) },
+    #if ENABLE_JSONBRIDGEAPI
+    { "x-p44-wantsBridging", apivalue_bool, wantsBridging_key+descriptions_key_offset, OKEY(dsBehaviour_Key) },
+    #endif
   };
   static const PropertyDescription settingsProperties[numDsBehaviourSettingsProperties] = {
     { "x-p44-logLevelOffset", apivalue_int64, logLevelOffset_key+settings_key_offset, OKEY(dsBehaviour_Key) },
@@ -320,6 +326,9 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
         case type_key+descriptions_key_offset: aPropValue->setStringValue(getTypeName()); return true;
         case dsIndex_key+descriptions_key_offset: aPropValue->setUint64Value(getIndex()); return true;
         case behaviourType_key+descriptions_key_offset: aPropValue->setStringValue(behaviourTypeIdentifier()); return true;
+        #if ENABLE_JSONBRIDGEAPI
+        case wantsBridging_key+descriptions_key_offset: aPropValue->setBoolValue(wantsBridging()); return true;
+        #endif
         // settings
         case logLevelOffset_key+settings_key_offset: { int o=getLocalLogLevelOffset(); if (o==0) return false; else aPropValue->setInt32Value(o); return true; }
         case colorClass_key+settings_key_offset: aPropValue->setUint16Value(getColorClass()); return true;

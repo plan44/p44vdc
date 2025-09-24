@@ -31,7 +31,7 @@ DeviceSettings::DeviceSettings(Device &aDevice) :
   inherited(aDevice.getVdcHost().getDsParamStore()),
   mDevice(aDevice),
   #if ENABLE_JSONBRIDGEAPI
-  mAllowBridging(false),
+  mBridgingFlags(BridgingFlags::bridge_none),
   #endif
   mZoneID(0)
 {
@@ -56,10 +56,14 @@ size_t DeviceSettings::numFieldDefs()
 }
 
 
-// flags in mDeviceFlags
+// global device flag definitons
 enum {
   // device global
-  deviceflags_allowBridging = 0x0001, ///< allow bridging this device
+  // - bits 0..3 are used for bridging flags (see BridgingFlags)
+  deviceflags_bridgingFlagsMask = DeviceSettings::bridge_flags_mask, ///< bridging flags
+  deviceflags_invertedBridgingFlags = DeviceSettings::bridge_flags_mask & ~DeviceSettings::bridge_output, ///< all input flags are stored inverted, output bit is stored as-is
+  // - bits 4..7 are reserved for future use
+  deviceflags_max = 0x0080, ///< highest device flag reserved at the root class level
 };
 
 const FieldDefinition *DeviceSettings::getFieldDef(size_t aIndex)
@@ -88,7 +92,7 @@ void DeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
   aRow->getCastedIfNotNull<DsZoneID, int>(aIndex++, mZoneID);
   // decode my own flags
   #if ENABLE_JSONBRIDGEAPI
-  mAllowBridging = flags & deviceflags_allowBridging;
+  mBridgingFlags = (BridgingFlags)((flags & deviceflags_bridgingFlagsMask) ^ deviceflags_invertedBridgingFlags);
   #endif
   // pass the flags out to subclass which called this superclass to get the flags (and decode themselves)
   if (aCommonFlagsP) *aCommonFlagsP = flags;
@@ -101,7 +105,7 @@ void DeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // encode the flags
   #if ENABLE_JSONBRIDGEAPI
-  if (mAllowBridging) aCommonFlags |= deviceflags_allowBridging;
+  aCommonFlags = (aCommonFlags & deviceflags_bridgingFlagsMask) | (mBridgingFlags ^ deviceflags_invertedBridgingFlags);
   #endif
   // bind the fields
   aStatement.bind(aIndex++, (long long int)aCommonFlags);
