@@ -113,7 +113,9 @@ Device::Device(Vdc *aVdcP) :
   mColorClass(class_black_joker),
   mApplyInProgress(false),
   mMissedApplyAttempts(0),
-  mUpdateInProgress(false)
+  mUpdateInProgress(false),
+  mPreviousSceneNo(INVALID_SCENE_NO),
+  mCurrentSceneNo(INVALID_SCENE_NO)
 {
   assert(aVdcP);
 }
@@ -1778,6 +1780,11 @@ void Device::callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool a
       mOutput->setLocalPriority(false);
     }
   }
+  #if P44SCRIPT_FULL_SUPPORT
+  // bookkeeping
+  mPreviousSceneNo = mCurrentSceneNo;
+  mCurrentSceneNo = sceneNo;
+  #endif
   if (!aScene->isDontCare()) {
     // Scene found and dontCare not set, check details
     // - check and update local priority
@@ -2722,6 +2729,21 @@ static ScriptObjPtr uid_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPt
   return new StringValue(d->device()->getDsUid().getString());
 }
 
+static ScriptObjPtr lastscene_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite, BuiltinMemberDescriptor*)
+{
+  DeviceObj* d = dynamic_cast<DeviceObj*>(aParentObj.get());
+  assert(d);
+  return new StringValue(VdcHost::sceneText(d->device()->previousSceneNo(), false, true)); // as ID
+}
+
+
+static ScriptObjPtr currentscene_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite, BuiltinMemberDescriptor*)
+{
+  DeviceObj* d = dynamic_cast<DeviceObj*>(aParentObj.get());
+  assert(d);
+  return new StringValue(VdcHost::sceneText(d->device()->currentSceneNo(), false, true)); // as ID
+}
+
 
 // button(id_or_index)
 // sensor(id_or_index)
@@ -2745,7 +2767,10 @@ static void inputValueSource_func(BuiltinFunctionContextPtr f)
   f->finish(new ValueSourceObj(vs));
 }
 
+
 static const BuiltinMemberDescriptor deviceMembers[] = {
+  MEMBER_DEF(currentscene, builtinvalue),
+  MEMBER_DEF(lastscene, builtinvalue),
   MEMBER_DEF(output, builtinvalue),
   MEMBER_DEF(name, builtinvalue),
   MEMBER_DEF(uid, builtinvalue),

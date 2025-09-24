@@ -661,14 +661,15 @@ namespace p44 {
     /// @return dS scene number or INVALID_SCENE_NO if none is found
     static SceneNo getSceneIdByKind(string aSceneKindName);
 
-    #endif
+    #endif // !REDUCED_FOOTPRINT
 
     /// get a text description for a scene number
     /// @param aSceneNo the scene number to get a description text for
     /// @param aIsGlobal if set, global names are used for ambiguous scenes
     ///   (those that have different meaning in room context vs. in global context),
     ///   otherwise, room scene names are used in the description text
-    static string sceneText(SceneNo aSceneNo, bool aIsGlobal = false);
+    /// @param aAsId return as ID that is recognized by getSceneIdByKind()
+    static string sceneText(SceneNo aSceneNo, bool aIsGlobal = false, bool aAsId = false);
 
   protected:
 

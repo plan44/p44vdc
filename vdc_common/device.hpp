@@ -103,6 +103,7 @@ namespace p44 {
     friend class SceneChannels;
     friend class SceneDeviceSettings;
     friend class ButtonBehaviour;
+    friend class OutputBehaviour;
 
     BehaviourVector mButtons; ///< buttons and switches (user interaction)
     BehaviourVector mInputs; ///< binary inputs (not for user interaction)
@@ -156,6 +157,8 @@ namespace p44 {
 
     #if P44SCRIPT_FULL_SUPPORT
     ScriptMainContextPtr mDeviceScriptContext; ///< script context to run device scripts (such as scene scripts)
+    SceneNo mPreviousSceneNo; ///< previously applied scene number, can be INVALID\_SCENE\_NO
+    SceneNo mCurrentSceneNo; ///< currently applied or in-progress-to-be-applied scene, can be INVALID\_SCENE\_NO
     #endif
 
   public:
@@ -593,6 +596,12 @@ namespace p44 {
 
     /// flag all channels unconditionally for re-applying to hardware
     void invalidateAllChannels();
+
+    /// @return /// previously applied scene number, can be INVALID\_SCENE\_NO
+    SceneNo previousSceneNo() { return mPreviousSceneNo; };
+
+    /// @return  currently applied or in-progress-to-be-applied scene, can be INVALID\_SCENE\_NO
+    SceneNo currentSceneNo() { return mCurrentSceneNo; };
 
     /// abort any currently ongoing scene action
     /// @note base class just calls stopSceneActions() on the output
