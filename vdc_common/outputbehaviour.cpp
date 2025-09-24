@@ -464,10 +464,10 @@ bool OutputBehaviour::applySceneToChannels(DsScenePtr aScene, MLMicroSeconds aTr
 
 bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aSceneCmd)
 {
-  // stop any actions still ongoing from a previous call
-  // Note: we do NOT stop transitions here, those channels affected by a new scene value
-  //   will stop or retarget anyway, unaffected channels may continue running.
-  stopSceneActions();
+  // Note: we do NOT stop transitions nor scene actions here (any more)
+  // - those channels affected by a new scene value will stop or retarget anyway, unaffected channels may continue running.
+  // - scene scripts will not be aborted here (but at all call sites
+  //   except for p44script loadscene(), where scene script might be the caller)
   // scenes with invoke functionality will apply channel values by default
   if (aSceneCmd==scene_cmd_none) {
     aSceneCmd = aScene->mSceneCmd;
@@ -960,6 +960,7 @@ static void loadscene_func(BuiltinFunctionContextPtr f)
     MLMicroSeconds transition = Infinite; // no override
     if (f->numArgs()>=2) transition = f->arg(1)->doubleValue()*Second;
     POLOG(o->output(), LOG_INFO, "loadscene(%s) loads channel values", VdcHost::sceneText(scene->mSceneNo).c_str());
+    // really only apply scene channels, but do NOT stop scene actions (as this would kill scene scripts using loadscene()
     o->output()->applySceneToChannels(scene, transition);
   }
   f->finish(o); // allow chaining

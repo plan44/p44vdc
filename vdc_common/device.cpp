@@ -1862,6 +1862,7 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatTo
   if (mPreparedScene) {
     DsScenePtr scene = mPreparedScene;
     // apply scene logically
+    mOutput->stopSceneActions(); // stop previous actions (applySceneToChannels does not do that any more)
     if (mOutput->applySceneToChannels(scene, mPreparedTransitionOverride)) {
       // prepare for apply (but do NOT yet apply!) on device hardware level)
       if (prepareSceneApply(scene)) {
@@ -1989,6 +1990,7 @@ void Device::undoScene(SceneNo aSceneNo)
     // scene found, now apply it to the output (if any)
     if (mOutput) {
       // now apply the pseudo state
+      mOutput->stopSceneActions(); // stop previous actions (applySceneToChannels does not do that any more)
       mOutput->applySceneToChannels(mPreviousState, Infinite); // no transition time override
       // apply the values now, not dimming
       if (prepareSceneApply(mPreviousState)) {
