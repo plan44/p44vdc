@@ -982,16 +982,22 @@ static void runactions_func(BuiltinFunctionContextPtr f)
 }
 
 
-// stopactions()
+// stopactions([transitions [,actions]])
+FUNC_ARG_DEFS(stopactions, { numeric|optionalarg }, { numeric|optionalarg } );
 static void stopactions_func(BuiltinFunctionContextPtr f)
 {
   OutputObj* o = dynamic_cast<OutputObj*>(f->thisObj().get());
   assert(o);
-  POLOG(o->output(), LOG_INFO, "stopping all scene actions");
   // Note: call this on device level, so device implementations
   //   have the chance to stop device-specific ongoing actions and transition
-  o->output()->getDevice().stopTransitions();
-  o->output()->getDevice().stopSceneActions();
+  if (!f->arg(0)->defined() || f->arg(0)->boolValue()) {
+    POLOG(o->output(), LOG_INFO, "stopping all transitions");
+    o->output()->getDevice().stopTransitions();
+  }
+  if (!f->arg(1)->defined() || f->arg(1)->boolValue()) {
+    POLOG(o->output(), LOG_INFO, "stopping all scene actions");
+    o->output()->getDevice().stopSceneActions();
+  }
   f->finish(o); // allow chaining
 }
 
@@ -1014,6 +1020,7 @@ static void applychannels_func(BuiltinFunctionContextPtr f)
   o->output()->getDevice().getVdc().cancelNativeActionUpdate(); // still delayed native scene updates must be cancelled before changing channel values
   o->output()->getDevice().requestApplyingChannels(boost::bind(&outputOpComplete, f, o->output()), false);
 }
+
 
 // syncchannels()
 static void syncchannels_func(BuiltinFunctionContextPtr f)
@@ -1121,7 +1128,7 @@ static void movechannel_func(BuiltinFunctionContextPtr f)
 static const BuiltinMemberDescriptor outputMembers[] = {
   FUNC_DEF_W_ARG(loadscene, executable|objectvalue),
   FUNC_DEF_W_ARG(runactions, executable|async|null),
-  FUNC_DEF_NOARG(stopactions, executable|objectvalue),
+  FUNC_DEF_W_ARG(stopactions, executable|objectvalue),
   FUNC_DEF_W_ARG(applychannels, executable|async|null),
   FUNC_DEF_NOARG(syncchannels, executable|async|null),
   FUNC_DEF_W_ARG(channel, executable|numeric|objectvalue),
