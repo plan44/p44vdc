@@ -331,6 +331,41 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
       }
       break;
     }
+    case EVENT_DEVICE_ACCESSIBILITY: {
+      pli++; // skip that 3rd byte dsm events seem to have
+      uint16_t devId;
+      if ((pli = Ds485Comm::payload_get16(aPayload, pli, devId))==0) return;
+      Ds485DevicePtr dev = deviceFor(aSource, devId); // upstream -> source is relevant
+      if (dev) {
+        switch (modifier) {
+          case EVENT_DEVICE_ACCESSIBILITY_ON:dev->mIsPresent = true; break;
+          case EVENT_DEVICE_ACCESSIBILITY_OFF: dev->mIsPresent = false; break;
+        }
+        dev->updatePresenceState(dev->mIsPresent);
+      }
+      else {
+        // accessibility for unknown device
+        uint16_t zoneId;
+        if ((pli = Ds485Comm::payload_get16(aPayload, pli, zoneId))==0) return; // something is wrong, skip
+        uint16_t vendId;
+        if ((pli = Ds485Comm::payload_get16(aPayload, pli, vendId))==0) return; // something is wrong, skip
+        uint16_t prodId;
+        if ((pli = Ds485Comm::payload_get16(aPayload, pli, prodId))==0) return; // something is wrong, skip
+        uint16_t funcId;
+        if ((pli = Ds485Comm::payload_get16(aPayload, pli, funcId))==0) return; // something is wrong, skip
+        uint16_t vers;
+        if ((pli = Ds485Comm::payload_get16(aPayload, pli, vers))==0) return; // something is wrong, skip
+        DsUid dSUID;
+        dSUID.setAsBinary(aPayload.substr(pli, 17)); pli += 17;
+        OLOG(LOG_WARNING,
+           "device accessibility event for unknown device %s in zoneID=%d (vendId=0x%04x, prodId=0x%04x, funcId=0x%04x, vers=0x%04x)",
+           dSUID.getString().c_str(),
+           zoneId,
+           vendId, prodId, funcId, vers
+        );
+      }
+      break;
+    }
     case EVENT_DEVICE_SENSOR: {
       pli++; // skip that 3rd byte dsm events seem to have
       uint16_t devId;
