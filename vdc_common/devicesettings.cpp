@@ -93,6 +93,8 @@ void DeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
   // decode my own flags
   #if ENABLE_JSONBRIDGEAPI
   mBridgingFlags = (BridgingFlags)((flags & deviceflags_bridgingFlagsMask) ^ deviceflags_invertedBridgingFlags);
+  // TODO: if we ever want buttons/sensors/input but no output bridging, this needs to be changed
+  if (mBridgingFlags==deviceflags_invertedBridgingFlags) mBridgingFlags = DeviceSettings::bridge_none; // only inverted ones set: upgrade from legacy
   #endif
   // pass the flags out to subclass which called this superclass to get the flags (and decode themselves)
   if (aCommonFlagsP) *aCommonFlagsP = flags;
