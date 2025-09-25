@@ -451,7 +451,7 @@ ErrorPtr ZoneList::save()
   // save all elements (only dirty ones will be actually stored to DB)
   for (ZonesVector::iterator pos = mZones.begin(); pos!=mZones.end(); ++pos) {
     err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
-    if (Error::notOK(err)) LOG(LOG_ERR,"Error saving zone %d: %s", (*pos)->mZoneID, err->text());
+    if (Error::notOK(err)) OLOG(LOG_ERR,"Error saving zone %d: %s", (*pos)->mZoneID, err->text());
   }
   return err;
 }
@@ -845,7 +845,7 @@ ErrorPtr SceneList::save()
   // save all elements (only dirty ones will be actually stored to DB)
   for (ScenesVector::iterator pos = mScenes.begin(); pos!=mScenes.end(); ++pos) {
     err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
-    if (Error::notOK(err)) LOG(LOG_ERR,"Error saving scene %d: %s", (*pos)->mSceneIdentifier.mSceneNo, err->text());
+    if (Error::notOK(err)) OLOG(LOG_ERR,"Error saving scene %d: %s", (*pos)->mSceneIdentifier.mSceneNo, err->text());
   }
   return err;
 }
@@ -1381,7 +1381,7 @@ ErrorPtr TriggerList::save()
   // save all elements (only dirty ones will be actually stored to DB)
   for (TriggersVector::iterator pos = mTriggers.begin(); pos!=mTriggers.end(); ++pos) {
     err = (*pos)->saveToStore(NULL, true); // multiple instances allowed, it's a *list*!
-    if (Error::notOK(err)) LOG(LOG_ERR,"Error saving trigger %d: %s", (*pos)->mTriggerId, err->text());
+    if (Error::notOK(err)) OLOG(LOG_ERR,"Error saving trigger %d: %s", (*pos)->mTriggerId, err->text());
   }
   return err;
 }
@@ -1511,9 +1511,9 @@ void LocalController::processGlobalEvent(VdchostEvent aActivity)
   }
   if (aActivity>=vdchost_redistributed_events) {
     // only process events that should be redistributed to all objects
-    LOG(LOG_INFO, ">>> localcontroller starts processing global event %d", (int)aActivity);
+    OLOG(LOG_INFO, "starts processing global event %d", (int)aActivity);
     mLocalTriggers.processGlobalEvent(aActivity);
-    LOG(LOG_INFO, ">>> localcontroller done processing event %d", (int)aActivity);
+    OLOG(LOG_INFO, "done processing event %d", (int)aActivity);
   }
 }
 
@@ -1592,7 +1592,7 @@ bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, dou
 bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour)
 {
   LocalController::sharedLocalController()->signalActivity(); // button clicks are activity
-  FOCUSLOG("processButtonClick: button = %s", aButtonBehaviour.shortDesc().c_str());
+  FOCUSOLOG("processButtonClick: button = %s", aButtonBehaviour.shortDesc().c_str());
   // defaults
   DsClickType clickType = aButtonBehaviour.mClickType;
   DsGroup group = aButtonBehaviour.mButtonGroup;
@@ -1609,7 +1609,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour)
   // direct action?
   if (aButtonBehaviour.mActionMode!=buttonActionMode_none) {
     // direct action
-    FOCUSLOG("processButtonClick: direct action");
+    FOCUSOLOG("processButtonClick: direct action");
     sceneToCall = aButtonBehaviour.mActionId;
     zoneID = global ? zoneId_global : aButtonBehaviour.mDevice.getZoneID();
     if (aButtonBehaviour.mActionMode==buttonActionMode_force) force = true;
@@ -1617,7 +1617,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour)
   }
   else {
     // actual click: determine what to do
-    FOCUSLOG("processButtonClick: actual click: %d (%s)", clickType, ButtonBehaviour::clickTypeName(clickType).c_str());
+    FOCUSOLOG("processButtonClick: actual click: %d (%s)", clickType, ButtonBehaviour::clickTypeName(clickType).c_str());
     switch (aButtonBehaviour.mButtonMode) {
       case buttonMode_standard:
       case buttonMode_turbo:
@@ -1641,7 +1641,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour)
     }
     // evaluate function
     if (aButtonBehaviour.mButtonFunc==buttonFunc_app) {
-      FOCUSLOG("processButtonClick: no default action for app button -> must be handled programmatically");
+      FOCUSOLOG("processButtonClick: no default action for app button -> must be handled programmatically");
       return false; // we do not handle app buttons
     }
     if (global) {
@@ -1832,7 +1832,7 @@ void LocalController::setOutputChannelValues(NotificationAudience &aAudience, st
 
 void LocalController::deviceAdded(DevicePtr aDevice)
 {
-  FOCUSLOG("deviceAdded: device = %s", aDevice->shortDesc().c_str());
+  FOCUSOLOG("deviceAdded: device = %s", aDevice->shortDesc().c_str());
   // make sure this device's zone exists in the global list
   ZoneDescriptorPtr deviceZone = mLocalZones.getZoneById(aDevice->getZoneID(), true);
   deviceZone->usedByDevice(aDevice, true);
@@ -1841,7 +1841,7 @@ void LocalController::deviceAdded(DevicePtr aDevice)
 
 void LocalController::deviceRemoved(DevicePtr aDevice)
 {
-  FOCUSLOG("deviceRemoved: device = %s", aDevice->shortDesc().c_str());
+  FOCUSOLOG("deviceRemoved: device = %s", aDevice->shortDesc().c_str());
   ZoneDescriptorPtr deviceZone = mLocalZones.getZoneById(aDevice->getZoneID(), false);
   if (deviceZone) deviceZone->usedByDevice(aDevice, false);
 }
@@ -1849,7 +1849,7 @@ void LocalController::deviceRemoved(DevicePtr aDevice)
 
 void LocalController::deviceChangesZone(DevicePtr aDevice, DsZoneID aFromZone, DsZoneID aToZone)
 {
-  FOCUSLOG("deviceChangesZone: device = %s, zone %d -> %d", aDevice->shortDesc().c_str(), aFromZone, aToZone);
+  FOCUSOLOG("deviceChangesZone: device = %s, zone %d -> %d", aDevice->shortDesc().c_str(), aFromZone, aToZone);
   if (aFromZone!=aToZone) {
     // - remove from old
     ZoneDescriptorPtr deviceZone = mLocalZones.getZoneById(aFromZone, false);
@@ -1914,7 +1914,7 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
         }
       }
     }
-    LOG(LOG_INFO,
+    OLOG(LOG_INFO,
       "Zone '%s' (%d) state updated: lastLightScene:%d, lastDim=%d, lastGlobalScene:%d, lightOn=%d/areas1234=%d%d%d%d, shadesOpen=%d/%d%d%d%d",
       zone->getName().c_str(), zone->getZoneId(),
       zone->mZoneState.mLastLightScene,
@@ -1939,7 +1939,7 @@ size_t LocalController::totalDevices() const
 
 void LocalController::startRunning()
 {
-  FOCUSLOG("startRunning");
+  FOCUSOLOG("startRunning");
 }
 
 
@@ -1948,11 +1948,11 @@ ErrorPtr LocalController::load()
 {
   ErrorPtr err;
   err = mLocalZones.load();
-  if (Error::notOK(err)) LOG(LOG_ERR, "could not load localZones: %s", err->text());
+  if (Error::notOK(err)) OLOG(LOG_ERR, "could not load localZones: %s", err->text());
   err = mLocalScenes.load();
-  if (Error::notOK(err)) LOG(LOG_ERR, "could not load localScenes: %s", err->text());
+  if (Error::notOK(err)) OLOG(LOG_ERR, "could not load localScenes: %s", err->text());
   err = mLocalTriggers.load();
-  if (Error::notOK(err)) LOG(LOG_ERR, "could not load localTriggers: %s", err->text());
+  if (Error::notOK(err)) OLOG(LOG_ERR, "could not load localTriggers: %s", err->text());
   return err;
 }
 
@@ -1961,11 +1961,11 @@ ErrorPtr LocalController::save()
 {
   ErrorPtr err;
   err = mLocalZones.save();
-  if (Error::notOK(err)) LOG(LOG_ERR, "could not save localZones: %s", err->text());
+  if (Error::notOK(err)) OLOG(LOG_ERR, "could not save localZones: %s", err->text());
   err = mLocalScenes.save();
-  if (Error::notOK(err)) LOG(LOG_ERR, "could not save localScenes: %s", err->text());
+  if (Error::notOK(err)) OLOG(LOG_ERR, "could not save localScenes: %s", err->text());
   err = mLocalTriggers.save();
-  if (Error::notOK(err)) LOG(LOG_ERR, "could not save localTriggers: %s", err->text());
+  if (Error::notOK(err)) OLOG(LOG_ERR, "could not save localTriggers: %s", err->text());
   return err;
 }
 
