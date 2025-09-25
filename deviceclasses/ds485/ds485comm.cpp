@@ -232,11 +232,14 @@ size_t Ds485Comm::payload_getGroups(const string& aPayload, size_t aAtIndex, uin
 }
 
 
-size_t Ds485Comm::payload_getString(const string& aPayload, size_t aAtIndex, size_t aFieldSize, string &aString)
+size_t Ds485Comm::payload_getString(const string& aPayload, size_t aAtIndex, size_t aFieldSize, string &aString, bool aBinary)
 {
   if (aAtIndex+aFieldSize>aPayload.size()) return payloaderr(aPayload, aAtIndex, "string");
   string f = aPayload.substr(aAtIndex, aFieldSize);
-  aString = f.c_str(); // do not copy any garbage beyond terminator
+  if (aBinary)
+    aString = f; // including all bytes of the field
+  else
+    aString = f.c_str(); // do not copy any garbage beyond terminator
   aAtIndex += aFieldSize;
   return aAtIndex;
 }

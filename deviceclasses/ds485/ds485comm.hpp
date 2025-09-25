@@ -136,7 +136,7 @@ namespace p44 {
     static size_t payload_get16(const string& aPayload, size_t aAtIndex, uint16_t& aWord);
     static size_t payload_get32(const string& aPayload, size_t aAtIndex, uint32_t& aLongWord);
     static size_t payload_getGroups(const string& aPayload, size_t aAtIndex, DsGroupMask& aGroupMask);
-    static size_t payload_getString(const string& aPayload, size_t aAtIndex, size_t aFieldSize, string& aString);
+    static size_t payload_getString(const string& aPayload, size_t aAtIndex, size_t aFieldSize, string& aString, bool aBinary=false);
     /// @}
 
     /// @name API to call from main thread (not blocking)

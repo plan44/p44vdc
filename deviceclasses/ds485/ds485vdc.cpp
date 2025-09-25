@@ -573,7 +573,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             "- zoneID=%d/0x%04x, active=%d, locked=%d\n"
             "- outMode=0x%04x, ltMode=0x%04x\n"
             "- groups=0x%016llx, activeGroup=%d, defaultGroup=%d",
-            j, dSUID.text().c_str(), devId, devName.c_str(),
+            j, dSUID.getString().c_str(), devId, devName.c_str(),
             vendId, prodId, funcId, vers,
             zoneId, zoneId, active, locked,
             outMode, ltMode,
@@ -831,8 +831,35 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
               dev->setSensorInfoAtIndex(si, sinfo);
             }
           } // sensors
-          // save device in list
-          mDs485Devices[fullDevId(dev->mDsmDsUid, dev->mDevId)] = dev;
+          // check for duplicates
+          for (Ds485DeviceMap::iterator pos = mDs485Devices.begin(); pos!=mDs485Devices.end(); ++pos) {
+            if (dev->mDSUID==pos->second->mDSUID) {
+              // we already have a device with this dSUID
+              POLOG(pos->second, LOG_WARNING,
+                "new device [0x%04x] (%sactive) has same dSUID as this one [0x%04x] (%sactive)",
+                dev->mDevId,
+                dev->mIsPresent ? "" : "NOT ",
+                pos->second->mDevId,
+                pos->second->mIsPresent ? "" : "NOT "
+              );
+              if (dev->mIsPresent && !pos->second->mIsPresent) {
+                // newly found is present, previously found is not -> replace
+                POLOG(pos->second, LOG_NOTICE, "discarding inactive device in favor of newly found");
+                mDs485Devices.erase(pos);
+                break;
+              }
+              else {
+                // existing is active (or both, though that's unlikely) -> do not consider newly found
+                POLOG(dev, dev->mIsPresent ? LOG_WARNING : LOG_NOTICE, "discarding new found device in favour of existing");
+                dev.reset();
+                break;
+              }
+            }
+          }
+          if (dev) {
+            // save new device in list
+            mDs485Devices[fullDevId(dev->mDsmDsUid, dev->mDevId)] = dev;
+          }
         } // device
       } // zone
     } // not me
