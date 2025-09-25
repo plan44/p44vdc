@@ -1759,6 +1759,7 @@ bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour)
       params->add("mode", params->newInt64(direction));
       params->add("autoStop", params->newBool(false)); // prevent stop dimming event w/o repeating command
       params->add("stopActions", params->newBool(false)); // prevent stopping runnig scene actions
+      params->add("force", params->newBool(true)); // force dimming even if light is off
       params->add("channel", params->newUint64(channelType));
       params->add("area", params->newUint64(map.mArea));
     }
@@ -1907,6 +1908,10 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
       if (aDeliveryState.mActionVariant!=dimmode_stop) {
         zone->mZoneState.mLastDimChannel = (DsChannelType)aDeliveryState.mActionParam;
         zone->mZoneState.mLastDim = (VdcDimMode)aDeliveryState.mActionVariant;
+        if (zone->mZoneState.mLastDimChannel==channeltype_brightness && zone->mZoneState.mLastDim==dimmode_up) {
+          // dimming up brightness on any light in the zone makes zone switched on
+          zone->mZoneState.setStateFor(group_yellow_light, 0, true);
+        }
       }
     }
     LOG(LOG_INFO,

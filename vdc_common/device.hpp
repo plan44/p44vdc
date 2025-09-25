@@ -837,7 +837,7 @@ namespace p44 {
     void callSceneDimStop(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
     void callScenePrepare2(PreparedCB aPreparedCB, DsScenePtr aScene, bool aForce);
     void callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply);
-    void dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter, double aDimPerMSOverride, bool aStopActions);
+    void dimChannelForAreaPrepare(PreparedCB aPreparedCB, ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, int aArea, MLMicroSeconds aAutoStopAfter, double aDimPerMSOverride, bool aStopActions, bool aForce);
     void dimRepeatPrepare(NotificationDeliveryStatePtr aDeliveryState);
     void dimChannelExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatToApply);
     void outputUndoStateSaved(PreparedCB aPreparedCB, DsScenePtr aScene);
