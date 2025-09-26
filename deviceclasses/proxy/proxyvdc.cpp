@@ -181,7 +181,7 @@ void ProxyVdc::bridgeApiIDQueryHandler(ErrorPtr aError, JsonObjectPtr aJsonMsg)
       // we had not reached the proxy before, but are not initializing
       mProxiedDeviceReached = true;
       if (!mInitialisationCompleteCB) {
-        // we're not in initialisatin any more, scan for devices now
+        // we're not in initialisation any more, scan for devices now
         setVdcError(ErrorPtr()); // clear previous error, if any
         collectDevices(NoOP, rescanmode_incremental);
       }

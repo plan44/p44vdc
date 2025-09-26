@@ -186,7 +186,7 @@ namespace p44 {
     void endButtonActivation();
 
     void requestButtonActivation(JsonObjectPtr aButtonInfo);
-    void buttonActivated(JsonObjectPtr aResult, ErrorPtr aError);
+    void buttonActivationChange(JsonObjectPtr aResult, ErrorPtr aError, bool aActivated);
     void activatedAndRescanned(ErrorPtr aError);
 
 

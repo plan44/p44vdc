@@ -199,6 +199,7 @@ void WbfVdc::handleGlobalEvent(VdchostEvent aEvent)
 
 void WbfVdc::connectGateway(StatusCB aCompletedCB)
 {
+  setVdcError(ErrorPtr()); // clear previous error, if any
   mRefindTicket.cancel(); // stop other scheduled refinds
   if (!getVdcHost().isNetworkConnected()) {
     OLOG(LOG_WARNING, "device has no IP yet -> must wait");
@@ -482,25 +483,32 @@ void WbfVdc::requestButtonActivation(JsonObjectPtr aButtonInfo)
     // we are actually waiting for a button activation
     if (aButtonInfo->isType(json_type_int)) {
       // {"findme":{"button":213}}
-      // button is already activated
-      mButtonActivationRequest->sendError(TextError::err("button is already activated"));
-      mButtonActivationRequest.reset();
+      // button is already activated -> un-activate it
+      mWbfComm.apiAction(WbfApiOperation::DELETE, string_format("/buttons/%d", aButtonInfo->int32Value()).c_str(), JsonObjectPtr(), boost::bind(&WbfVdc::buttonActivationChange, this, _1, _2, false));
     }
     else {
       // button does not yet have an ID -> activate it
       // {"findme":{"button":{"channel":1,"device":"00014929"}}}
-      mWbfComm.apiAction(WbfApiOperation::POST, "/smartbuttons", aButtonInfo, boost::bind(&WbfVdc::buttonActivated, this, _1, _2));
+      mWbfComm.apiAction(WbfApiOperation::POST, "/smartbuttons", aButtonInfo, boost::bind(&WbfVdc::buttonActivationChange, this, _1, _2, true));
     }
   }
 }
 
 
-void WbfVdc::buttonActivated(JsonObjectPtr aResult, ErrorPtr aError)
+void WbfVdc::buttonActivationChange(JsonObjectPtr aResult, ErrorPtr aError, bool aActivated)
 {
   if (mButtonActivationRequest) {
-    OLOG(LOG_INFO, "button activation result: %s", JsonObject::text(aResult));
+    OLOG(LOG_INFO, "button %sactivation result: %s", aActivated ? "" : "DE", JsonObject::text(aResult));
     // report the status
-    mButtonActivationRequest->sendStatus(aError);
+    if (Error::isOK(aError)) {
+      ApiValuePtr v = mButtonActivationRequest->newApiValue();
+      v->setType(apivalue_bool);
+      v->setBoolValue(aActivated);
+      mButtonActivationRequest->sendResult(v);
+    }
+    else {
+      mButtonActivationRequest->sendStatus(aError);
+    }
     mButtonActivationRequest.reset();
     // stop activation in Wiser
     endButtonActivation();
