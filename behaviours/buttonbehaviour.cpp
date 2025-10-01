@@ -459,6 +459,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
       else {
         // other tips are sent upstream
         sendClick(ct_tip_1x);
+        clickSequenceComplete(); // always complete after one click
       }
     }
   }
@@ -531,6 +532,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
           FOCUSOLOG("stopped dimming - sending ct_hold_end");
           sendClick(ct_hold_end);
           mButtonStateMachineTicket.cancel();
+          clickSequenceComplete(); // end of dimming is end of sequence
         }
       }
     }
@@ -847,7 +849,7 @@ void ButtonBehaviour::sendClick(DsClickType aClickType)
       OLOG(LOG_INFO, "sending value event for clicktype=%s, state=%d", clickTypeName(aClickType).c_str(), mButtonPressed);
       sendValueEvent();
     }
-    #endif
+    #endif // ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT
     // also let vdchost know for local click handling
     // TODO: more elegant solution for this
     if (!isBridgeExclusive()) {
