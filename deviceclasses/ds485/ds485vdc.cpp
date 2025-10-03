@@ -636,7 +636,12 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
           dev->mNumOPC = numOPC;
           // - output mode and function
           VdcOutputMode mode = outputmode_disabled;
-          if ((outMode>=17 && outMode<=24) || outMode==28 || outMode==30) mode = outputmode_gradual;
+          if (
+            (outMode>=17 && outMode<=24) || // various dimmers
+            outMode==28 || // also a dimmer
+            outMode==30 || // PWM
+            (outMode>=48 && outMode<=51) // 0-10V
+          ) mode = outputmode_gradual;
           else if (outMode!=0) mode = outputmode_binary;
           VdcOutputFunction func = mode==outputmode_binary ? outputFunction_switch : outputFunction_dimmer;
           VdcUsageHint usage = usage_room;
