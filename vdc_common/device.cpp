@@ -807,12 +807,6 @@ void Device::syncedChannels(VdcApiRequestPtr aRequest)
 }
 
 
-
-#define MOC_DIM_STEP_TIMEOUT (5*Second)
-#define LEGACY_DIM_STEP_TIMEOUT (500*MilliSecond) // should be 400, but give it extra 100 because of delays in getting next dim call, especially for area scenes
-#define EMERGENCY_DIM_STEP_TIMEOUT (300*Second) // just to prevent dimming forever if something goes wrong
-
-
 ErrorPtr Device::checkChannel(ApiValuePtr aParams, ChannelBehaviourPtr &aChannel)
 {
   ChannelBehaviourPtr ch;

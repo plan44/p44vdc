@@ -40,6 +40,10 @@ namespace p44 {
 
   #define ZG(mod) (0x5A00|(mod))
   #define DEV(mod) (0x4400|(mod))
+  #define IS_ZG(mod) (mod==ZG(mod))
+
+
+  #define MAX_OPC_CHANNELS 8 // we only know of 5, but some spares are ok
 
   typedef double (*DsSensorConverter_func)(uint16_t aValue, SensorBehaviourPtr aSensorBehaviour);
 
@@ -74,12 +78,14 @@ namespace p44 {
     DsZoneID mDS485ZoneId; ///< the zoneID as found via dS485 scanning, must always take precedence!
     bool mIsPresent;
     int mNumOPC;
+    uint8_t mOPCChannelIds[MAX_OPC_CHANNELS];
     Ds485Vdc& mDs485Vdc;
 
     bool mUpdatingCache; ///< if this is set, channels must not be applied to dS, because we are only updating the cache FROM dS-side change
     MLTicket mTracingTimer;
     SceneNo mTracedScene;
     uint16_t m16BitBuffer; ///< buffer for subsequent lo/hi byte data reads
+    MLTicket mDimTracingTimer;
 
     std::bitset<NUM_VALID_SCENES> mCachedScenes; ///< scenes we have already cached
     std::vector<DsSensorInstanceInfo> mSensorInfos; ///< sensor infos by index
@@ -178,7 +184,7 @@ namespace p44 {
     void handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, DsClickType aClickType);
 
     /// trace scene call to figure out how the device's current state now is
-    void traceSceneCall(SceneNo aSceneNo);
+    void traceSceneCall(SceneNo aSceneNo, bool aGrouped);
     void traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte);
 
   private:
@@ -189,6 +195,7 @@ namespace p44 {
     void processBinaryInputValue(uint8_t aBinaryInputIndex, uint8_t aBinaryInputValue);
 
     void requestOutputValueUpdate();
+    void traceDimChannel(DsChannelType aChannelType, int aArea, VdcDimMode aDimMode, MLMicroSeconds aAutoStopAfter);
     void trace8bitChannelChange(ChannelBehaviourPtr aChannelOrNullForDefault, uint8_t a8BitChannelValue, bool aTransitional);
     void trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForDefault, uint16_t a16BitChannelValue, bool aTransitional);
     void startTracingFor(SceneNo aSceneNo);

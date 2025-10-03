@@ -163,7 +163,7 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
       case ct_local_on: {
         // device has been operated locally and has invoked LOCAL_ON or OFF scene on the device
         OLOG(LOG_NOTICE, "dS device locally switched %s -> trace new output state", aClickType==ct_local_on ? "ON" : "OFF");
-        traceSceneCall(aClickType==ct_local_on ? LOCAL_ON : LOCAL_OFF);
+        traceSceneCall(aClickType==ct_local_on ? LOCAL_ON : LOCAL_OFF, false);
         break;
       }
       case ct_local_stop: {
@@ -377,8 +377,45 @@ void Ds485Device::trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForD
 
 #define SCENE_APPLY_RESULT_SAMPLE_DELAY (3*Second)
 
-void Ds485Device::traceSceneCall(SceneNo aSceneNo)
+#warning tracing group calls needs additional checking for don't care and areas
+// TODO: for that, we need to obtain the original scene's don't care, and for areas the area ON scene's don't care
+void Ds485Device::traceSceneCall(SceneNo aSceneNo, bool aGrouped)
 {
+  // check dimming first
+  int area = 0;
+  VdcDimMode dimMode = dimmode_stop;
+  switch (aSceneNo) {
+    // dim down
+    case AREA_4_DEC: area++;
+    case AREA_3_DEC: area++;
+    case AREA_2_DEC: area++;
+    case AREA_1_DEC: area++;
+    case DEC_S:
+      dimMode = dimmode_down;
+      goto dim;
+    // dim up
+    case AREA_4_INC: area++;
+    case AREA_3_INC: area++;
+    case AREA_2_INC: area++;
+    case AREA_1_INC: area++;
+    case INC_S:
+      dimMode = dimmode_up;
+      goto dim;
+    // dim stop
+    case AREA_4_STOP_S: area++;
+    case AREA_3_STOP_S: area++;
+    case AREA_2_STOP_S: area++;
+    case AREA_1_STOP_S: area++;
+    case STOP_S:
+      dimMode = dimmode_stop;
+    dim: {
+      traceDimChannel(channeltype_default, area, dimMode, LEGACY_DIM_STEP_TIMEOUT);
+      // nothing more!
+      return;
+    }
+    default: break;
+  }
+  // normal scene call
   if (mCachedScenes[aSceneNo]) {
     OLOG(LOG_INFO, "traceSceneCall '%s': taking scene value from cache to adjust local output channels", VdcHost::sceneText(aSceneNo, false).c_str());
     // we have the output value(s) cached that have been invoked with this scene
@@ -392,6 +429,27 @@ void Ds485Device::traceSceneCall(SceneNo aSceneNo)
     // -> wait a little for output to settle, then read back current value from device
     OLOG(LOG_INFO, "traceSceneCall '%s': output values not yet cached, schedule output value sampling", VdcHost::sceneText(aSceneNo, false).c_str());
     mTracingTimer.executeOnce(boost::bind(&Ds485Device::startTracingFor, this, aSceneNo), SCENE_APPLY_RESULT_SAMPLE_DELAY);
+  }
+}
+
+
+void Ds485Device::traceDimChannel(DsChannelType aChannelType, int aArea, VdcDimMode aDimMode, MLMicroSeconds aAutoStopAfter)
+{
+  mDimTracingTimer.cancel();
+  OutputBehaviourPtr o = getOutput();
+  ChannelBehaviourPtr ch = o->getChannelByType(aChannelType);
+  if (ch) {
+    if (aDimMode==dimmode_stop) {
+      // dimming stops, retrieve current output state
+      POLOG(ch, LOG_INFO, "dimming STOPs, requesting output value update");
+      requestOutputValueUpdate();
+    }
+    else {
+      // dimming starts, just show, do nothing locally
+      POLOG(ch, LOG_INFO, "starts dimming %s, autostop in %.1f s", aDimMode==dimmode_up ? "UP" : "DOWN", (double)aAutoStopAfter/Second);
+      // schedule a sample well after automatic stop
+      mDimTracingTimer.executeOnce(boost::bind(&Ds485Device::requestOutputValueUpdate, this), aAutoStopAfter*2);
+    }
   }
 }
 
@@ -435,6 +493,7 @@ void Ds485Device::requestInputValueUpdate(uint8_t aDsInputIndex)
 void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string aPayload, size_t aPli)
 {
   bool invalidate = false;
+  VdcDimMode dimMode = dimmode_stop;
   switch (aFlaggedModifier) {
     case DEV(DEVICE_ACTION_REQUEST_ACTION_SAVE_SCENE):
     case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_SAVE_SCENE):
@@ -457,7 +516,7 @@ void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string a
         OLOG(LOG_NOTICE, "scene '%s' saved -> trigger updating chache", VdcHost::sceneText(mTracedScene, false).c_str());
         // traceSceneCall will need to actually trace down the current, now saved value
       }
-      traceSceneCall(scene);
+      traceSceneCall(scene, IS_ZG(aFlaggedModifier));
       break;
     }
     case DEV(DEVICE_ACTION_REQUEST_ACTION_SET_OUTVAL):
@@ -563,6 +622,7 @@ void Ds485Device::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   if (needsToApplyChannels(&transitionTime)) {
     if (cl) {
       // TODO: handle color
+      OLOG(LOG_WARNING, "DS native color light support not implemented (assumed not existing except on paper)");
     }
     else if (l && l->brightnessNeedsApplying()) {
       string payload;
