@@ -82,9 +82,8 @@ namespace p44 {
     Ds485Vdc& mDs485Vdc;
 
     bool mUpdatingCache; ///< if this is set, channels must not be applied to dS, because we are only updating the cache FROM dS-side change
-    MLTicket mTracingTimer;
-    SceneNo mTracedScene;
     uint16_t m16BitBuffer; ///< buffer for subsequent lo/hi byte data reads
+    SceneNo mUnappliedScene; ///< scene that could not be applied to local channels because scene config not yet available
     MLTicket mDimTracingTimer;
 
     std::bitset<NUM_VALID_SCENES> mCachedScenes; ///< scenes we have already cached
@@ -184,7 +183,7 @@ namespace p44 {
     void handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, DsClickType aClickType);
 
     /// trace scene call to figure out how the device's current state now is
-    void traceSceneCall(SceneNo aSceneNo, bool aGrouped);
+    void traceSceneCall(SceneNo aSceneNo);
     void traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte);
 
   private:
@@ -195,10 +194,10 @@ namespace p44 {
     void processBinaryInputValue(uint8_t aBinaryInputIndex, uint8_t aBinaryInputValue);
 
     void requestOutputValueUpdate();
+    void requestSceneUpdate(SceneNo aSceneNo);
     void traceDimChannel(DsChannelType aChannelType, int aArea, VdcDimMode aDimMode, MLMicroSeconds aAutoStopAfter);
     void trace8bitChannelChange(ChannelBehaviourPtr aChannelOrNullForDefault, uint8_t a8BitChannelValue, bool aTransitional);
     void trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForDefault, uint16_t a16BitChannelValue, bool aTransitional);
-    void startTracingFor(SceneNo aSceneNo);
 
     void requestSensorValueUpdate(uint8_t aDsSensorIndex);
     void requestInputValueUpdate(uint8_t aDsInputIndex);

@@ -55,7 +55,7 @@ Ds485Device::Ds485Device(Ds485Vdc *aVdcP, DsUid& aDsmDsUid, uint16_t aDevId, DsZ
   mNumOPC(0),
   mUpdatingCache(false),
   m16BitBuffer(0),
-  mTracedScene(INVALID_SCENE_NO)
+  mUnappliedScene(INVALID_SCENE_NO)
 {
 }
 
@@ -163,7 +163,7 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
       case ct_local_on: {
         // device has been operated locally and has invoked LOCAL_ON or OFF scene on the device
         OLOG(LOG_NOTICE, "dS device locally switched %s -> trace new output state", aClickType==ct_local_on ? "ON" : "OFF");
-        traceSceneCall(aClickType==ct_local_on ? LOCAL_ON : LOCAL_OFF, false);
+        traceSceneCall(aClickType==ct_local_on ? LOCAL_ON : LOCAL_OFF);
         break;
       }
       case ct_local_stop: {
@@ -320,7 +320,54 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
         }
       }
       break;
-    } // RAM
+    } // case RAM
+    case 128: { // Scenes
+      SceneNo sceneNo = aOffs & 0x7F;
+      SceneDeviceSettingsPtr scenes = getScenes();
+      if (scenes && sceneNo<NUM_VALID_SCENES) {
+        DsScenePtr scene = scenes->getScene(sceneNo);
+        if (scene) {
+          if (aOffs<0x80) {
+            // scene value
+            double newValue = (double)aByte*100/255;
+            scene->setSceneValue(0, newValue); // just first channel
+            if (!mCachedScenes[sceneNo]) {
+              mCachedScenes[sceneNo] = true; // consider cached now
+              OLOG(LOG_NOTICE, "scene '%s' now cached, channel[0]=%.1f, dontCare=%d", VdcHost::sceneText(sceneNo, false).c_str(), newValue, scene->isDontCare());
+            }
+            if (sceneNo==mUnappliedScene) {
+              mUnappliedScene = INVALID_SCENE_NO;
+              traceSceneCall(sceneNo);
+            }
+          }
+          else {
+            // scene config
+            // - bit0 = don't care
+            scene->setDontCare(aByte & 0x01);
+            // - bit1 = ignore local priority
+            scene->setIgnoreLocalPriority(aByte & 0x02);
+            // - bit2 = special behaviour (ignore)
+            // - bit3 = blink
+            SimpleScenePtr simplescene = boost::dynamic_pointer_cast<SimpleScene>(scene);
+            if (simplescene) {
+              simplescene->setPVar(simplescene->mEffect, aByte & 0x08 ? scene_effect_alert : scene_effect_smooth);
+              // TODO: maybe also map dim time to effects
+            }
+            // - bit6/7 = 0:no change, 1..3: use dimtime0..2
+          }
+          if (scene->isDirty()) {
+            OLOG(LOG_NOTICE,
+              "scene '%s' changed from config: channel[0]=%.1f, dontCare=%d, ignoreLocalPriority=%d",
+              VdcHost::sceneText(sceneNo, false).c_str(),
+              scene->sceneValue(0),
+              scene->isDontCare(),
+              scene->ignoresLocalPriority()
+            );
+            scenes->updateScene(scene);
+          }
+        }
+      }
+    } // case Scenes
   }
 }
 
@@ -346,40 +393,13 @@ void Ds485Device::trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForD
     );
     aChannelOrNullForDefault->syncChannelValue(newValue);
     o->reportOutputState();
-    // update local scene's value
-    SceneDeviceSettingsPtr scenes = getScenes();
-    if (scenes && mTracedScene!=INVALID_SCENE_NO) {
-      OLOG(LOG_INFO, "tracing scene '%s' ongoing - store new channel value if applicable", VdcHost::sceneText(mTracedScene, false).c_str());
-      DsScenePtr scene = scenes->getScene(mTracedScene);
-      if (scene && !scene->isDontCare()) {
-        SceneCmd c = scene->mSceneCmd;
-        if (
-          c==scene_cmd_invoke ||
-          c==scene_cmd_off ||
-          c==scene_cmd_min ||
-          c==scene_cmd_max
-        ) {
-          // traced channel value originates from this scene -> update local value
-          POLOG(aChannelOrNullForDefault, LOG_INFO, "updating value to %.1f in scene '%s'", newValue, VdcHost::sceneText(mTracedScene, false).c_str());
-          scene->setSceneValue(aChannelOrNullForDefault->getChannelIndex(), newValue);
-          mCachedScenes[mTracedScene] = true; // we are in sync now
-          if (scene->isDirty()) {
-            scenes->updateScene(scene);
-            POLOG(aChannelOrNullForDefault, LOG_NOTICE, "changed to new value %.1f in scene '%s'", newValue, VdcHost::sceneText(mTracedScene, false).c_str());
-          }
-        }
-      }
-    }
   }
-  mTracedScene = INVALID_SCENE_NO;
 }
 
 
 #define SCENE_APPLY_RESULT_SAMPLE_DELAY (3*Second)
 
-#warning tracing group calls needs additional checking for don't care and areas
-// TODO: for that, we need to obtain the original scene's don't care, and for areas the area ON scene's don't care
-void Ds485Device::traceSceneCall(SceneNo aSceneNo, bool aGrouped)
+void Ds485Device::traceSceneCall(SceneNo aSceneNo)
 {
   // check dimming first
   int area = 0;
@@ -425,10 +445,11 @@ void Ds485Device::traceSceneCall(SceneNo aSceneNo, bool aGrouped)
     mUpdatingCache = false;
   }
   else {
-    // we do not yet have a cached value
-    // -> wait a little for output to settle, then read back current value from device
-    OLOG(LOG_INFO, "traceSceneCall '%s': output values not yet cached, schedule output value sampling", VdcHost::sceneText(aSceneNo, false).c_str());
-    mTracingTimer.executeOnce(boost::bind(&Ds485Device::startTracingFor, this, aSceneNo), SCENE_APPLY_RESULT_SAMPLE_DELAY);
+    // we do not yet have this scene cached -> request values
+    OLOG(LOG_INFO, "traceSceneCall '%s': output values not yet cached, requesting scene config for adjusting local output channels later", VdcHost::sceneText(aSceneNo, false).c_str());
+    requestSceneUpdate(aSceneNo);
+    // mark call to this scene as not-yet-applied, so when scene update arrives, we can apply it
+    mUnappliedScene = aSceneNo;
   }
 }
 
@@ -452,6 +473,25 @@ void Ds485Device::traceDimChannel(DsChannelType aChannelType, int aArea, VdcDimM
     }
   }
 }
+
+
+void Ds485Device::requestSceneUpdate(SceneNo aSceneNo)
+{
+  if (getOutput()) {
+    // TODO: improve for 16bit channels, support pos/tilt for shadow
+    string payload;
+    // first the scene config
+    Ds485Comm::payload_append8(payload, 128); // bank Scenes
+    Ds485Comm::payload_append8(payload, aSceneNo+0x80); // scene config
+    issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+    // then the scene value
+    payload.clear();
+    Ds485Comm::payload_append8(payload, 128); // bank Scenes
+    Ds485Comm::payload_append8(payload, aSceneNo); // scene value
+    issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+  }
+}
+
 
 
 void Ds485Device::requestOutputValueUpdate()
@@ -513,10 +553,10 @@ void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string a
       if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, scene))==0) return;
       if (invalidate) {
         mCachedScenes[scene] = false;
-        OLOG(LOG_NOTICE, "scene '%s' saved -> trigger updating chache", VdcHost::sceneText(mTracedScene, false).c_str());
+        OLOG(LOG_NOTICE, "scene '%s' saved -> trigger updating chache", VdcHost::sceneText(scene, false).c_str());
         // traceSceneCall will need to actually trace down the current, now saved value
       }
-      traceSceneCall(scene, IS_ZG(aFlaggedModifier));
+      traceSceneCall(scene);
       break;
     }
     case DEV(DEVICE_ACTION_REQUEST_ACTION_SET_OUTVAL):
@@ -546,17 +586,6 @@ void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string a
     }
   }
   return;
-}
-
-
-
-void Ds485Device::startTracingFor(SceneNo aSceneNo)
-{
-  // trigger request for current value
-  OLOG(LOG_INFO, "query output values for updating scene '%s'", VdcHost::sceneText(aSceneNo, false).c_str());
-  mTracedScene = aSceneNo;
-  requestOutputValueUpdate();
-  // - traceXXXChannelChange will get the actual scene value
 }
 
 
@@ -626,7 +655,11 @@ bool Ds485Device::prepareSceneApply(DsScenePtr aScene)
     allChannelsApplied();
     getOutput()->reportOutputState();
   }
-  return !mUpdatingCache;
+  return !mUpdatingCache; // actually apply only when this is not a cache update
+  // TODO: we're completely lacking the mechanisms to apply local scene calls efficiently by invoking DS-side scenes for now
+  // - this should be easy once we are sure our caching is complete, including the don't care flags.
+  // - we can just forward the scene call to the device
+  // - TODO: how would we detect and forward grouped scene calls?
 }
 
 
