@@ -379,11 +379,13 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
             uint16_t sens12bit;
             if ((pli = Ds485Comm::payload_get16(aPayload, pli, sens12bit))==0) return;
             dev->processSensorValue12Bit(sensIdx, sens12bit);
+            break;
           }
           case 5 /* missing: EVENT_DEVICE_SENSOR_VALUE_EXTENDED */: {
             uint8_t sensIdx;
             if ((pli = Ds485Comm::payload_get8(aPayload, pli, sensIdx))==0) return;
             POLOG(dev, LOG_WARNING, "dS485 Sensor extended (double) value event not yet handled: sensor index=%d", sensIdx);
+            break;
           }
           case EVENT_DEVICE_SENSOR_BINARYINPUTEVENT: {
             uint8_t bininpIdx;
@@ -393,14 +395,17 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
             uint8_t bininpVal;
             if ((pli = Ds485Comm::payload_get8(aPayload, pli, bininpVal))==0) return;
             dev->processBinaryInputValue(bininpIdx, bininpVal);
+            break;
           }
           case EVENT_DEVICE_SENSOR_EVENT: {
             uint8_t eventIdx;
             if ((pli = Ds485Comm::payload_get8(aPayload, pli, eventIdx))==0) return;
             POLOG(dev, LOG_WARNING, "dS485 Sensor event not yet handled: event index=%d", eventIdx);
+            break;
           }
         }
       }
+      break;
     }
     case ZONE_GROUP_ACTION_REQUEST: {
       uint16_t zoneId;

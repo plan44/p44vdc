@@ -276,7 +276,7 @@ void Ds485Device::processBinaryInputValue(uint8_t aBinaryInputIndex, uint8_t aBi
 void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
 {
   switch (aBank) {
-    case 64: // RAM
+    case 64: { // RAM
       switch (aOffs) {
         case 0: {
           trace8bitChannelChange(nullptr, aByte, false);
@@ -320,6 +320,7 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
         }
       }
       break;
+    } // RAM
   }
 }
 
@@ -445,7 +446,7 @@ void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string a
     case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_FORCE_CALL_SCENE):
     case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_CALL_SCENE_MIN):
     case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_LOCAL_STOP):
-    case ZG(20): // FIXME: not in dsm-api-const, only in dsm-api.xml
+    case ZG(20): // action_dimming_stop, FIXME: not in dsm-api-const, only in dsm-api.xml
     {
       // all these cause output to change to a unknown value, so we need to get the output
       // state after the command completes, and update our local scene value along
