@@ -527,6 +527,23 @@ void Ds485Device::processActionRequest(uint16_t aFlaggedModifier, const string a
       trace8bitChannelChange(nullptr, outval, false);
       break;
     }
+    case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_OPC_INC):
+    case DEV(DEVICE_ACTION_REQUEST_ACTION_OPC_INC):
+      dimMode = dimmode_up;
+      goto dim;
+    case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_OPC_DEC):
+    case DEV(DEVICE_ACTION_REQUEST_ACTION_OPC_DEC):
+      dimMode = dimmode_down;
+      goto dim;
+    case ZG(ZONE_GROUP_ACTION_REQUEST_ACTION_OPC_STOP):
+    case DEV(DEVICE_ACTION_REQUEST_ACTION_OPC_STOP):
+      dimMode = dimmode_stop;
+    dim: {
+      uint8_t channelId;
+      if ((aPli = Ds485Comm::payload_get8(aPayload, aPli, channelId))==0) return;
+      traceDimChannel(channelId, 0, dimMode, MOC_DIM_STEP_TIMEOUT);
+      break;
+    }
   }
   return;
 }

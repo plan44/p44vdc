@@ -658,6 +658,8 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
             if (channelId==channeltype_colortemp && func!=outputFunction_colordimmer) func = outputFunction_ctdimmer;
             if (channelId==channeltype_shade_position_outside || channelId==channeltype_shade_position_inside) func = outputFunction_positional;
             if (channelId==channeltype_shade_position_outside || channelId==channeltype_shade_angle_outside) usage = usage_outdoors;
+            // save index-to-channelID
+            if (oi<MAX_OPC_CHANNELS) dev->mOPCChannelIds[oi] = channelId;
           }
           // examine the funcid for basic device setup
           // - color class
