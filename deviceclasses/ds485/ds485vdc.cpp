@@ -682,7 +682,7 @@ ErrorPtr Ds485Vdc::scanDs485BusSync(ChildThreadWrapper &aThread)
               ShadowBehaviourPtr sb = new ShadowBehaviour(*dev, (DsGroup)defaultGroup);
               sb->setDeviceParams(shadowdevice_jalousie, false, 0, 0, 0, true); // no move semantics, just set values
               ob = sb;
-              ob->setHardwareName("light");
+              ob->setHardwareName("shadow");
             }
             else {
               // just a simple single channel output
