@@ -333,7 +333,7 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
             scene->setSceneValue(0, newValue); // just first channel
             if (!mCachedScenes[sceneNo]) {
               mCachedScenes[sceneNo] = true; // consider cached now
-              OLOG(LOG_NOTICE, "scene '%s' now cached, channel[0]=%.1f, dontCare=%d", VdcHost::sceneText(sceneNo, false).c_str(), newValue, scene->isDontCare());
+              OLOG(LOG_INFO, "scene '%s' now considered cached, channel[0]=%.1f, dontCare=%d", VdcHost::sceneText(sceneNo, false).c_str(), newValue, scene->isDontCare());
             }
             if (sceneNo==mUnappliedScene) {
               mUnappliedScene = INVALID_SCENE_NO;
@@ -356,7 +356,7 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
             // - bit6/7 = 0:no change, 1..3: use dimtime0..2
           }
           if (scene->isDirty()) {
-            OLOG(LOG_NOTICE,
+            OLOG(LOG_INFO,
               "scene '%s' changed from config: channel[0]=%.1f, dontCare=%d, ignoreLocalPriority=%d",
               VdcHost::sceneText(sceneNo, false).c_str(),
               scene->sceneValue(0),
@@ -368,6 +368,47 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
         }
       }
     } // case Scenes
+    case 129: { // Shadow Position bits 7..4 of 16bit value
+      SceneNo sceneNo = aOffs<<1;
+      do {
+        if (mCachedScenes[sceneNo]) {
+          // we can refine only if we have alrerady cached the MSB
+          uint8_t by = aByte & 0x0F;
+          SceneDeviceSettingsPtr scenes = getScenes();
+          if (scenes && sceneNo<NUM_VALID_SCENES) {
+            ShadowScenePtr shadowscene = boost::dynamic_pointer_cast<ShadowScene>(scenes->getScene(sceneNo));
+            if (shadowscene) {
+              uint16_t val16 = shadowscene->sceneValue(0)*255*0x100/100;
+              val16 = (val16 & 0xFF00) + (by<<4) + by; // augment with new LSB, duplicated nibble (0xZ -> 0xZZ)
+              double newValue = (double)val16*100/255/0x100;
+              shadowscene->setSceneValue(0, newValue);
+              if (shadowscene->isDirty()) {
+                OLOG(LOG_INFO, "scene '%s' position precision updated to %.1f", VdcHost::sceneText(sceneNo, false).c_str(), newValue);
+                scenes->updateScene(shadowscene);
+              }
+            }
+          }
+        }
+        aByte >>= 4; // Bits 0..3 are even scene's, 4..7 odd scene's
+        sceneNo++; // next
+      } while (sceneNo & 0x01); // continue only if next is odd
+    }
+    case 130: { // Shadow Scene Angles
+      SceneNo sceneNo = aOffs;
+      SceneDeviceSettingsPtr scenes = getScenes();
+      if (scenes && sceneNo<NUM_VALID_SCENES) {
+        ShadowScenePtr shadowscene = boost::dynamic_pointer_cast<ShadowScene>(scenes->getScene(sceneNo));
+        if (shadowscene) {
+          // bit 0 is reserved for direction with uncalibrated tilt, so ignored that here
+          double newValue = (double)(aByte & 0xFE)*100/255;
+          shadowscene->setSceneValue(1, newValue); // just first channel
+          if (shadowscene->isDirty()) {
+            OLOG(LOG_INFO, "scene '%s' angle updated to %.1f", VdcHost::sceneText(sceneNo, false).c_str(), newValue);
+            scenes->updateScene(shadowscene);
+          }
+        }
+      }
+    } // case Shadow Scene Angles
   }
 }
 
@@ -489,6 +530,21 @@ void Ds485Device::requestSceneUpdate(SceneNo aSceneNo)
     Ds485Comm::payload_append8(payload, 128); // bank Scenes
     Ds485Comm::payload_append8(payload, aSceneNo); // scene value
     issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+    ShadowBehaviourPtr sh = getOutput<ShadowBehaviour>();
+    if (sh) {
+      if (sh->hasShadeBladeAngle()) {
+        // also query the angle
+        payload.clear();
+        Ds485Comm::payload_append8(payload, 130); // bank Shadow Blade Angle Scene Values
+        Ds485Comm::payload_append8(payload, aSceneNo); // scene value
+        issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+      }
+      // query more precise position
+      payload.clear();
+      Ds485Comm::payload_append8(payload, 129); // bank Shadow Blade Angle Scene Values
+      Ds485Comm::payload_append8(payload, aSceneNo>>1); // two values stored in one byte
+      issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+    }
   }
 }
 
@@ -698,7 +754,7 @@ void Ds485Device::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_SET, payload);
         sb->mPosition->channelValueApplied();
       }
-      if (sb->mAngle && sb->mAngle->needsApplying()) {
+      if (sb->hasShadeBladeAngle() && sb->mAngle->needsApplying()) {
         // set new angle
         string payload;
         Ds485Comm::payload_append8(payload, 64); // Bank: RAM

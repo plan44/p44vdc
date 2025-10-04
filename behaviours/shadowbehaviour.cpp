@@ -342,7 +342,7 @@ Tristate ShadowBehaviour::hasModelFeature(DsModelFeatures aFeatureIndex)
       return yes;
     case modelFeature_shadebladeang:
       // Jalousie also has blade angle, other kinds don't
-      return mShadowDeviceKind==shadowdevice_jalousie ? yes : no;
+      return hasShadeBladeAngle() ? yes : no;
     case modelFeature_shadeprops:
     case modelFeature_motiontimefins:
       // TODO: once dS support is here for propagating moving times etc, enable this
@@ -705,7 +705,7 @@ void ShadowBehaviour::applyPosition(SimpleCB aApplyDoneCB)
 void ShadowBehaviour::applyAngle(SimpleCB aApplyDoneCB)
 {
   // determine current angle (100 = fully open)
-  if (mShadowDeviceKind!=shadowdevice_jalousie) {
+  if (!hasShadeBladeAngle()) {
     // ignore angle, just consider done
     allDone(aApplyDoneCB);
   }

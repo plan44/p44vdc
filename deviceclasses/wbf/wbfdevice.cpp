@@ -678,7 +678,7 @@ void WbfDevice::handleLoadState(JsonObjectPtr aState, DsBehaviourPtr aBehaviour)
       else {
         // final
         mainChannel->syncChannelValue(mainValue);
-        if (sb->mAngle) {
+        if (sb->hasShadeBladeAngle()) {
           if (aState->get("tilt", o)) {
             double tiltvalue = o->doubleValue()*11.111111111; // value is 0..9 range for 0..100% tilt
             sb->mAngle->syncChannelValue(tiltvalue);

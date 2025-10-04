@@ -351,6 +351,8 @@ namespace p44 {
 
     /// @}
 
+    /// @return true if the device has a second channel with shade blade angle (aka "tilt")
+    bool hasShadeBladeAngle() { return mShadowDeviceKind==shadowdevice_jalousie; }
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object, may contain LFs
