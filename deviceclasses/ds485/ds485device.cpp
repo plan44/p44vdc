@@ -329,7 +329,7 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
         if (scene) {
           if (aOffs<0x80) {
             // scene value
-            double newValue = (double)aByte*100/0xFF;
+            double newValue = (double)aByte*100/255;
             scene->setSceneValue(0, newValue); // just first channel
             if (!mCachedScenes[sceneNo]) {
               mCachedScenes[sceneNo] = true; // consider cached now
@@ -378,9 +378,9 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
           if (scenes && sceneNo<NUM_VALID_SCENES) {
             ShadowScenePtr shadowscene = boost::dynamic_pointer_cast<ShadowScene>(scenes->getScene(sceneNo));
             if (shadowscene) {
-              uint16_t val16 = shadowscene->sceneValue(0)*0xFFFF/100;
+              uint16_t val16 = shadowscene->sceneValue(0)*255*0x100/100;
               val16 = (val16 & 0xFF00) + (by<<4) + by; // augment with new LSB, duplicated nibble (0xZ -> 0xZZ)
-              double newValue = (double)val16*100/0xFFFF;
+              double newValue = (double)val16*100/255/0x100;
               shadowscene->setSceneValue(0, newValue);
               if (shadowscene->isDirty()) {
                 OLOG(LOG_INFO, "scene '%s' position precision updated to %.1f", VdcHost::sceneText(sceneNo, false).c_str(), newValue);
@@ -400,7 +400,7 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
         ShadowScenePtr shadowscene = boost::dynamic_pointer_cast<ShadowScene>(scenes->getScene(sceneNo));
         if (shadowscene) {
           // bit 0 is reserved for direction with uncalibrated tilt, so ignored that here
-          double newValue = (double)(aByte & 0xFE)*100/0xFF;
+          double newValue = (double)(aByte & 0xFE)*100/255;
           shadowscene->setSceneValue(1, newValue); // just first channel
           if (shadowscene->isDirty()) {
             OLOG(LOG_INFO, "scene '%s' angle updated to %.1f", VdcHost::sceneText(sceneNo, false).c_str(), newValue);
@@ -415,8 +415,7 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
 
 void Ds485Device::trace8bitChannelChange(ChannelBehaviourPtr aChannelOrNullForDefault, uint8_t a8BitChannelValue, bool aTransitional)
 {
-  // duplicate MSB into LSB such that 8bit 0x00 -> 0x0000, 0xFF -> 0xFFFF, 0x7F -> 0x7F7F
-  trace16bitChannelChange(aChannelOrNullForDefault, (uint16_t)(a8BitChannelValue<<8)+a8BitChannelValue, aTransitional);
+  trace16bitChannelChange(aChannelOrNullForDefault, (uint16_t)a8BitChannelValue<<8, aTransitional);
 }
 
 
@@ -428,7 +427,7 @@ void Ds485Device::trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForD
   }
   if (o && aChannelOrNullForDefault) {
     // TODO: maybe evaluate aTransitional?
-    double newValue = (double)a16BitChannelValue*100/0xFFFF;
+    double newValue = (double)a16BitChannelValue*100/255/0x100;
     POLOG(aChannelOrNullForDefault, LOG_INFO,
       "got updated dS485 value: 16bit=0x%04x/%d 8bit=0x%02x/%d) = %.2f",
       a16BitChannelValue, a16BitChannelValue, a16BitChannelValue>>8, a16BitChannelValue>>8, newValue
@@ -520,6 +519,7 @@ void Ds485Device::traceDimChannel(DsChannelType aChannelType, int aArea, VdcDimM
 void Ds485Device::requestSceneUpdate(SceneNo aSceneNo)
 {
   if (getOutput()) {
+    // TODO: improve for 16bit channels, support pos/tilt for shadow
     string payload;
     // first the scene config
     Ds485Comm::payload_append8(payload, 128); // bank Scenes
@@ -732,14 +732,14 @@ void Ds485Device::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     }
     else if (l && l->brightnessNeedsApplying()) {
       string payload;
-      Ds485Comm::payload_append8(payload, l->brightnessForHardware(true)*0xFF/100);
+      Ds485Comm::payload_append8(payload, l->brightnessForHardware(true)*255/100);
       issueDeviceRequest(DEVICE_ACTION_REQUEST, DEVICE_ACTION_REQUEST_ACTION_SET_OUTVAL, payload);
       l->brightnessApplied();
     }
     else if (sb) {
       if (sb->mPosition->needsApplying()) {
         // set new target position
-        uint16_t new16val = sb->mPosition->getChannelValue()*0xFFFF/100;
+        uint16_t new16val = sb->mPosition->getChannelValue()*255*0x100/100;
         string payload;
         // hi byte
         Ds485Comm::payload_append8(payload, 64); // Bank: RAM
@@ -759,7 +759,7 @@ void Ds485Device::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         string payload;
         Ds485Comm::payload_append8(payload, 64); // Bank: RAM
         Ds485Comm::payload_append8(payload, 4); // Target lamella angle
-        Ds485Comm::payload_append8(payload, sb->mAngle->getChannelValue()*0xFF/100);
+        Ds485Comm::payload_append8(payload, sb->mAngle->getChannelValue()*255/100);
         issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_SET, payload);
         sb->mAngle->channelValueApplied();
       }
@@ -769,7 +769,7 @@ void Ds485Device::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       OutputBehaviourPtr o = getOutput();
       ChannelBehaviourPtr ch = o->getChannelByType(channeltype_default);
       string payload;
-      Ds485Comm::payload_append8(payload, ch->getChannelValue()*0xFF/100);
+      Ds485Comm::payload_append8(payload, ch->getChannelValue()*255/100);
       issueDeviceRequest(DEVICE_ACTION_REQUEST, DEVICE_ACTION_REQUEST_ACTION_SET_OUTVAL, payload);
       ch->channelValueApplied();
     }
