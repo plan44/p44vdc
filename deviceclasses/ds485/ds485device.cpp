@@ -25,7 +25,7 @@
 #define ALWAYS_DEBUG 0
 // - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
 //   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
-#define FOCUSLOGLEVEL 7
+#define FOCUSLOGLEVEL 6
 
 #include "ds485device.hpp"
 
@@ -273,7 +273,7 @@ void Ds485Device::processBinaryInputValue(uint8_t aBinaryInputIndex, uint8_t aBi
 
 
 
-void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
+void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte, bool aIsAnswer)
 {
   switch (aBank) {
     case 64: { // RAM
@@ -329,7 +329,7 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
         if (scene) {
           if (aOffs<0x80) {
             // scene value
-            double newValue = (double)aByte*100/255;
+            double newValue = (double)aByte*100/0xFF;
             scene->setSceneValue(0, newValue); // just first channel
             if (!mCachedScenes[sceneNo]) {
               mCachedScenes[sceneNo] = true; // consider cached now
@@ -358,12 +358,15 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
           if (scene->isDirty()) {
             OLOG(LOG_INFO,
               "scene '%s' changed from config: channel[0]=%.1f, dontCare=%d, ignoreLocalPriority=%d",
-              VdcHost::sceneText(sceneNo, false).c_str(),
-              scene->sceneValue(0),
-              scene->isDontCare(),
-              scene->ignoresLocalPriority()
+              VdcHost::sceneText(sceneNo, false).c_str(), scene->sceneValue(0), scene->isDontCare(), scene->ignoresLocalPriority()
             );
             scenes->updateScene(scene);
+          }
+          else {
+            FOCUSOLOG(
+              "scene '%s' confirmed from config as: channel[0]=%.1f, dontCare=%d, ignoreLocalPriority=%d",
+              VdcHost::sceneText(sceneNo, false).c_str(), scene->sceneValue(0), scene->isDontCare(), scene->ignoresLocalPriority()
+            );
           }
         }
       }
@@ -378,13 +381,16 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
           if (scenes && sceneNo<NUM_VALID_SCENES) {
             ShadowScenePtr shadowscene = boost::dynamic_pointer_cast<ShadowScene>(scenes->getScene(sceneNo));
             if (shadowscene) {
-              uint16_t val16 = shadowscene->sceneValue(0)*255*0x100/100;
+              uint16_t val16 = shadowscene->sceneValue(0)*0xFFFF/100;
               val16 = (val16 & 0xFF00) + (by<<4) + by; // augment with new LSB, duplicated nibble (0xZ -> 0xZZ)
-              double newValue = (double)val16*100/255/0x100;
+              double newValue = (double)val16*100/0xFFFF;
               shadowscene->setSceneValue(0, newValue);
               if (shadowscene->isDirty()) {
                 OLOG(LOG_INFO, "scene '%s' position precision updated to %.1f", VdcHost::sceneText(sceneNo, false).c_str(), newValue);
                 scenes->updateScene(shadowscene);
+              }
+              else {
+                FOCUSOLOG("scene '%s' position precision confirmed at %.1f", VdcHost::sceneText(sceneNo, false).c_str(), newValue);
               }
             }
           }
@@ -400,22 +406,27 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte)
         ShadowScenePtr shadowscene = boost::dynamic_pointer_cast<ShadowScene>(scenes->getScene(sceneNo));
         if (shadowscene) {
           // bit 0 is reserved for direction with uncalibrated tilt, so ignored that here
-          double newValue = (double)(aByte & 0xFE)*100/255;
+          double newValue = (double)(aByte & 0xFE)*100/0xFF;
           shadowscene->setSceneValue(1, newValue); // just first channel
           if (shadowscene->isDirty()) {
             OLOG(LOG_INFO, "scene '%s' angle updated to %.1f", VdcHost::sceneText(sceneNo, false).c_str(), newValue);
             scenes->updateScene(shadowscene);
           }
+          else {
+            FOCUSOLOG("scene '%s' angle confirmed at %.1f", VdcHost::sceneText(sceneNo, false).c_str(), newValue);
+          }
         }
       }
     } // case Shadow Scene Angles
   }
+  confirmReadResult(aBank, aOffs);
 }
 
 
 void Ds485Device::trace8bitChannelChange(ChannelBehaviourPtr aChannelOrNullForDefault, uint8_t a8BitChannelValue, bool aTransitional)
 {
-  trace16bitChannelChange(aChannelOrNullForDefault, (uint16_t)a8BitChannelValue<<8, aTransitional);
+  // duplicate MSB into LSB such that 8bit 0x00 -> 0x0000, 0xFF -> 0xFFFF, 0x7F -> 0x7F7F
+  trace16bitChannelChange(aChannelOrNullForDefault, (uint16_t)(a8BitChannelValue<<8)+a8BitChannelValue, aTransitional);
 }
 
 
@@ -427,7 +438,7 @@ void Ds485Device::trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForD
   }
   if (o && aChannelOrNullForDefault) {
     // TODO: maybe evaluate aTransitional?
-    double newValue = (double)a16BitChannelValue*100/255/0x100;
+    double newValue = (double)a16BitChannelValue*100/0xFFFF;
     POLOG(aChannelOrNullForDefault, LOG_INFO,
       "got updated dS485 value: 16bit=0x%04x/%d 8bit=0x%02x/%d) = %.2f",
       a16BitChannelValue, a16BitChannelValue, a16BitChannelValue>>8, a16BitChannelValue>>8, newValue
@@ -519,31 +530,16 @@ void Ds485Device::traceDimChannel(DsChannelType aChannelType, int aArea, VdcDimM
 void Ds485Device::requestSceneUpdate(SceneNo aSceneNo)
 {
   if (getOutput()) {
-    // TODO: improve for 16bit channels, support pos/tilt for shadow
-    string payload;
-    // first the scene config
-    Ds485Comm::payload_append8(payload, 128); // bank Scenes
-    Ds485Comm::payload_append8(payload, aSceneNo+0x80); // scene config
-    issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
-    // then the scene value
-    payload.clear();
-    Ds485Comm::payload_append8(payload, 128); // bank Scenes
-    Ds485Comm::payload_append8(payload, aSceneNo); // scene value
-    issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+    scheduleConfigRead(128, aSceneNo+0x80); // bank Scenes, scene config flags
+    scheduleConfigRead(128, aSceneNo); // bank Scenes, scene values
     ShadowBehaviourPtr sh = getOutput<ShadowBehaviour>();
     if (sh) {
       if (sh->hasShadeBladeAngle()) {
         // also query the angle
-        payload.clear();
-        Ds485Comm::payload_append8(payload, 130); // bank Shadow Blade Angle Scene Values
-        Ds485Comm::payload_append8(payload, aSceneNo); // scene value
-        issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+        scheduleConfigRead(130, aSceneNo); // bank Shade blade angle scene values
       }
       // query more precise position
-      payload.clear();
-      Ds485Comm::payload_append8(payload, 129); // bank Shadow Blade Angle Scene Values
-      Ds485Comm::payload_append8(payload, aSceneNo>>1); // two values stored in one byte
-      issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+      scheduleConfigRead(129, aSceneNo>>1); // bank extension, stored in nibbles (two values in one byte)
     }
   }
 }
@@ -553,10 +549,7 @@ void Ds485Device::requestSceneUpdate(SceneNo aSceneNo)
 void Ds485Device::requestOutputValueUpdate()
 {
   if (getOutput()) {
-    string payload;
-    Ds485Comm::payload_append8(payload, 64); // bank RAM
-    Ds485Comm::payload_append8(payload, 0); // offset outputvalue
-    issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+    scheduleConfigRead(64, 0); // bank RAM, offset outputvalue
   }
 }
 
@@ -732,14 +725,14 @@ void Ds485Device::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     }
     else if (l && l->brightnessNeedsApplying()) {
       string payload;
-      Ds485Comm::payload_append8(payload, l->brightnessForHardware(true)*255/100);
+      Ds485Comm::payload_append8(payload, l->brightnessForHardware(true)*0xFF/100);
       issueDeviceRequest(DEVICE_ACTION_REQUEST, DEVICE_ACTION_REQUEST_ACTION_SET_OUTVAL, payload);
       l->brightnessApplied();
     }
     else if (sb) {
       if (sb->mPosition->needsApplying()) {
         // set new target position
-        uint16_t new16val = sb->mPosition->getChannelValue()*255*0x100/100;
+        uint16_t new16val = sb->mPosition->getChannelValue()*0xFFFF/100;
         string payload;
         // hi byte
         Ds485Comm::payload_append8(payload, 64); // Bank: RAM
@@ -759,7 +752,7 @@ void Ds485Device::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         string payload;
         Ds485Comm::payload_append8(payload, 64); // Bank: RAM
         Ds485Comm::payload_append8(payload, 4); // Target lamella angle
-        Ds485Comm::payload_append8(payload, sb->mAngle->getChannelValue()*255/100);
+        Ds485Comm::payload_append8(payload, sb->mAngle->getChannelValue()*0xFF/100);
         issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_SET, payload);
         sb->mAngle->channelValueApplied();
       }
@@ -769,7 +762,7 @@ void Ds485Device::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       OutputBehaviourPtr o = getOutput();
       ChannelBehaviourPtr ch = o->getChannelByType(channeltype_default);
       string payload;
-      Ds485Comm::payload_append8(payload, ch->getChannelValue()*255/100);
+      Ds485Comm::payload_append8(payload, ch->getChannelValue()*0xFF/100);
       issueDeviceRequest(DEVICE_ACTION_REQUEST, DEVICE_ACTION_REQUEST_ACTION_SET_OUTVAL, payload);
       ch->channelValueApplied();
     }
@@ -805,6 +798,58 @@ void Ds485Device::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 
 
 // MARK: - ds485 helpers
+
+void Ds485Device::scheduleConfigRead(uint8_t aBank, uint8_t aOffset)
+{
+  uint16_t bankOffs = (((uint16_t)aBank)<<8) + aOffset;
+  bool wasEmpty = mPendingBankOffsReads.empty();
+  mPendingBankOffsReads.insert(bankOffs);
+  FOCUSOLOG("configRead: scheduleConfigRead: bank %u/offs %u, %zu reads now pending", aBank, aOffset, mPendingBankOffsReads.size());
+  if (wasEmpty) {
+    issueNextRead();
+  }
+}
+
+
+#define DS485_CONFIG_READ_REPEAT_DELAY (5*Second)
+
+void Ds485Device::confirmReadResult(uint8_t aBank, uint8_t aOffset)
+{
+  mReadRepeater.cancel();
+  uint16_t bankOffs = (((uint16_t)aBank)<<8) + aOffset;
+  auto pos = mPendingBankOffsReads.find(bankOffs);
+  if (pos!=mPendingBankOffsReads.end()) {
+    // this is one of the reads we were waiting for
+    mPendingBankOffsReads.erase(pos);
+    FOCUSOLOG("configRead: confirmReadResult: confirmed read of bank %u/offset %u, %zu more reads pending", aBank, aOffset, mPendingBankOffsReads.size());
+    issueNextRead();
+  }
+  else if (!mPendingBankOffsReads.empty()) {
+    // keep the request, retry a bit later
+    FOCUSOLOG("configRead: confirmReadResult: bank %u/offs %u confirmed, is not of those %zu we need -> wait more and rely on retries", aBank, aOffset, mPendingBankOffsReads.size());
+  }
+}
+
+
+void Ds485Device::issueNextRead()
+{
+  if (!mPendingBankOffsReads.empty()) {
+    uint16_t bankOffs = *mPendingBankOffsReads.begin();
+    uint8_t bank = bankOffs>>8;
+    uint8_t offs = bankOffs&0xFF;
+    FOCUSOLOG("configRead: issueNextRead: sending get for bank %u/offset %u", bank, offs);
+    string payload;
+    Ds485Comm::payload_append8(payload, bank);
+    Ds485Comm::payload_append8(payload, offs);
+    ErrorPtr err = issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+    if (Error::notOK(err)) {
+      OLOG(LOG_WARNING, "configRead: error issuing device request: %s", err->text());
+    }
+    // have it repeat some time later
+    mReadRepeater.executeOnce(boost::bind(&Ds485Device::issueNextRead, this), DS485_CONFIG_READ_REPEAT_DELAY);
+  }
+}
+
 
 
 ErrorPtr Ds485Device::issueDeviceRequest(uint8_t aCommand, uint8_t aModifier, const string& aMorePayload)

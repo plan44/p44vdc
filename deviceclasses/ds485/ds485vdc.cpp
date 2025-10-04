@@ -459,7 +459,7 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
             if ((pli = Ds485Comm::payload_get8(aPayload, pli, offs))==0) return;
             uint8_t byte;
             if ((pli = Ds485Comm::payload_get8(aPayload, pli, byte))==0) return;
-            dev->traceConfigValue(bank, offs, byte);
+            dev->traceConfigValue(bank, offs, byte, false);
           }
           break;
         }
@@ -483,7 +483,7 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
         if ((pli = Ds485Comm::payload_get8(aPayload, pli, offs))==0) return;
         uint8_t byte;
         if ((pli = Ds485Comm::payload_get8(aPayload, pli, byte))==0) return;
-        dev->traceConfigValue(bank, offs, byte);
+        dev->traceConfigValue(bank, offs, byte, true);
       }
       break;
     }
