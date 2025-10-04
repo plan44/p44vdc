@@ -25,7 +25,7 @@
 #define ALWAYS_DEBUG 0
 // - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
 //   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
-#define FOCUSLOGLEVEL 6
+#define FOCUSLOGLEVEL 7
 
 #include "ds485device.hpp"
 
@@ -419,7 +419,6 @@ void Ds485Device::traceConfigValue(uint8_t aBank, uint8_t aOffs, uint8_t aByte, 
       }
     } // case Shadow Scene Angles
   }
-  confirmReadResult(aBank, aOffs);
 }
 
 
@@ -801,55 +800,13 @@ void Ds485Device::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 
 void Ds485Device::scheduleConfigRead(uint8_t aBank, uint8_t aOffset)
 {
-  uint16_t bankOffs = (((uint16_t)aBank)<<8) + aOffset;
-  bool wasEmpty = mPendingBankOffsReads.empty();
-  mPendingBankOffsReads.insert(bankOffs);
-  FOCUSOLOG("configRead: scheduleConfigRead: bank %u/offs %u, %zu reads now pending", aBank, aOffset, mPendingBankOffsReads.size());
-  if (wasEmpty) {
-    issueNextRead();
+  if (mIsPresent) {
+    mDs485Vdc.scheduleConfigRead(this, aBank, aOffset);
+  }
+  else {
+    FOCUSOLOG("device is not active -> do not try to read config");
   }
 }
-
-
-#define DS485_CONFIG_READ_REPEAT_DELAY (5*Second)
-
-void Ds485Device::confirmReadResult(uint8_t aBank, uint8_t aOffset)
-{
-  mReadRepeater.cancel();
-  uint16_t bankOffs = (((uint16_t)aBank)<<8) + aOffset;
-  auto pos = mPendingBankOffsReads.find(bankOffs);
-  if (pos!=mPendingBankOffsReads.end()) {
-    // this is one of the reads we were waiting for
-    mPendingBankOffsReads.erase(pos);
-    FOCUSOLOG("configRead: confirmReadResult: confirmed read of bank %u/offset %u, %zu more reads pending", aBank, aOffset, mPendingBankOffsReads.size());
-    issueNextRead();
-  }
-  else if (!mPendingBankOffsReads.empty()) {
-    // keep the request, retry a bit later
-    FOCUSOLOG("configRead: confirmReadResult: bank %u/offs %u confirmed, is not of those %zu we need -> wait more and rely on retries", aBank, aOffset, mPendingBankOffsReads.size());
-  }
-}
-
-
-void Ds485Device::issueNextRead()
-{
-  if (!mPendingBankOffsReads.empty()) {
-    uint16_t bankOffs = *mPendingBankOffsReads.begin();
-    uint8_t bank = bankOffs>>8;
-    uint8_t offs = bankOffs&0xFF;
-    FOCUSOLOG("configRead: issueNextRead: sending get for bank %u/offset %u", bank, offs);
-    string payload;
-    Ds485Comm::payload_append8(payload, bank);
-    Ds485Comm::payload_append8(payload, offs);
-    ErrorPtr err = issueDeviceRequest(DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
-    if (Error::notOK(err)) {
-      OLOG(LOG_WARNING, "configRead: error issuing device request: %s", err->text());
-    }
-    // have it repeat some time later
-    mReadRepeater.executeOnce(boost::bind(&Ds485Device::issueNextRead, this), DS485_CONFIG_READ_REPEAT_DELAY);
-  }
-}
-
 
 
 ErrorPtr Ds485Device::issueDeviceRequest(uint8_t aCommand, uint8_t aModifier, const string& aMorePayload)

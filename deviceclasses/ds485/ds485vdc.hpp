@@ -64,6 +64,10 @@ namespace p44 {
 
     Ds485Persistence mDb;
 
+    typedef  std::map<uint32_t, Ds485DevicePtr> PendingDeviceReadsMap;
+    PendingDeviceReadsMap mPendingDeviceReads;
+    MLTicket mReadRepeater;
+
   public:
 
     Ds485Comm mDs485Comm;
@@ -114,6 +118,12 @@ namespace p44 {
 
     /// vdc level methods
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
+
+    /// DS485
+    void scheduleConfigRead(Ds485DevicePtr aDev, uint8_t aBank, uint8_t aOffset);
+    void confirmReadResult(uint16_t aDevId, uint8_t aBank, uint8_t aOffset);
+    void issueNextRead();
+
 
   protected:
 

@@ -81,9 +81,6 @@ namespace p44 {
     uint8_t mOPCChannelIds[MAX_OPC_CHANNELS];
     Ds485Vdc& mDs485Vdc;
 
-    std::set<uint16_t> mPendingBankOffsReads;
-    MLTicket mReadRepeater;
-
     bool mUpdatingCache; ///< if this is set, channels must not be applied to dS, because we are only updating the cache FROM dS-side change
     uint16_t m16BitBuffer; ///< buffer for subsequent lo/hi byte data reads
     SceneNo mUnappliedScene; ///< scene that could not be applied to local channels because scene config not yet available
@@ -205,10 +202,8 @@ namespace p44 {
     void requestSensorValueUpdate(uint8_t aDsSensorIndex);
     void requestInputValueUpdate(uint8_t aDsInputIndex);
 
-
     void scheduleConfigRead(uint8_t aBank, uint8_t aOffset);
-    void confirmReadResult(uint8_t aBank, uint8_t aOffset);
-    void issueNextRead();
+
     ErrorPtr issueDeviceRequest(uint8_t aCommand, uint8_t aModifier, const string& aMorePayload = "");
     ErrorPtr issueDsmRequest(uint8_t aCommand, uint8_t aModifier, const string& aPayload = "");
 

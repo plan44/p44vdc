@@ -298,7 +298,68 @@ void Ds485Vdc::ds485BusScanned(ErrorPtr aScanStatus, StatusCB aCompletedCB)
 
 
 
+// MARK: - ds485 helpers
+
+void Ds485Vdc::scheduleConfigRead(Ds485DevicePtr aDev, uint8_t aBank, uint8_t aOffset)
+{
+  uint16_t devId = aDev->mDevId;
+  uint32_t readReq = ((uint32_t)devId<<16) + (((uint16_t)aBank)<<8) + aOffset;
+  bool wasEmpty = mPendingDeviceReads.empty();
+  mPendingDeviceReads[readReq] = aDev;
+  FOCUSOLOG("configRead: scheduleConfigRead: devId=0x%04x/bank %u/offs %u, %zu reads now pending", devId, aBank, aOffset, mPendingDeviceReads.size());
+  if (wasEmpty) {
+    issueNextRead();
+  }
+}
+
+
+#define DS485_CONFIG_READ_REPEAT_DELAY (5*Second)
+
+void Ds485Vdc::confirmReadResult(uint16_t aDevId, uint8_t aBank, uint8_t aOffset)
+{
+  uint32_t readReq = ((uint32_t)aDevId<<16) + (((uint16_t)aBank)<<8) + aOffset;
+  auto pos = mPendingDeviceReads.find(readReq);
+  if (pos!=mPendingDeviceReads.end()) {
+    // this is one of the reads we were waiting for
+    mPendingDeviceReads.erase(pos);
+    FOCUSOLOG("configRead: confirmReadResult: confirmed read of devId=0x%04x/bank %u/offset %u, %zu more reads pending", aDevId, aBank, aOffset, mPendingDeviceReads.size());
+    issueNextRead();
+  }
+  else if (!mPendingDeviceReads.empty()) {
+    // keep the request, retry a bit later
+    FOCUSOLOG("configRead: confirmReadResult: devId=0x%04x/bank %u/offs %u confirmed, is not of those %zu we need -> wait more and rely on retries", aDevId, aBank, aOffset, mPendingDeviceReads.size());
+  }
+}
+
+
+void Ds485Vdc::issueNextRead()
+{
+  mReadRepeater.cancel();
+  if (!mPendingDeviceReads.empty()) {
+    PendingDeviceReadsMap::iterator pos = mPendingDeviceReads.begin();
+    uint32_t readReq = pos->first;
+    uint16_t devId = (readReq>>16) & 0xFFFF;
+    uint8_t bank = (readReq>>8) & 0xFF;
+    uint8_t offs = readReq&0xFF;
+    FOCUSOLOG("configRead: issueNextRead: sending get for devId=0x%04x/bank %u/offset %u", devId, bank, offs);
+    string payload;
+    Ds485Comm::payload_append16(payload, devId);
+    Ds485Comm::payload_append8(payload, bank);
+    Ds485Comm::payload_append8(payload, offs);
+    ErrorPtr err = mDs485Comm.issueRequest(pos->second->mDsmDsUid, DEVICE_CONFIG, DEVICE_CONFIG_GET, payload);
+    if (Error::notOK(err)) {
+      OLOG(LOG_WARNING, "configRead: issueNextRead: error issuing device config read request: %s", err->text());
+    }
+    // have it repeat some time later
+    mReadRepeater.executeOnce(boost::bind(&Ds485Vdc::issueNextRead, this), DS485_CONFIG_READ_REPEAT_DELAY);
+  }
+}
+
+
+
+
 // MARK: - operation
+
 
 void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, const string aPayload)
 {
@@ -338,8 +399,15 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
       Ds485DevicePtr dev = deviceFor(aSource, devId); // upstream -> source is relevant
       if (dev) {
         switch (modifier) {
-          case EVENT_DEVICE_ACCESSIBILITY_ON:dev->mIsPresent = true; break;
-          case EVENT_DEVICE_ACCESSIBILITY_OFF: dev->mIsPresent = false; break;
+          case EVENT_DEVICE_ACCESSIBILITY_ON: {
+            dev->mIsPresent = true;
+            dev->requestOutputValueUpdate();
+            break;
+          }
+          case EVENT_DEVICE_ACCESSIBILITY_OFF: {
+            dev->mIsPresent = false;
+            break;
+          }
         }
         dev->updatePresenceState(dev->mIsPresent);
       }
@@ -460,6 +528,7 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
             uint8_t byte;
             if ((pli = Ds485Comm::payload_get8(aPayload, pli, byte))==0) return;
             dev->traceConfigValue(bank, offs, byte, false);
+            confirmReadResult(devId, bank, offs);
           }
           break;
         }
@@ -484,6 +553,7 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
         uint8_t byte;
         if ((pli = Ds485Comm::payload_get8(aPayload, pli, byte))==0) return;
         dev->traceConfigValue(bank, offs, byte, true);
+        confirmReadResult(devId, bank, offs);
       }
       break;
     }
