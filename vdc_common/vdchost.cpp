@@ -128,7 +128,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   mMainScriptLogger.isMemberVariable();
   // vdchost is the global context for this app, so register its members in the standard scripting
   // domain making them accessible in all scripts
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(VdcHostLookup::sharedLookup());
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::p44VdcHostMembers());
   mVdcHostScriptContext = StandardScriptingDomain::sharedDomain().newContext();
   // init main script source
   mMainScript.setSharedMainContext(mVdcHostScriptContext);
@@ -137,40 +137,40 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   mMainScript.setScriptResultHandler(boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel(), ""));
   // Add some extras
   #if ENABLE_HTTP_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::HttpLookup);
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::httpGlobals());
   #endif
   #if ENABLE_SOCKET_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::SocketLookup);
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::socketGlobals());
   #endif
   #if ENABLE_WEBSOCKET_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::WebSocketLookup);
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::webSocketGlobals());
   #endif
   #if ENABLE_ANALOGIO_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::AnalogIoLookup);
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::analogIoGlobals());
   #endif
   #if ENABLE_DIGITALIO_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::DigitalIoLookup);
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::digitalIoGlobals());
   #endif
   #if ENABLE_DCMOTOR_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::DcMotorLookup);
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::dcMotorGlobals());
   #endif
   #if ENABLE_I2C_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::I2CLookup());
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::i2cGlobals());
   #endif
   #if ENABLE_SPI_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::SPILookup());
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::spiGlobals());
   #endif
   #if ENABLE_SERIAL_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::SerialLookup());
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::serialGlobals());
   #endif
   #if ENABLE_MIDI_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::MidiLookup());
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::midiGlobals());
   #endif
   #if ENABLE_MODBUS_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::ModbusLookup);
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::modbusGlobals());
   #endif
   #if !DISABLE_DISCOVERY && ENABLE_DNSSD_SCRIPT_FUNCS
-  StandardScriptingDomain::sharedDomain().registerMemberLookup(new P44Script::DnsSdLookup);
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::dnsSdGlobals());
   #endif
   #endif // P44SCRIPT_FULL_SUPPORT
   #endif // ENABLE_P44SCRIPT
@@ -2744,7 +2744,7 @@ static void globalevent_func(BuiltinFunctionContextPtr f)
 }
 
 
-static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
+static const BuiltinMemberDescriptor cP44VdcHostMembers[] = {
   FUNC_DEF_W_ARG(vdcapi, executable|structured),
   FUNC_DEF_W_ARG(device, executable|anyvalid),
   FUNC_DEF_W_ARG(valuesource, executable|anyvalid),
@@ -2756,20 +2756,11 @@ static const BuiltinMemberDescriptor p44VdcHostMembers[] = {
   BUILTINS_TERMINATOR
 };
 
-VdcHostLookup::VdcHostLookup() :
-  inherited(p44VdcHostMembers)
+
+const BuiltinMemberDescriptor* p44::P44Script::p44VdcHostMembers()
 {
+  return cP44VdcHostMembers;
 }
 
-static MemberLookupPtr sharedVdcHostLookup;
-
-MemberLookupPtr VdcHostLookup::sharedLookup()
-{
-  if (!sharedVdcHostLookup) {
-    sharedVdcHostLookup = new VdcHostLookup;
-    sharedVdcHostLookup->isMemberVariable(); // disable refcounting
-  }
-  return sharedVdcHostLookup;
-}
 
 #endif // P44SCRIPT_FULL_SUPPORT

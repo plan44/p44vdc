@@ -841,12 +841,8 @@ namespace p44 {
 
   namespace P44Script {
 
-    class VdcHostLookup : public BuiltInMemberLookup {
-      typedef BuiltInMemberLookup inherited;
-      VdcHostLookup();
-    public:
-      static MemberLookupPtr sharedLookup();
-    };
+    // get global builtins
+    const BuiltinMemberDescriptor* p44VdcHostMembers();
 
   }
 

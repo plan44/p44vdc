@@ -194,7 +194,6 @@ P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) 
 {
   #if P44SCRIPT_REGISTERED_SOURCE
   mScriptManager = new P44ScriptManager(&StandardScriptingDomain::sharedDomain());
-  StandardScriptingDomain::setStandardScriptingDomain(&(mScriptManager->domain()));
   // playground script in vdc host script (mainscript) context
   mPlayground.setScriptHostUid("p44script_playground", true); // unstored
   mPlayground.setSharedMainContext(mVdcHostScriptContext);
