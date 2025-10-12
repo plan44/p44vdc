@@ -501,6 +501,7 @@ typedef enum {
   sensorType_duration = 31, ///< time in seconds
   sensorType_percent = 32, ///< absolute percentage 0..100% (for user dimmers)
   sensorType_percent_speed = 33, ///< change speed in % of full range per second (for user dimmers)
+  sensorType_frequency = 34, ///< Frequency in Hz
   numVdcSensorTypes
 } VdcSensorType;
 

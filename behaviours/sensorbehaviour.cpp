@@ -107,6 +107,7 @@ const ValueUnit sensorTypeUnits[numVdcSensorTypes] = {
   VALUE_UNIT(valueUnit_second, unitScaling_1), ///< time in seconds
   VALUE_UNIT(valueUnit_percent, unitScaling_1), ///< absolute percentage 0..100% (for user dimmers)
   VALUE_UNIT(valueUnit_percent, unitScaling_1), ///< change speed in % of full range per second (for user dimmers)
+  VALUE_UNIT(valueUnit_hertz, unitScaling_1), ///< Frequency in Hz
 };
 
 
@@ -145,6 +146,7 @@ const char *sensorTypeIds[numVdcSensorTypes] = {
   "time", ///< duration in seconds
   "percent", ///< absolute percent value
   "percent_speed", ///< relative speed in % of full range per second
+  "frequency", ///< frequency in Hz
 };
 
 
