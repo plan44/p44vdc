@@ -976,7 +976,18 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
           MLMicroSeconds transitionTime = getOutput()->mTransitionTime;
           o = aParams->get("transitionTime");
           if (o) transitionTime = o->doubleValue()*Second;
-          channel->setChannelValue(newValue, transitionTime, true, withCoupling); // always apply precise value
+          int transitionDir = 0; // automatic
+          if (transitionTime>0) {
+            o = aParams->get("direction");
+            if (o) {
+              string ds = o->stringValue();
+              if (uequals(ds, "up")) transitionDir = 1;
+              else if (uequals(ds, "down")) transitionDir = -1;
+              else if (uequals(ds, "shortest")) transitionDir = -2;
+              else if (uequals(ds, "longest")) transitionDir = 2;
+            }
+          }
+          channel->setChannelValue(newValue, transitionTime, true, withCoupling, transitionDir); // always apply precise value
         }
       }
       if (!suppress && Error::isOK(err)) {

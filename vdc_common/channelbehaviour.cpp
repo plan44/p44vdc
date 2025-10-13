@@ -410,7 +410,7 @@ bool ChannelBehaviour::syncChannelValueBool(bool aValue, bool aAlwaysSync)
 
 void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransitionTimeUp, MLMicroSeconds aTransitionTimeDown, bool aAlwaysApply)
 {
-  setChannelValue(aNewValue, aNewValue>getChannelValue(true) ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply, true); // with coupling
+  setChannelValue(aNewValue, aNewValue>getChannelValue(true) ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply, true, 0); // with coupling
 }
 
 
@@ -418,12 +418,12 @@ bool ChannelBehaviour::setChannelValueIfNotDontCare(DsScenePtr aScene, double aN
 {
   if (aScene->isSceneValueFlagSet(getChannelIndex(), valueflags_dontCare))
     return false; // don't care, don't set
-  setChannelValue(aNewValue, aNewValue>getChannelValue(true) ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply, true); // with coupling
+  setChannelValue(aNewValue, aNewValue>getChannelValue(true) ? aTransitionTimeUp : aTransitionTimeDown, aAlwaysApply, true, 0); // with coupling
   return true; // actually set
 }
 
 
-void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransitionTime, bool aAlwaysApply, bool aWithCoupling)
+void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransitionTime, bool aAlwaysApply, bool aWithCoupling, int aDirection)
 {
   // round to resolution
   if (enforceResolution() && getResolution()>0) {
@@ -452,9 +452,30 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
   }
   // prevent propagating changes smaller than device resolution, but always apply when transition is in progress
   if (aAlwaysApply || inTransition() || fabs(aNewValue-mCachedChannelValue)>=getResolution()) {
+    // determine direction
+    if (aDirection<-1 || aDirection>1) {
+      // shortest (-2) or longest (+2) requested - valid for wraparound only
+      if (wrapsAround()) {
+        double range = getMax()-getMin();
+        double d = aNewValue-mCachedChannelValue;
+        mTransitionDirection = d>0 ? 1 : -1;
+        int isShortest = fabs(d)<=range/2;
+        if (isShortest && aDirection>1) {
+          // we want longest, use the other direction
+          mTransitionDirection = -mTransitionDirection;
+        }
+      }
+      else {
+        mTransitionDirection = 0; // does not wrap, longest/shortest does not have any meaning -> automatic
+      }
+    }
+    else {
+      // explicit (-1,1) or auto (0)
+      mTransitionDirection = aDirection;
+    }
     OLOG(LOG_INFO,
-      "is requested to change from %0.2f ->  %0.2f (transition time=%dmS)",
-      mCachedChannelValue, aNewValue, (int)(aTransitionTime/MilliSecond)
+      "is requested to change from %0.2f ->  %0.2f (transition time=%dmS, dir-hint=%d, dir=%d)",
+      mCachedChannelValue, aNewValue, (int)(aTransitionTime/MilliSecond), aDirection, mTransitionDirection
     );
     // setting new value captures current (possibly transitional) value as previous and completes transition
     mPreviousChannelValue = mChannelLastSync!=Never ? getChannelValue(true) : aNewValue; // If there is no valid previous value, set current as previous.
@@ -463,7 +484,6 @@ void ChannelBehaviour::setChannelValue(double aNewValue, MLMicroSeconds aTransit
     // save target parameters for next transition
     setPVar(mCachedChannelValue, aNewValue); // might need to be persisted
     mNextTransitionTime = aTransitionTime;
-    mTransitionDirection = 0; // automatic, shortest way
     mChannelUpdatePending = true; // pending to be sent to the device
     // possibly coupled channels can adjust to this change
     if (aWithCoupling) adjustCoupledChannels();

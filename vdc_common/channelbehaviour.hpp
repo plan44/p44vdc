@@ -145,7 +145,8 @@ namespace p44 {
     /// @param aNewValue the new output value
     /// @param aTransitionTime time in microseconds to be spent on transition from current to new channel value
     /// @param aAlwaysApply if set, new value will be applied to hardware even if not different from currently known value
-    void setChannelValue(double aNewValue, MLMicroSeconds aTransitionTime /* =0 */, bool aAlwaysApply /* = false */, bool aWithCoupling /* = true */);
+    /// @param aDirection for transitions, the direction to take: 0=automatic, 1=forward, 2=longest, -1=backward, -2=shortest
+    void setChannelValue(double aNewValue, MLMicroSeconds aTransitionTime /* =0 */, bool aAlwaysApply /* = false */, bool aWithCoupling /* = true */, int aDirection /* = 0 */);
 
     /// set new channel value and separate transition times for increasing/decreasing value at applyChannelValues()
     /// @param aNewValue the new output value
