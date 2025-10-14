@@ -1112,7 +1112,7 @@ static void movechannel_func(BuiltinFunctionContextPtr f)
     return;
   }
   else {
-    MLMicroSeconds timePerUnit = 0; // default to standard dimming rate of the channel
+    MLMicroSeconds timePerUnit = Infinite; // default to standard dimming rate of the channel
     bool withCoupling = true; // default to apply coupled channel changes
     if (f->numArgs()>2) {
       timePerUnit = f->arg(2)->doubleValue()*Second;

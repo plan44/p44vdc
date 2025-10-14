@@ -500,10 +500,11 @@ void ChannelBehaviour::moveChannelValue(int aDirection, MLMicroSeconds aTimePerU
     stopTransition();
   }
   else {
-    if (aTimePerUnit==0) {
+    if (aTimePerUnit==Infinite) {
       // use standard dimming rate
       aTimePerUnit = (1.0/getDimPerMS())*MilliSecond;
     }
+    if (aTimePerUnit==0) return; // no rate -> cannot move
     double dist = 0;
     if (wrapsAround()) {
       // do one full round

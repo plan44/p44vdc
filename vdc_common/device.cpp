@@ -907,7 +907,7 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
       if ((o = aParams->get("move"))) {
         // start/stop moving
         int dir = o->int32Value();
-        MLMicroSeconds timePerUnit = 0; // default rate
+        MLMicroSeconds timePerUnit = Infinite; // default rate
         if ((o = aParams->get("rate"))) {
           timePerUnit = o->doubleValue()*Second;
         }
