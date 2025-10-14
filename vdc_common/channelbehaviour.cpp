@@ -327,7 +327,7 @@ double ChannelBehaviour::getChannelValue(bool aTransitional)
       double r = getMax()-getMin(); // full range distance
       if (mTransitionDirection!=0) {
         // explicit direction, if sign is wrong or distance apparently zero -> make distance longer
-        if (d==0 || ((d>0) != (mTransitionDirection>0))) {
+        if (fabs(d)<getResolution() || ((d>0) != (mTransitionDirection>0))) {
           d += mTransitionDirection*r; // extend distance by range
         }
       }
