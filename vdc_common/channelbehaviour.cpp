@@ -522,7 +522,7 @@ void ChannelBehaviour::moveChannelValue(int aDirection, MLMicroSeconds aTimePerU
 
 
 
-double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime, bool aWithCoupling)
+bool ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime, bool aWithCoupling)
 {
   if (aIncrement==0) return mCachedChannelValue; // no change
   double newValue = mCachedChannelValue+aIncrement;
@@ -549,7 +549,8 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
   // - non-wrapping channels might already be at the end of their range, then nothing needs to be done
   // - dimming a wrapping channel with nonzero transition time *always* means transitioning, possibly one
   //   full round to the same value
-  if (newValue!=mCachedChannelValue || (wrapsAround() && aTransitionTime!=0)) {
+  bool changed = newValue!=mCachedChannelValue;
+  if (changed || (wrapsAround() && aTransitionTime!=0)) {
     FOCUSOLOG(
       "is requested to dim by %f from %0.2f ->  %0.2f (transition time=%dmS)",
       aIncrement, mCachedChannelValue, newValue, (int)(aTransitionTime/MilliSecond)
@@ -566,7 +567,7 @@ double ChannelBehaviour::dimChannelValue(double aIncrement, MLMicroSeconds aTran
     if (aWithCoupling) adjustCoupledChannels();
   }
   setPVar(mIsVolatileValue, false); // channel actively dimmed, is not volatile
-  return newValue;
+  return changed;
 }
 
 

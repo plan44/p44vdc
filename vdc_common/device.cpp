@@ -1618,7 +1618,7 @@ void Device::dimChannelExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatT
 void Device::dimAutostopHandler(ChannelBehaviourPtr aChannel)
 {
   // timeout: stop dimming immediately
-  mDimTimeoutTicket = 0;
+  mDimTimeoutTicket.cancel();
   dimChannel(aChannel, dimmode_stop, true);
   mCurrentDimMode = dimmode_stop; // stopped now
 }
@@ -1666,10 +1666,17 @@ void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool 
 
 void Device::dimHandler(ChannelBehaviourPtr aChannel, double aIncrement, MLMicroSeconds aNow)
 {
-  // increment channel value
-  aChannel->dimChannelValue(aIncrement, DIM_STEP_INTERVAL, true); // use coupling if defined in the output
-  // apply to hardware
-  requestApplyingChannels(boost::bind(&Device::dimDoneHandler, this, aChannel, aIncrement, aNow+DIM_STEP_INTERVAL), true); // apply in dimming mode
+  // increment channel value (use coupling if enabled for the output)
+  mIsDimming = aChannel->dimChannelValue(aIncrement, DIM_STEP_INTERVAL, true);
+  if (mIsDimming) {
+    // still progress in dimming
+    requestApplyingChannels(boost::bind(&Device::dimDoneHandler, this, aChannel, aIncrement, aNow+DIM_STEP_INTERVAL), true); // apply in dimming mode
+  }
+  else {
+    // not able to dim further, autostop early (before eventual timeout)
+    aChannel->setTransitionProgress(1); // consider transition fully done
+    dimAutostopHandler(aChannel);
+  }
 }
 
 

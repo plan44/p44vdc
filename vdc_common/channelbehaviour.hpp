@@ -168,8 +168,8 @@ namespace p44 {
     /// dim channel value up or down, preventing going below getMinDim().
     /// @param aIncrement how much to increment/decrement the value
     /// @param aTransitionTime time in microseconds to be spent on transition from current to new channel value
-    /// @return new channel value after increment/decrement
-    double dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime, bool aWithCoupling);
+    /// @return true when channel value has actually changed by this dimming (not yet at min or max)
+    bool dimChannelValue(double aIncrement, MLMicroSeconds aTransitionTime, bool aWithCoupling);
 
     /// start or stop moving channel value up or down
     /// @param aDirection 0 to stop moving, 1 to move up, -1 to move down
