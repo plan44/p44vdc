@@ -394,6 +394,12 @@ void OutputBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 {
   #if ENABLE_SCENE_SCRIPT
   SimpleScenePtr simpleScene = boost::dynamic_pointer_cast<SimpleScene>(aScene);
+  // in any case, calling new scene must make sure we have no handlers left running from other scene scripts
+  ScriptMainContextPtr dsc = mDevice.getDeviceScriptContext(false); // do not create context!
+  if (dsc) {
+    dsc->clearHandlers();
+  }
+  // maybe we need to start a scene script now
   if (simpleScene && simpleScene->mEffect==scene_effect_script && simpleScene->mSceneScript.active()) {
     // run scene script
     OLOG(LOG_INFO, "Starting Scene Script: '%s'", singleLine(simpleScene->mSceneScript.getSource().c_str(), true, 80).c_str() );
@@ -424,6 +430,7 @@ void OutputBehaviour::stopSceneActions()
   ScriptMainContextPtr dsc = mDevice.getDeviceScriptContext(false);
   if (dsc) {
     dsc->abort(stopall, new ErrorValue(ScriptError::Aborted, "scene actions stopped"));
+    dsc->clearHandlers();
   }
   #endif // ENABLE_SCENE_SCRIPT
 }
