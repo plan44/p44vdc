@@ -610,11 +610,17 @@ namespace p44 {
 
     /// abort any currently ongoing scene action
     /// @note base class just calls stopSceneActions() on the output
+    /// @note does not report the output state, use reportOutputState() when final state should be reported
     virtual void stopSceneActions();
 
     /// stop running transitions
     /// @note base class just calls stopTransitions() on the output
+    /// @note does not report the output state, use reportOutputState() when final state should be reported
     virtual void stopTransitions();
+
+    /// report the current output state (if any)
+    /// @return true when something was reported
+    bool reportOutputState();
 
     /// get channel by index
     /// @param aChannelIndex the channel index (0=primary channel, 1..n other channels)

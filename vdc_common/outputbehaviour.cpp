@@ -1006,6 +1006,7 @@ static void stopactions_func(BuiltinFunctionContextPtr f)
     POLOG(o->output(), LOG_INFO, "stopping all scene actions");
     o->output()->getDevice().stopSceneActions();
   }
+  o->output()->getDevice().reportOutputState();
   f->finish(o); // allow chaining
 }
 

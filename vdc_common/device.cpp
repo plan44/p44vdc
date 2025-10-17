@@ -1013,6 +1013,8 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
     if (!o || o->boolValue()) stopTransitions(); // channel transitions
     o = aParams->get("sceneactions");
     if (!o || o->boolValue()) stopSceneActions(); // actions such as blinking, scene scripts, animations on views
+    // report output changes according to output settings
+    reportOutputState();
   }
   else {
     inherited::handleNotification(aNotification, aParams, aExaminedCB);
@@ -1394,7 +1396,7 @@ void Device::applyingChannelsComplete()
     }
     FOCUSLOG("- confirmed apply (really) finalized (ticket #%ld)", ticketNo);
     // report output changes according to output settings
-    getOutput()->reportOutputState();
+    reportOutputState();
   }
 }
 
@@ -1902,7 +1904,7 @@ void Device::callSceneExecutePrepared(SimpleCB aDoneCB, NotificationType aWhatTo
           allChannelsApplied();
           // - report output changes according to output settings
           //   (in non-optimized case above, this is done by applyingChannelsComplete() as consequence of requestApplyingChannels())
-          getOutput()->reportOutputState();
+          reportOutputState();
           // - consider scene applied but indirectly
           sceneValuesApplied(aDoneCB, scene, true);
           return;
@@ -1973,11 +1975,16 @@ void Device::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
 }
 
 
+bool Device::reportOutputState()
+{
+  if (mOutput) return mOutput->reportOutputState();
+  return false; // nothing reported
+}
+
+
 void Device::stopSceneActions()
 {
-  if (mOutput) {
-    mOutput->stopSceneActions();
-  }
+  if (mOutput) mOutput->stopSceneActions();
 }
 
 
@@ -1986,9 +1993,7 @@ void Device::stopTransitions()
   // in the base class, this is just cancelling possibly running default dimming
   mIsDimming = false;
   mDimHandlerTicket.cancel();
-  if (mOutput) {
-    mOutput->stopTransitions();
-  }
+  if (mOutput) mOutput->stopTransitions();
 }
 
 

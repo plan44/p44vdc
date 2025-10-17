@@ -331,7 +331,7 @@ void WbfVdc::gatewayWebsocketHandler(const string aMessage, ErrorPtr aError)
         if (pos!=mLoadsMap.end()) {
           WbfDevice& dev = static_cast<WbfDevice&>(pos->second->getDevice());
           dev.handleLoadState(part, pos->second);
-          dev.getOutput()->reportOutputState();
+          dev.reportOutputState();
         }
         else {
           OLOG(LOG_WARNING, "load id %d not found in loadsMap[%zd] -> cannot report", id, mLoadsMap.size())

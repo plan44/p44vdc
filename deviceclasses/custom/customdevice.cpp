@@ -277,7 +277,7 @@ void CustomDevice::deviceInitiatedSyncComplete()
 {
   mSyncedCB = NoOP;
   // when device initiates multiple channel sync, report output when done
-  getOutput()->reportOutputState();
+  reportOutputState();
 }
 
 
@@ -602,7 +602,7 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
       ChannelBehaviourPtr cb = getChannelByIndex(aIndex);
       if (cb) {
         cb->reportChannelProgress(aValue);
-        getOutput()->reportOutputState();
+        reportOutputState();
       }
       else {
         return TextError::err("no channel #%d", aIndex);
@@ -644,7 +644,7 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
         }
         if (changed && !mSyncedCB) {
           // channel report is not part of active syncChannelValues, report changed output state
-          getOutput()->reportOutputState();
+          reportOutputState();
         }
       }
       else {

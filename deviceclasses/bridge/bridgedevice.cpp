@@ -296,7 +296,7 @@ bool BridgeDevice::prepareSceneCall(DsScenePtr aScene)
       //   become changed for "external" reasons and sync that.
       //   We need to call reportOutputState() to inform the bridge, though.
       getChannelByType(channeltype_default)->syncChannelValue(newval, true, true); // always, derived
-      getOutput()->reportOutputState();
+      reportOutputState();
     }
     // suppress processing the scene call locally
     return false;
@@ -346,7 +346,7 @@ void BridgeDevice::resetSignalChannel()
 {
   OLOG(LOG_NOTICE, "auto-resetting scene caller's controlling output");
   getChannelByType(channeltype_default)->syncChannelValue(0, true);
-  getOutput()->reportOutputState();
+  reportOutputState();
 }
 
 

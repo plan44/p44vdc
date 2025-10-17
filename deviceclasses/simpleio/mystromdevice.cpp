@@ -179,7 +179,7 @@ void MyStromDevice::stateReceived(JsonObjectPtr aJsonResponse, ErrorPtr aError)
     o = aJsonResponse->get("relay");
     if (o) {
       if (getOutput()->getChannelByIndex(0)->syncChannelValueBool(o->boolValue())) {
-        getOutput()->reportOutputState();
+        reportOutputState();
       }
     }
   }

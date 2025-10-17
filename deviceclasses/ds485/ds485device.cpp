@@ -443,7 +443,7 @@ void Ds485Device::trace16bitChannelChange(ChannelBehaviourPtr aChannelOrNullForD
       a16BitChannelValue, a16BitChannelValue, a16BitChannelValue>>8, a16BitChannelValue>>8, newValue
     );
     aChannelOrNullForDefault->syncChannelValue(newValue);
-    o->reportOutputState();
+    reportOutputState();
   }
 }
 
@@ -701,7 +701,7 @@ bool Ds485Device::prepareSceneApply(DsScenePtr aScene)
     // dS485 scene call of which we knew we have the values cached.
     // So we did not retrieve and sync channels, but fake-apply the scene
     allChannelsApplied();
-    getOutput()->reportOutputState();
+    reportOutputState();
   }
   return !mUpdatingCache; // actually apply only when this is not a cache update
   // TODO: we're completely lacking the mechanisms to apply local scene calls efficiently by invoking DS-side scenes for now
