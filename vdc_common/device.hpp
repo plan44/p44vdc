@@ -152,6 +152,7 @@ namespace p44 {
     SimpleCB mAppliedOrSupersededCB; ///< will be called when values are either applied or ignored because a subsequent change is already pending
     SimpleCB mApplyCompleteCB; ///< will be called when apply is complete (set by waitForApplyComplete())
     bool mApplyInProgress; ///< set when applying values is in progress
+    bool mDoReportApply; ///< only if set at applyingChannelsComplete, the output state should be reported
     int mMissedApplyAttempts; ///< number of apply attempts that could not be executed. If>0, completing next apply will trigger a re-apply to finalize values
     SimpleCB mUpdatedOrCachedCB; ///< will be called when current values are either read from hardware, or new values have been requested for applying
     bool mUpdateInProgress; ///< set when updating channel values from hardware is in progress
@@ -545,11 +546,12 @@ namespace p44 {
     ///   in a single channel (and not switching between color modes etc.)
     /// @param aModeChange if set, channels will be applied in all cases, even if output mode is set to "disabled".
     ///   This flag is set in calls when output mode has changed
+    /// @param aWithReport after successful application of the channel changes, report new output state(s)
     /// @note this internally calls applyChannelValues() to perform actual work, but serializes the behaviour towards the caller
     ///   such that aAppliedOrSupersededCB of the previous request is always called BEFORE initiating subsequent
     ///   channel updates in the hardware. It also may discard requests (but still calling aAppliedOrSupersededCB) to
     ///   avoid stacking up delayed requests.
-    void requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForDimming, bool aModeChange = false);
+    void requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForDimming, bool aModeChange = false, bool aWithReport = true);
 
     /// request callback when apply is really complete (all pending applies done)
     /// @param aApplyCompleteCB will called when values are applied and no other change is pending

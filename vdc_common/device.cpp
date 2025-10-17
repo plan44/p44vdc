@@ -112,6 +112,7 @@ Device::Device(Vdc *aVdcP) :
   DsAddressable(&aVdcP->getVdcHost()),
   mColorClass(class_black_joker),
   mApplyInProgress(false),
+  mDoReportApply(false),
   mMissedApplyAttempts(0),
   mUpdateInProgress(false),
   mPreviousSceneNo(INVALID_SCENE_NO),
@@ -904,9 +905,10 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
     bool withCoupling = true; // enabled by default
     if ((o = aParams->get("coupling"))) withCoupling = o->boolValue();
     if (Error::isOK(err = checkChannel(aParams, channel))) {
+      int dir = 0; // will be set != 0 when moving
       if ((o = aParams->get("move"))) {
         // start/stop moving
-        int dir = o->int32Value();
+        dir = o->int32Value();
         MLMicroSeconds timePerUnit = Infinite; // default rate
         if ((o = aParams->get("rate"))) {
           timePerUnit = o->doubleValue()*Second;
@@ -997,7 +999,7 @@ void Device::handleNotification(const string &aNotification, ApiValuePtr aParams
         if (o) apply_now = o->boolValue();
         if (apply_now) {
           mVdcP->cancelNativeActionUpdate(); // still delayed native scene updates must be cancelled before changing channel values
-          requestApplyingChannels(NoOP, false);
+          requestApplyingChannels(NoOP, false, false, dir==0); // do NOT report when this is start of a move (dir!=0)
         }
       }
     }
@@ -1232,7 +1234,7 @@ bool Device::addToOptimizedSet(NotificationDeliveryStatePtr aDeliveryState)
 #endif
 #define SERIALIZER_WATCHDOG_TIMEOUT (20*Second)
 
-void Device::requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForDimming, bool aModeChange)
+void Device::requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForDimming, bool aModeChange, bool aWithReport)
 {
   if (!aModeChange && mOutput && !mOutput->isEnabled()) {
     // disabled output and not a mode change -> no operation
@@ -1270,6 +1272,7 @@ void Device::requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForD
     mMissedApplyAttempts++;
     mAppliedOrSupersededCB = aAppliedOrSupersededCB;
     mApplyInProgress = true;
+    mDoReportApply = aWithReport;
   }
   else {
     // case c) applying is not currently in progress, can start updating hardware now
@@ -1282,6 +1285,7 @@ void Device::requestApplyingChannels(SimpleCB aAppliedOrSupersededCB, bool aForD
     // - start applying
     mAppliedOrSupersededCB = aAppliedOrSupersededCB;
     mApplyInProgress = true;
+    mDoReportApply = aWithReport;
     applyChannelValues(boost::bind(&Device::applyingChannelsComplete, this), aForDimming);
   }
 }
@@ -1375,6 +1379,7 @@ void Device::applyingChannelsComplete()
   }
   #endif
   mApplyInProgress = false;
+  bool doReport = mDoReportApply; // capture, callbacks might schedule next apply with different setting
   // if more apply request have happened in the meantime, we need to reapply now
   if (!checkForReapply()) {
     // apply complete and no final re-apply pending
@@ -1396,7 +1401,10 @@ void Device::applyingChannelsComplete()
     }
     FOCUSLOG("- confirmed apply (really) finalized (ticket #%ld)", ticketNo);
     // report output changes according to output settings
-    reportOutputState();
+    if (doReport) {
+      reportOutputState();
+      mDoReportApply = false;
+    }
   }
 }
 
@@ -1656,7 +1664,7 @@ void Device::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bool 
         // start dimming
         // ...but setup callback to wait first for all apply operations to really complete before
         SimpleCB dd = boost::bind(&Device::dimDoneHandler, this, aChannel, increment, MainLoop::now()+10*MilliSecond);
-        waitForApplyComplete(boost::bind(&Device::requestApplyingChannels, this, dd, false, false));
+        waitForApplyComplete(boost::bind(&Device::requestApplyingChannels, this, dd, false, false, true));
       }
       else {
         OLOG(LOG_WARNING, "generic dimChannel() without apply -> unlikely (optimized generic dimming?)");
