@@ -637,15 +637,15 @@ void WbfDevice::handleButtonCmd(JsonObjectPtr aCmd, DsBehaviourPtr aBehaviour)
     if (bb) {
       if (evtype=="click") {
         // this is an already evaluated click (short press/release sequence)
-        bb->injectClick(ct_click_1x);
+        bb->injectClick(ct_click_1x, true);
       }
       else if (evtype=="press") {
         // start of holding button for longer
-        bb->injectClick(ct_hold_start);
+        bb->injectClick(ct_hold_start, true);
       }
       else if (evtype=="release") {
         // end of holding button for longer
-        bb->injectClick(ct_hold_end);
+        bb->injectClick(ct_hold_end, true);
       }
     }
   }

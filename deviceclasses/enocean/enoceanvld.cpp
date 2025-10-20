@@ -64,10 +64,10 @@ static void D2030AButtonHandler(const struct EnoceanInputDescriptor &aInputDescr
     // - 3 : pressed longer
     // - 4 : released
     switch (action) {
-      case 1 : bb->injectClick(ct_click_1x); break;
-      case 2 : bb->injectClick(ct_click_2x); break;
-      case 3 : bb->injectClick(ct_hold_start); break;
-      case 4 : bb->injectClick(ct_hold_end); break;
+      case 1 : bb->injectClick(ct_click_1x, true); break;
+      case 2 : bb->injectClick(ct_click_2x, true); break;
+      case 3 : bb->injectClick(ct_hold_start, true); break;
+      case 4 : bb->injectClick(ct_hold_end, true); break;
     }
   }
 }

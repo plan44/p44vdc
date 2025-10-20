@@ -181,7 +181,7 @@ void Ds485Device::handleDeviceUpstreamMessage(bool aIsSensor, uint8_t aKeyNo, Ds
         ButtonBehaviourPtr b = getButton(0);
         if (b) {
           OLOG(LOG_NOTICE, "dS device button click received: clicktype=%s", ButtonBehaviour::clickTypeName(aClickType).c_str());
-          b->injectClick(aClickType);
+          b->injectClick(aClickType, false);
         }
         break;
       }

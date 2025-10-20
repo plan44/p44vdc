@@ -203,7 +203,8 @@ namespace p44 {
     /// @note this is for devices which do click/hold disambiguation themselves.
     /// Do NOT use this mixed with updateButtonState()!
     /// @param aClickType the click or hold/release to inject
-    void injectClick(DsClickType aClickType);
+    /// @param aFilterByStateMachineMode filter out clicks or longpresses according to mStateMachineMode
+    void injectClick(DsClickType aClickType, bool aFilterByStateMachineMode);
 
     /// inject (set) current button state without causing evaluation
     /// @note this is for devices which do click/hold disambiguation themselves.

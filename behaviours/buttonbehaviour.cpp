@@ -304,7 +304,7 @@ void ButtonBehaviour::injectState(bool aButtonPressed)
 }
 
 
-void ButtonBehaviour::injectClick(DsClickType aClickType)
+void ButtonBehaviour::injectClick(DsClickType aClickType, bool aFilterByStateMachineMode)
 {
   switch (aClickType) {
     // add clicks and tips to counter (which will expire after t_tip_timeout)
@@ -319,6 +319,11 @@ void ButtonBehaviour::injectClick(DsClickType aClickType)
     case ct_tip_1x:
     case ct_click_1x:
       mClickCounter++;
+    reportclicks:
+      if (aFilterByStateMachineMode && mStateMachineMode==statemachine_dimmer) break; // ignore clicks
+      if (aFilterByStateMachineMode && mStateMachineMode==statemachine_single) {
+        mClickCounter = 1; // only single clicks
+      }
       // report current count as tips
       mState = S4_nextTipWait; // must set a state, although regular state machine is not used, to make sure valueSource reports clicks
       if (isLocalButtonEnabled() && mClickCounter==1) {
@@ -332,16 +337,20 @@ void ButtonBehaviour::injectClick(DsClickType aClickType)
         mButtonPressed = false;
         sendClick((DsClickType)(ct_tip_1x+mClickCounter-1));
       }
-      if (mClickCounter<4) {
+      if (mClickCounter<4 && !(aFilterByStateMachineMode && mStateMachineMode==statemachine_single)) {
         // time out after we're sure all tips are accumulated
         mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::injectedOpComplete, this, true), t_tip_timeout);
       }
       else {
-        // counter overflow, reset right now
+        // counter overflow or single-click button, reset right now
         injectedOpComplete(true);
       }
       break;
     case ct_hold_start:
+      if (aFilterByStateMachineMode && mStateMachineMode==statemachine_simple) {
+        mClickCounter = 1;
+        goto reportclicks;
+      }
       mButtonPressed = true;
       if (mClickType==ct_hold_start) {
         aClickType = ct_hold_repeat; // already started before -> treat as repeat
@@ -352,6 +361,7 @@ void ButtonBehaviour::injectClick(DsClickType aClickType)
       break;
     case ct_hold_end:
       mButtonPressed = false;
+      if (aFilterByStateMachineMode && mStateMachineMode==statemachine_simple) break; // ignore release
       if (mClickType!=ct_hold_start && mClickType!=ct_hold_repeat) break; // suppress hold end when not in hold start
       sendClick(aClickType);
       injectedOpComplete(false);

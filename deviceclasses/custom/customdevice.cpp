@@ -545,12 +545,12 @@ ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aVa
           // direct click reporting
           int click = (int)(-aValue);
           switch (click) {
-            case 1 : bb->injectClick(ct_tip_1x); break;
-            case 2 : bb->injectClick(ct_tip_2x); break;
-            case 3 : bb->injectClick(ct_tip_3x); break;
-            case 4 : bb->injectClick(ct_tip_4x); break;
-            case 10 : bb->injectClick(ct_hold_end); break;
-            case 11 : bb->injectClick(ct_hold_start); break;
+            case 1 : bb->injectClick(ct_tip_1x, true); break;
+            case 2 : bb->injectClick(ct_tip_2x, true); break;
+            case 3 : bb->injectClick(ct_tip_3x, true); break;
+            case 4 : bb->injectClick(ct_tip_4x, true); break;
+            case 10 : bb->injectClick(ct_hold_end, true); break;
+            case 11 : bb->injectClick(ct_hold_start, true); break;
           }
         }
         else if (aValue>2) {

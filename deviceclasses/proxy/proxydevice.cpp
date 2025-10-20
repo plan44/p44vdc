@@ -355,7 +355,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
           }
         }
         else if (props->get("clickType", o)) {
-          bb->injectClick(static_cast<DsClickType>(o->int32Value()));
+          bb->injectClick(static_cast<DsClickType>(o->int32Value()), false);
         }
       }
     }
