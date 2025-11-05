@@ -190,6 +190,7 @@ static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
 void SensorBehaviour::defaultModeration(bool aEnable)
 {
   mProfileP = nullptr;
+  mFilter.reset();
   if (aEnable) {
     const SensorBehaviourProfile *sbpP = sensorBehaviourProfiles;
     while (sbpP->type!=sensorType_none) {
