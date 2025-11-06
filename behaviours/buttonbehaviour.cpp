@@ -446,7 +446,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
     FOCUSOLOG("single click only button state machine entered in state %s", stateNames[state]);
     if (mButtonPressed) {
       // the button was pressed right now
-      mState = S8_awaitrelease;
+      mState = S8_awaitrelease; // must be!=idle or getSourceValue() will return 0 instead of clicktype
       sendClick(ct_progress); // report getting pressed to bridges (not dS)
     }
     else {
@@ -455,12 +455,12 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
         // we haven't seen a press before, assume the press got lost and act (late) on the release
         // - simulate the button pressing (for bridges)
         mButtonPressed = true;
+        mState = S8_awaitrelease; // must be!=idle or getSourceValue() will return 0 instead of clicktype
         sendClick(ct_progress); // report getting pressed to bridges (not dS)
         mButtonPressed = false;
       }
       // report getting released to bridges (not dS)
       sendClick(ct_progress);
-      mState = S0_idle;
       // Note: we do not have other states but idle and awaitrelease
       if (isLocalButtonEnabled()) {
         // first tip switches local output if local button is enabled
@@ -471,6 +471,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
         sendClick(ct_tip_1x);
         clickSequenceComplete(); // always complete after one click
       }
+      mState = S0_idle;
     }
   }
   else if (mButtonMode==buttonMode_turbo || mStateMachineMode==statemachine_simple) {
@@ -491,18 +492,19 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
     }
     else {
       // the button was released right now
-      if (mState==S0_idle) {
+      if (mState!=S8_awaitrelease) {
         // we haven't seen a press before, assume the press got lost and act (late) on the release
         // - simulate the button pressing (for bridges)
         mButtonPressed = true;
+        mState = S8_awaitrelease; // must be!=idle or getSourceValue() will return 0 instead of clicktype
         sendClick(ct_progress); // report getting pressed to bridges (not dS)
         mButtonPressed = false;
         // - process as tip
         isTip = true;
       }
       sendClick(ct_progress); // report getting released to bridges (not dS)
-      // Note: we do not have other states but idle and awaitrelease
-      mState = S0_idle;
+      // Note: we do not have other states but idle, awaitrelease and nextTipWait
+      mState = S4_nextTipWait; // must be!=idle or getSourceValue() will return 0 instead of clicktype
       // complete the sequence if nothing happens within tip_timeout, anyway
       mButtonStateMachineTicket.executeOnce(boost::bind(&ButtonBehaviour::clickSequenceComplete, this), t_tip_timeout);
     }
@@ -532,6 +534,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
         if (mButtonPressed) {
           FOCUSOLOG("started dimming - sending ct_hold_start");
           // button just pressed
+          mState = S8_awaitrelease;
           sendClick(ct_hold_start);
           // schedule hold repeats
           mHoldRepeats = 0;
@@ -540,6 +543,7 @@ void ButtonBehaviour::checkCustomStateMachine(bool aStateChanged, MLMicroSeconds
         else {
           // button just released
           FOCUSOLOG("stopped dimming - sending ct_hold_end");
+          mState = S0_idle;
           sendClick(ct_hold_end);
           mButtonStateMachineTicket.cancel();
           clickSequenceComplete(); // end of dimming is end of sequence
