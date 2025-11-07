@@ -620,6 +620,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
       if (aStateChanged && !mButtonPressed) {
         // no packet send time, skip S15
         sendClick(ct_hold_end);
+        clickSequenceComplete(); // end of dimming is end of sequence
         mState = S0_idle;
       }
       else if (timeSinceRef>=t_dim_repeat_time) {
@@ -631,6 +632,7 @@ void ButtonBehaviour::checkStandardStateMachine(bool aStateChanged, MLMicroSecon
         else {
           // early hold end reporting, still waiting for actual release of the button
           sendClick(ct_hold_end);
+          clickSequenceComplete(); // end of dimming is end of sequence
           mState = S14_awaitrelease_timedout;
         }
       }
