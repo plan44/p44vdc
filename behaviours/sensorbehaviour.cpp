@@ -33,14 +33,18 @@ using namespace p44;
 
 #define DSS_SENSOR_MAX_PUSH_INTERVAL (55*Minute) // all sensors that have a aliveSignInterval!=Never must get pushed at least this often (otherwise dSS flags sensor red)
 
+#define DEFAULT_MIN_PUSH_INTERVAL (30*Second)
+#define DEFAULT_MAX_PUSH_INTERVAL (Never)
+#define DEFAULT_CHANGESONLY_INTERVAL (30*Minute)
+
 SensorBehaviour::SensorBehaviour(Device &aDevice, const string aId) :
   inherited(aDevice, aId),
   mProfileP(nullptr), // the profile
   // persistent settings
   mSensorGroup(group_black_variable), // default to joker
-  mMinPushInterval(30*Second), // default unless sensor type profile sets another value
-  mMaxPushInterval(0),
-  mChangesOnlyInterval(30*Minute), // report unchanged values only rarely by default (note: before 2021-09-16 we did not have a default limit here)
+  mMinPushInterval(DEFAULT_MIN_PUSH_INTERVAL), // default unless sensor type profile sets another value
+  mMaxPushInterval(DEFAULT_MAX_PUSH_INTERVAL),
+  mChangesOnlyInterval(DEFAULT_CHANGESONLY_INTERVAL), // report unchanged values only rarely by default (note: before 2021-09-16 we did not have a default limit here)
   #if !REDUCED_FOOTPRINT
   mSensorFunc(sensorFunc_standard),
   mSensorChannel(channeltype_default),
@@ -189,6 +193,15 @@ static const SensorBehaviourProfile sensorBehaviourProfiles[] = {
 
 void SensorBehaviour::defaultModeration(bool aEnable)
 {
+  if (!aEnable && mProfileP) {
+    // a profile was enabled before. Revert interval settings that were changed by profile back to defaults
+    if (mProfileP->pushIntvl>0) {
+      mMinPushInterval = DEFAULT_MIN_PUSH_INTERVAL;
+    }
+    if (mProfileP->chgOnlyIntvl>0) {
+      mChangesOnlyInterval = DEFAULT_CHANGESONLY_INTERVAL;
+    }
+  }
   mProfileP = nullptr;
   mFilter.reset();
   if (aEnable) {
