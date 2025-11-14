@@ -793,6 +793,7 @@ void CustomDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   ShadowBehaviourPtr sb = getOutput<ShadowBehaviour>();
   if (sb && mUseMovement) {
     // ask shadow behaviour to start movement sequence on default channel
+    // Note: movement sequencer will call aDoneCB
     sb->applyBlindChannels(boost::bind(&CustomDevice::changeChannelMovement, this, 0, _1, _2), aDoneCB, aForDimming);
   }
   else {
@@ -829,8 +830,9 @@ void CustomDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
         cb->channelValueApplied();
       }
     }
+    // consider applied
+    inherited::applyChannelValues(aDoneCB, aForDimming);
   }
-  inherited::applyChannelValues(aDoneCB, aForDimming);
 }
 
 
