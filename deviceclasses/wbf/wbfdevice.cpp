@@ -64,10 +64,10 @@ static const WbfSensorTypeInfo* sensorTypeInfoByWbfType(const string& aType)
 
 
 
-WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevDesc, JsonObjectPtr aOutDesc, JsonObjectPtr aInputsArr, int& aInputsUsed) :
+WbfDevice::WbfDevice(WbfVdc *aVdcP, JsonObjectPtr aDevDesc, JsonObjectPtr aOutDesc, JsonObjectPtr aInputsArr, int& aInputsUsed, int aNumOutputs, int aNumSensors) :
   inherited(aVdcP),
-  mSubDeviceIndex(aSubdeviceIndex),
   mLoadId(-1),
+  mSubDeviceIndex(-1), // not yet assigned
   mHasWhiteChannel(false)
 {
   DBGOLOG(LOG_INFO,
@@ -114,6 +114,10 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
     JsonObjectPtr loadDesc = aOutDesc->get("load_info"); // our own field transporting the load associated with the output
     if (loadDesc) {
       if (loadDesc->get("id", o)) mLoadId = o->int32Value();
+      if (loadDesc->get("channel", o) && mSubDeviceIndex<0) { // only set once
+        mSubDeviceIndex = o->int32Value(); // output always gets output channel's subdevice index
+      }
+      else OLOG(LOG_ERR,"load has no 'channel' -> no unique ID");
       // when we have a load, use its name
       if (loadDesc->get("name", o)) {
         namesFound++;
@@ -214,7 +218,8 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
       }
     }
   } // output
-  if (!getOutput()) {
+  bool hasOutput = getOutput()!=nullptr;
+  if (!hasOutput) {
     // no output, just install minimal settings without scenes
     installSettings();
   }
@@ -230,7 +235,13 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
       JsonObjectPtr sensorInfo;
       JsonObjectPtr buttonInfo;
       if (inpDesc->get("sensor_info", sensorInfo)) {
-        if (sensorInfo->get("channel", o)) inputDesc.insert(0, string_format("%d:", o->int32Value()));
+        if (sensorInfo->get("channel", o)) {
+          inputDesc.insert(0, string_format("%d:", o->int32Value()));
+          if (mSubDeviceIndex<0) { // only set once
+            mSubDeviceIndex = aNumOutputs + o->int32Value(); // sensor subdevice indices are offset by number of outputs in originating WBF device
+          }
+        }
+        else OLOG(LOG_ERR,"sensor has no 'channel' -> no unique ID");
         // this is a sensor (or binary input aka "bool" sensor)
         if (sensorInfo->get("type", o)) {
           const WbfSensorTypeInfo* sensorDesc = sensorTypeInfoByWbfType(o->stringValue());
@@ -243,7 +254,7 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
               sb->setHardwareSensorConfig(sensorDesc->vdcSensorType, sensorDesc->usageHint, sensorDesc->min, sensorDesc->max, sensorDesc->resolution, 0, 0);
               sb->setGroup(sensorDesc->group);
               sb->setHardwareName(inputDesc);
-              if (namesFound==0) { defaultName = inputDesc; namesFound++; }
+              if (namesFound==0) { defaultName = inputDesc; } // does not count as real name, but is better than just frontset name
               mPendingInputMappings[sensorId] = sb;
               addBehaviour(sb);
               aInputsArr->arrayDel(iidx); // delete this input from the list
@@ -255,7 +266,7 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
               ib->setHardwareInputConfig(sensorDesc->dsInputType, sensorDesc->usageHint, true, 0, 0);
               ib->setGroup(sensorDesc->group);
               ib->setHardwareName(inputDesc);
-              if (namesFound==0) { defaultName = inputDesc; namesFound++; }
+              if (namesFound==0) { defaultName = inputDesc; } // does not count as real name, but is better than just frontset name
               mPendingInputMappings[sensorId] = ib;
               addBehaviour(ib);
               aInputsArr->arrayDel(iidx); // delete this input from the list
@@ -266,36 +277,49 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
         }
       } // if sensorinfo
       else if (inpDesc->get("button_info", buttonInfo)) {
-        if (buttonInfo->get("channel", o)) inputDesc.insert(0, string_format("%d:", o->int32Value()));
-        // for now, only add buttons which have a non-null ID, which are those meant to act as "smartbutton"
-        // for now, only take ONE button (which can be a two-way rocker) per device
-        if (buttonInfo->get("id", o) && !o->isType(json_type_null) && buttonsTaken==0) {
-          if (buttonInfo->get("name", o) && namesFound==0) { defaultName = o->stringValue(); namesFound++; }
-          int buttonId = o->int32Value();
-          VdcButtonType bty = buttonType_single;
-          if (buttonInfo->get("sub_type", o) && o->stringValue()=="up down") bty = buttonType_2way;
-          // non-null ID, is a smart button, pick it
-          ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, "")); // automatic id if not specified
-          bb->setHardwareButtonConfig(0, bty, bty==buttonType_2way ? buttonElement_down : buttonElement_center, false, 1, 0);
-          bb->setGroup(group_yellow_light); // pre-configure for light...
-          bb->setFunction(buttonFunc_app); // ...but only as app button
-          bb->setHardwareName(bty==buttonType_2way ? "down" : "button");
-          if (namesFound==0) { defaultName = inputDesc; namesFound++; }
-          // this is the primary behaviour, secondary button, if any, does not need to be registered
-          mPendingInputMappings[buttonId] = bb;
-          addBehaviour(bb);
-          if (bty==buttonType_2way) {
-            // need the other half, add the "up" element
-            bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, "")); // automatic id if not specified
-            bb->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, 0);
-            bb->setGroup(group_yellow_light); // pre-configure for light
-            bb->setHardwareName("up");
+        // add buttons only as separate devices detached from output (and other inputs)
+        if (!hasOutput && aInputsUsed==0) {
+          // for now, only add buttons which have a non-null ID, which are those meant to act as "smartbutton"
+          // for now, only take ONE button (which can be a two-way rocker) per device
+          if (buttonInfo->get("id", o) && !o->isType(json_type_null) && buttonsTaken==0) {
+            int buttonId = o->int32Value();
+            int buttonChannel = 0;
+            if (buttonInfo->get("channel", o)) {
+              buttonChannel = o->int32Value();
+              inputDesc.insert(0, string_format("%d:", buttonChannel));
+              if (mSubDeviceIndex<0) { // only set once
+                mSubDeviceIndex = aNumOutputs+aNumSensors + buttonChannel; // button subdevice indices are offset by number of outputs+sensors in originating WBF device
+              }
+            }
+            else OLOG(LOG_ERR,"button has no 'channel' -> no unique ID");
+            // Note: as buttons are always separate devices, namesFound is always 0 here.
+            if (buttonInfo->get("name", o) && namesFound==0) { defaultName = o->stringValue(); namesFound++; }
+            VdcButtonType bty = buttonType_single;
+            if (buttonInfo->get("sub_type", o) && o->stringValue()=="up down") bty = buttonType_2way;
+            // non-null ID, is a smart button, pick it
+            ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, "")); // automatic id if not specified
+            bb->setHardwareButtonConfig(0, bty, bty==buttonType_2way ? buttonElement_down : buttonElement_center, false, 1, 0);
+            bb->setGroup(group_yellow_light); // pre-configure for light...
+            bb->setFunction(buttonFunc_app); // ...but only as app button
+            bb->setHardwareName(bty==buttonType_2way ? "down" : "button");
+            // as a fallback, use the front set descriptive name plus the channel index
+            if (namesFound==0) { string_format_append(defaultName, " (%d)", buttonChannel); namesFound++; }
+            // this is the primary behaviour, secondary button, if any, does not need to be registered
+            mPendingInputMappings[buttonId] = bb;
             addBehaviour(bb);
+            if (bty==buttonType_2way) {
+              // need the other half, add the "up" element
+              bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, "")); // automatic id if not specified
+              bb->setHardwareButtonConfig(0, buttonType_2way, buttonElement_up, false, 0, 0);
+              bb->setGroup(group_yellow_light); // pre-configure for light
+              bb->setHardwareName("up");
+              addBehaviour(bb);
+            }
+            buttonsTaken++; // we've taken one
+            aInputsArr->arrayDel(iidx); // delete this input from the list
+            aInputsUsed++; // count it
+            break; // buttons are always separate, no need to check further
           }
-          buttonsTaken++; // we've taken one
-          aInputsArr->arrayDel(iidx); // delete this input from the list
-          aInputsUsed++; // count it
-          continue; // same index now has another input (or array exhausted)
         }
       } // if buttoninfo
       // input not eaten up, check next
@@ -305,6 +329,10 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevD
   // set the name
   initializeName(defaultName);
   // derive the dSUID
+  if (mSubDeviceIndex<0) {
+    OLOG(LOG_ERR, "undefined subdevice index, using 0");
+    mSubDeviceIndex = 0;
+  }
   deriveDsUid();
 }
 
@@ -318,6 +346,56 @@ WbfDevice::~WbfDevice()
   for (int i=0; i<numButtons(); i++) wbfVdc().unregisterBehaviourMap(wbfVdc().mButtonsMap, getButton(i));
 }
 
+
+
+void WbfDevice::setName(const string &aName)
+{
+  // set a new name
+  // Note: names are scoped to this P44 device, so writing them does not clear eSetup or Wiser app's names
+  string oldname = getName();
+  inherited::setName(aName);
+  if (getName()!=oldname) {
+    // really changed, propagate to uGateway
+    const char* target = nullptr;
+    int id = -1;
+    if (getOutput()) {
+      target = "/loads";
+      id = mLoadId;
+    } // for devices with output, the name is that of the load
+    else if (getButton(0)) {
+      // buttons are always separate, so device name is that of the button
+      target = "/buttons";
+      id = wbfVdc().partIdForBehaviour(wbfVdc().mButtonsMap, getButton(0));
+    }
+    else if (getSensor(0)) {
+      // first sensor will get the name
+      target = "/sensors";
+      id = wbfVdc().partIdForBehaviour(wbfVdc().mSensorsMap, getSensor(0));
+    }
+    else if (getInput(0)) {
+      // first input will get the name
+      target = "/sensors"; // binary inputs are also "sensors" in wbf
+      id = wbfVdc().partIdForBehaviour(wbfVdc().mSensorsMap, getInput(0));
+    }
+    if (target && id>=0) {
+      // now send the new target state
+      JsonObjectPtr modReq = JsonObject::newString(aName)->wrapAs("name");
+      wbfVdc().mWbfComm.apiAction(
+        WbfApiOperation::PATCH,
+        string_format("%s/%d", target, id).c_str(),
+        modReq,
+        boost::bind(&WbfDevice::nameChangeApplied, this, _1, _2)
+      );
+    }
+  }
+}
+
+void WbfDevice::nameChangeApplied(JsonObjectPtr aModReqResult, ErrorPtr aError)
+{
+  if (Error::notOK(aError)) {
+    OLOG(LOG_WARNING, "error changing name: %s", Error::text(aError));
+  }
+}
 
 
 bool WbfDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
@@ -416,11 +494,17 @@ string WbfDevice::getOpStateText()
 
 
 
-#define PRESENT_WHEN_SEEN_EARLIER_THAN (10*Minute)
+#define PRESENT_WHEN_SEEN_EARLIER_THAN (30*Minute)
 
 void WbfDevice::checkPresence(PresenceCB aPresenceResultHandler)
 {
-  wbfVdc().mWbfComm.apiQuery(string_format("/devices/%s", mWbfId.c_str()).c_str(), boost::bind(&WbfDevice::deviceInfoReceived, this, aPresenceResultHandler, _1, _2));
+  if (MainLoop::now()-mLastSeen<PRESENT_WHEN_SEEN_EARLIER_THAN) {
+    aPresenceResultHandler(true);
+  }
+  else {
+    // need a refresh
+    wbfVdc().mWbfComm.apiQuery(string_format("/devices/%s", mWbfId.c_str()).c_str(), boost::bind(&WbfDevice::deviceInfoReceived, this, aPresenceResultHandler, _1, _2));
+  }
 }
 
 

@@ -68,7 +68,7 @@ namespace p44 {
     // information from the device itself
     string mWbfId; ///< the ID of the entire device
     int mLoadId; ///< the load ID, -1 if none
-    uint8_t mSubDeviceIndex; ///< subdevice index when creating multiple p44 devices from one wbf device
+    int8_t mSubDeviceIndex; ///< subdevice index when creating multiple p44 devices from one wbf device
     string mWbfCommNames; ///< the commerical name(s) of the device's module(s)
     string mWbfCommRefs; ///< the commercial reference(s) of the device's module(s)
     string mSerialNos; ///< the serial no (or c/a serials) of the device's module(s)
@@ -86,7 +86,9 @@ namespace p44 {
     ///   pick some or all of them, AND DELETE those picked from the array. This allows for matching buttons with
     ///   the corresponding outputs
     /// @param aInputsUsed number of inputs actually used for this device. Can be 0 when no usable/mappable input is left in aInputsArr
-    WbfDevice(WbfVdc *aVdcP, uint8_t aSubdeviceIndex, JsonObjectPtr aDevDesc, JsonObjectPtr aOutDesc, JsonObjectPtr aInputsArr, int& aInputsUsed);
+    /// @param aNumOutputs number of output channels in originating device (for offsetting sensor+button subdevice indices)
+    /// @param aNumSensors number of output channels in originating device (for offsetting button subdevice indices
+    WbfDevice(WbfVdc *aVdcP, JsonObjectPtr aDevDesc, JsonObjectPtr aOutDesc, JsonObjectPtr aInputsArr, int& aInputsUsed, int aNumOutputs, int aNumSensors);
     virtual ~WbfDevice();
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
@@ -106,7 +108,7 @@ namespace p44 {
     /// set user assignable name
     /// @param aName new name of the wbf device
     /// @note will propagate the name to the wbf gateway
-    //virtual void setName(const string &aName) P44_OVERRIDE;
+    virtual void setName(const string &aName) P44_OVERRIDE;
 
 
     /// @name interaction with subclasses, actually representing physical I/O
@@ -202,6 +204,8 @@ namespace p44 {
   private:
 
     void deriveDsUid();
+
+    void nameChangeApplied(JsonObjectPtr aModReqResult, ErrorPtr aError);
 
     void identifyBlink(int aRemainingBlinks);
 

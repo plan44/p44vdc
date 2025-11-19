@@ -663,13 +663,14 @@ void WbfVdc::buttonsListHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArr
     JsonObjectPtr o;
     if (!devDesc->get("id", o)) continue; // cannot process device w/o id
     string wbfId = o->stringValue();
-    int subDeviceIndex = 0;
     // process the inputs (sensors, buttons) first, will be passed to devices to pick from later
     JsonObjectPtr inpArr;
+    int numSensors = 0;
     if (devDesc->get("inputs", inpArr)) {
       for (int iidx = 0; iidx<inpArr->arrayLength(); iidx++) {
         JsonObjectPtr inpDesc = inpArr->arrayGet(iidx);
         if (inpDesc->get("sensor", o)) {
+          numSensors++; // count for channel -> subdeviceindex offsetting, even when not used/usable
           // find the sensor
           long sensorId = o->int32Value();
           for (int sidx = 0; sidx<aSensorsArray->arrayLength(); sidx++) {
@@ -711,10 +712,9 @@ void WbfVdc::buttonsListHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArr
       if (numOutputs==0) {
         // only inputs, create device(s) for it
         while (inpArr->arrayLength()>0) {
-          WbfDevicePtr newDev = new WbfDevice(this, subDeviceIndex, devDesc, nullptr, inpArr, inputsUsed);
+          WbfDevicePtr newDev = new WbfDevice(this, devDesc, nullptr, inpArr, inputsUsed, numOutputs, numSensors);
           if (inputsUsed==0) break; // do not add devices w/o any input
           addWbfDevice(newDev);
-          subDeviceIndex++;
         }
       }
       else {
@@ -754,11 +754,10 @@ void WbfVdc::buttonsListHandler(StatusCB aCompletedCB, JsonObjectPtr aDevicesArr
           // Device can pick inputs from inpArr, and must delete those it picks!
           // more devices w/o output are created for additional inputs
           do {
-            WbfDevicePtr newDev = new WbfDevice(this, subDeviceIndex, devDesc, outDesc, inpArr, inputsUsed);
+            WbfDevicePtr newDev = new WbfDevice(this, devDesc, outDesc, inpArr, inputsUsed, numOutputs, numSensors);
             if (inputsUsed==0 && !outDesc) break; // no more mappable inputs, input-only device -> do not add it
             addWbfDevice(newDev);
             outDesc.reset(); // forget the output, it is consumed
-            subDeviceIndex++;
           } while (oidx+1>=numOutputs); // do not repeat (but let the next output pick inputs) when we're not on the last output
         } // for all outputs
       } // device(s) with output(s)
@@ -792,6 +791,17 @@ void WbfVdc::removeDevice(DevicePtr aDevice, bool aForget)
     // - remove device
     inherited::removeDevice(aDevice, aForget);
   }
+}
+
+
+int WbfVdc::partIdForBehaviour(PartIdToBehaviourMap &aMap, DsBehaviourPtr aBehaviour)
+{
+  for (PartIdToBehaviourMap::iterator pos = aMap.begin(); pos!=aMap.end(); ++pos) {
+    if (pos->second==aBehaviour) {
+      return pos->first; // the id
+    }
+  }
+  return -1; // not found
 }
 
 

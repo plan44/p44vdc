@@ -193,6 +193,7 @@ namespace p44 {
     void wbfapicallResponse(VdcApiRequestPtr aRequest, JsonObjectPtr aResult, ErrorPtr aError);
 
     static void unregisterBehaviourMap(PartIdToBehaviourMap &aMap, DsBehaviourPtr aBehaviour);
+    static int partIdForBehaviour(PartIdToBehaviourMap &aMap, DsBehaviourPtr aBehaviour);
 
   };
 
