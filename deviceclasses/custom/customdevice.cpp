@@ -866,6 +866,7 @@ void CustomDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       }
     }
     // consider applied
+    sendDeviceApiFlagMessage("APPLY");
     inherited::applyChannelValues(aDoneCB, aForDimming);
   }
 }
