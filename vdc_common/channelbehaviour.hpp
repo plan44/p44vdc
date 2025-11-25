@@ -269,6 +269,9 @@ namespace p44 {
     /// @param aPending if set to false, channel pending flag will be reset
     void makeApplyPending(bool aPending = true) { mChannelUpdatePending = aPending; }
 
+    /// make channel pending for apply or already applied (used in context of color mode changes)
+    void makePendingOrApplied(bool aApplied, bool aAnyway) { if (aApplied) channelValueApplied(aAnyway); else makeApplyPending(); }
+
     /// to be called when channel value has been successfully applied to hardware
     /// @param aAnyWay if true, lastSent state will be set even if channel was not in needsApplying() state
     void channelValueApplied(bool aAnyWay = false);

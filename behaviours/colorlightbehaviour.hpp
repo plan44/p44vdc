@@ -38,7 +38,11 @@ namespace p44 {
     colorLightModeHueSaturation, ///< "hs" - hue & saturation
     colorLightModeXY, ///< "xy" - CIE color space coordinates
     colorLightModeCt, ///< "ct" - Mired color temperature: 153 (6500K) to 500 (2000K)
-    colorLightModeRGBWA, ///< direct RGBWA channels, not directly supported at colorlightbehaviour level, but internally in some devices
+    colorLightInternalModes,
+    colorLightModeRGBWA = colorLightInternalModes, ///< direct RGBWA channels, not directly supported at colorlightbehaviour level, but internally in some devices
+    colorLightModeRGBW, ///< direct RGBW channels, not directly supported at colorlightbehaviour level, but internally in some devices
+    colorLightModeRGB, ///< direct RGB channels, not directly supported at colorlightbehaviour level, but internally in some devices
+    numColorModes
   } ColorLightMode;
 
 
@@ -256,7 +260,8 @@ namespace p44 {
     void deriveMissingColorChannels(bool aTransitional);
 
     /// mark Color Light values applied (flags channels applied depending on colormode)
-    void appliedColorValues();
+    /// @param aPending if set, makes the channel of the current color mode pending for apply (rather than applied)
+    void appliedColorValues(bool aApplied = true);
 
     /// initialize a transition or update its progress over time
     /// @param aNow current time, used to calculate progress. Default is 0 and means starting a new transition NOW

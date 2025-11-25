@@ -771,8 +771,7 @@ bool CustomDevice::prepareSceneApply(DsScenePtr aScene)
   // only implemented to catch "UNDO"
   if (mSceneCommands && aScene->mSceneCmd==scene_cmd_undo) {
     if (mSimpletext) {
-      string m = string_format("SCMD=UNDO");
-      sendDeviceApiSimpleMessage(m);
+      sendDeviceApiSimpleMessage("SCMD=UNDO");
     }
     else {
       JsonObjectPtr message = JsonObject::newObj();
@@ -798,11 +797,47 @@ void CustomDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
   }
   else {
     // check for special color light handling
-    ColorLightBehaviourPtr cl = getOutput<ColorLightBehaviour>();
-    if (cl) {
-      // derive color mode from changed channel values
-      // Note: external device cannot make use of colormode for now, but correct mode is important for saving scenes
-      cl->deriveColorMode();
+    RGBColorLightBehaviourPtr rgb = getOutput<RGBColorLightBehaviour>();
+    if (rgb) {
+      // derive current color mode from changed channel values
+      rgb->deriveColorMode();
+      // check specific target color mode wish
+      if (mTargetColorMode!=colorLightModeNone) {
+        // specific color mode requested
+        if (mTargetColorMode<colorLightInternalModes) {
+          // just force the mode and report the channels
+          if (rgb->setColorMode(mTargetColorMode)) {
+            // make sure new color mode's channels are marked for apply
+            rgb->appliedColorValues(false);
+            rgb->brightnessNeedsApplying();
+          }
+        }
+        else if (!mSimpletext) {
+          // JSON mode only: calculate primaries and send extra message for those
+          JsonObjectPtr message = JsonObject::newString("primaries")->wrapAs("message");
+          double r,g,b,w,a;
+          switch (mTargetColorMode) {
+            case colorLightModeRGBWA:
+              rgb->getRGBWA(r, g, b, w, a, 100, false, false);
+              message->add("a", JsonObject::newDouble(a));
+              goto rgbw;
+            case colorLightModeRGBW:
+              rgb->getRGBW(r, g, b, w, 100, false, false);
+            rgbw:
+              message->add("w", JsonObject::newDouble(w));
+              goto rgb;
+            default:
+            case colorLightModeRGB:
+              rgb->getRGB(r, g, b, 100, false, false);
+            rgb:
+              message->add("r", JsonObject::newDouble(r));
+              message->add("g", JsonObject::newDouble(g));
+              message->add("b", JsonObject::newDouble(b));
+              break;
+          }
+          sendDeviceApiJsonMessage(message);
+        }
+      }
     }
     // generic channel apply
     for (int i=0; i<numChannels(); i++) {
@@ -817,7 +852,7 @@ void CustomDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
           sendDeviceApiSimpleMessage(m);
         }
         else {
-          JsonObjectPtr message = JsonObject::newObj();
+          JsonObjectPtr message = JsonObject::newString("channel")->wrapAs("message");
           message->add("message", JsonObject::newString("channel"));
           message->add("index", JsonObject::newInt32((int)i));
           message->add("type", JsonObject::newInt32(cb->getChannelType())); // informational
@@ -999,6 +1034,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   // Output
   // - get group (overridden for some output types)
   mColorClass = class_undefined; // none set so far
+  mTargetColorMode = colorLightModeNone; // not defined
   DsGroup defaultGroup = group_undefined; // none set so far
   if (aInitParams->get("group", o)) {
     defaultGroup = (DsGroup)o->int32Value(); // custom output color
@@ -1255,6 +1291,16 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   else {
     // no output, just install minimal settings without scenes
     installSettings();
+  }
+  // color mode we want to have for lights
+  if (aInitParams->get("colormode", o)) {
+    string cm = o->stringValue();
+    if (uequals(cm, "HS")) mTargetColorMode = colorLightModeHueSaturation;
+    else if (uequals(cm, "XY")) mTargetColorMode = colorLightModeXY;
+    else if (uequals(cm, "CT")) mTargetColorMode = colorLightModeCt;
+    else if (uequals(cm, "RGBWA")) mTargetColorMode = colorLightModeRGBWA;
+    else if (uequals(cm, "RGBW")) mTargetColorMode = colorLightModeRGBW;
+    else if (uequals(cm, "RGB")) mTargetColorMode = colorLightModeRGB;
   }
   // set options that might have a default set by the output type
   if (aInitParams->get("controlvalues", o)) mControlValues = o->boolValue();

@@ -585,20 +585,20 @@ void ColorLightBehaviour::deriveMissingColorChannels(bool aTransitional)
 }
 
 
-void ColorLightBehaviour::appliedColorValues()
+void ColorLightBehaviour::appliedColorValues(bool aApplied)
 {
   mBrightness->channelValueApplied(true);
   switch (mColorMode) {
     case colorLightModeHueSaturation:
-      mHue->channelValueApplied(true);
-      mSaturation->channelValueApplied(true);
+      mHue->makePendingOrApplied(aApplied, true);
+      mSaturation->makePendingOrApplied(aApplied, true);
       // reset others in case these were falsely triggered for update
       mCt->makeApplyPending(false);
       mCIEx->makeApplyPending(false);
       mCIEy->makeApplyPending(false);
       break;
     case colorLightModeCt:
-      mCt->channelValueApplied(true);
+      mCt->makePendingOrApplied(aApplied, true);
       // reset others in case these were falsely triggered for update
       mHue->makeApplyPending(false);
       mSaturation->makeApplyPending(false);
@@ -606,8 +606,8 @@ void ColorLightBehaviour::appliedColorValues()
       mCIEy->makeApplyPending(false);
       break;
     case colorLightModeXY:
-      mCIEx->channelValueApplied(true);
-      mCIEy->channelValueApplied(true);
+      mCIEx->makePendingOrApplied(aApplied, true);
+      mCIEy->makePendingOrApplied(aApplied, true);
       // reset others in case these were falsely triggered for update
       mHue->makeApplyPending(false);
       mSaturation->makeApplyPending(false);

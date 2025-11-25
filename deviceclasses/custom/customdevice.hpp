@@ -43,6 +43,7 @@
 #include "jsonobject.hpp"
 
 #include "buttonbehaviour.hpp"
+#include "colorlightbehaviour.hpp"
 #if ENABLE_CUSTOM_SINGLEDEVICE
 #include "singledevice.hpp"
 #endif
@@ -122,13 +123,14 @@ namespace p44 {
     bool mSceneCommands; ///< if set, scene commands are forwarded to the external device
     bool mSceneCalls; ///< if set, dS scene calls are forwarded to the external device
     bool mForwardIdentify; ///< if set, "IDENTIFY" messages will be sent, and device will show the "identification" modelfeature in the vDC API
+    ColorLightMode mTargetColorMode; ///< color light mode
 
     #if ENABLE_CUSTOM_EXOTIC
     string mConfigurationId; ///< current configuration's id
     DeviceConfigurationsVector mConfigurations; ///< the device's possible configurations
     uint64_t mExtraModelFeatures; ///< extra model features
     uint64_t mMutedModelFeatures; ///< explicitly disabled model features
-    #endif
+    #endif // ENABLE_CUSTOM_EXOTIC
 
     #if ENABLE_CUSTOM_SINGLEDEVICE
     bool mNoConfirmAction; ///< if set, device implementation is not expected to use
