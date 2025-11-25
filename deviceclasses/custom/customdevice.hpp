@@ -307,7 +307,7 @@ namespace p44 {
     virtual string getDeviceConfigurationId() P44_OVERRIDE;
     virtual ErrorPtr switchConfiguration(const string aConfigurationId) P44_OVERRIDE;
     virtual void getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB) P44_OVERRIDE;
-    #endif
+    #endif // ENABLE_CUSTOM_EXOTIC
 
     #if ENABLE_CUSTOM_SINGLEDEVICE
     /// @name factory methods for elements configured via dynamic JSON config
@@ -317,7 +317,7 @@ namespace p44 {
     virtual ErrorPtr dynamicActionFromJSON(DeviceActionPtr &aAction, JsonObjectPtr aJSONConfig, const string aActionId, const string aDescription, const string aTitle, const string aCategory) P44_OVERRIDE;
 
     /// @}
-    #endif
+    #endif // ENABLE_CUSTOM_SINGLEDEVICE
 
     /// for vdc, to configure the device
     ErrorPtr configureDevice(JsonObjectPtr aInitParams);
@@ -342,6 +342,7 @@ namespace p44 {
 
     ErrorPtr processInputJson(char aInputType, JsonObjectPtr aParams);
     ErrorPtr processInput(char aInputType, uint32_t aIndex, double aValue, bool aUndefined);
+    ErrorPtr processPrimariesJson(JsonObjectPtr aParams);
 
     #if ENABLE_CUSTOM_SINGLEDEVICE
     ErrorPtr parseParam(const string aParamName, JsonObjectPtr aParamDetails, ValueDescriptorPtr &aParam);

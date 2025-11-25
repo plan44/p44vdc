@@ -336,6 +336,9 @@ ErrorPtr CustomDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMe
       else if (aMessageType=="channel_config") {
         err = processInputJson('c', aMessage);
       }
+      else if (aMessageType=="primaries") {
+        err = processPrimariesJson(aMessage);
+      }
       #if ENABLE_CUSTOM_SINGLEDEVICE
       else if (aMessageType=="confirmAction") {
         JsonObjectPtr o;
@@ -530,6 +533,32 @@ ErrorPtr CustomDevice::processInputJson(char aInputType, JsonObjectPtr aParams)
   }
   return ErrorPtr();
 }
+
+
+ErrorPtr CustomDevice::processPrimariesJson(JsonObjectPtr aParams)
+{
+  double r=0, g=0, b=0, w=0, a=0;
+  JsonObjectPtr o;
+  RGBColorLightBehaviourPtr rgb = getOutput<RGBColorLightBehaviour>();
+  if (aParams->get("r", o)) r = o->doubleValue();
+  if (aParams->get("g", o)) g = o->doubleValue();
+  if (aParams->get("b", o)) b = o->doubleValue();
+  if (aParams->get("w", o)) {
+    w = o->doubleValue();
+    if (aParams->get("a", o)) {
+      a = o->doubleValue();
+      rgb->setRGBWA(r, g, b, w, a, 100, false);
+    }
+    else {
+      rgb->setRGBW(r, g, b, w, 100, false);
+    }
+  }
+  else {
+    rgb->setRGB(r, g, b, 100, false);
+  }
+  return ErrorPtr();
+}
+
 
 
 ErrorPtr CustomDevice::processInput(char aInputType, uint32_t aIndex, double aValue, bool aUndefined)
