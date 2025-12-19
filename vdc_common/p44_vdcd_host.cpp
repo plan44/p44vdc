@@ -848,6 +848,13 @@ void P44VdcHost::handleGlobalEvent(VdchostEvent aEvent)
     }
     #endif // P44SCRIPT_FULL_SUPPORT
   }
+  #if ENABLE_LEDCHAIN
+  if (aEvent==vdchost_logstats) {
+    if (mLedChainArrangement) {
+      mLedChainArrangement->showStats();
+    }
+  }
+  #endif // ENABLE_LEDCHAIN
   inherited::handleGlobalEvent(aEvent);
 }
 
