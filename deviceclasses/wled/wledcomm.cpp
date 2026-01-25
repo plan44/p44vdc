@@ -205,6 +205,12 @@ void WledComm::getPalettes(WledApiResultCB aResultCallback)
 }
 
 
+void WledComm::getNetwork(WledApiResultCB aResultCallback)
+{
+  queueApiCall("net", "GET", NULL, aResultCallback);
+}
+
+
 void WledComm::queueApiCall(const string &aPath, const string &aMethod,
                             JsonObjectPtr aData, WledApiResultCB aResultCallback)
 {

@@ -73,7 +73,7 @@ void WledDevice::hsvToRgb(double aHue, double aSaturation, double aValue,
                           uint8_t &aRed, uint8_t &aGreen, uint8_t &aBlue)
 {
   double s = aSaturation / 100.0;
-  double v = aValue;
+  double v = aValue / 100.0;
   double c = v * s;
   double h = aHue / 60.0;
   double x = c * (1.0 - fabs(fmod(h, 2.0) - 1.0));
@@ -196,18 +196,27 @@ string WledDevice::description()
 
 void WledDevice::initializeBehaviors(JsonObjectPtr aDeviceInfo)
 {
-  // Create color light behavior if device supports color
   if (!(mHasRgb || mHasRgbw || mHasCct)) {
     LightBehaviourPtr light = new LightBehaviour(*this);
     light->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_undefined, true, 10.0);
     light->setHardwareName("wled light");
     light->initMinBrightness(DS_BRIGHTNESS_STEP);
     addBehaviour(light);
-    mColorLightBehaviour = light;
-  } else {
+    mDimmerLightBehaviour = light;
+  }
+  if (mHasRgb || mHasRgbw) {
     ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this, mHasCct));
     cl->setHardwareOutputConfig(outputFunction_colordimmer, outputmode_gradual, usage_undefined, true, 8.5);
     cl->setHardwareName(string_format("wled %s light #%s", "color", mDeviceName.c_str()));
+    cl->initMinBrightness(DS_BRIGHTNESS_STEP); // min brightness
+    addBehaviour(cl);
+    mColorLightBehaviour = cl;
+  }
+  if (mHasCct && !(mHasRgb || mHasRgbw)) {
+    // CCT only device
+    ColorLightBehaviourPtr cl = ColorLightBehaviourPtr(new ColorLightBehaviour(*this, true));
+    cl->setHardwareOutputConfig(outputFunction_ctdimmer, outputmode_gradual, usage_undefined, true, 8.5);
+    cl->setHardwareName(string_format("wled %s light #%s", "tunable white", mDeviceName.c_str()));
     cl->initMinBrightness(DS_BRIGHTNESS_STEP); // min brightness
     addBehaviour(cl);
     mColorLightBehaviour = cl;
@@ -264,18 +273,138 @@ void WledDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
 
   mSettingState = true;
 
-  // Get brightness from light behavior
+  uint8_t brightness = 0;
   if (mColorLightBehaviour) {
-    double brightness = 0;
     ChannelBehaviourPtr brCh = mColorLightBehaviour->getChannelByType(channeltype_brightness);
     if (brCh) {
-      brightness = brCh->getChannelValue();
+      brightness = (uint8_t)(brCh->getChannelValue() / 100 * 255.0);
     }
-    
-    // For now, just query state
-    mVdc.mWledComm.getState(boost::bind(&WledDevice::handleStateResponse, this, _1, _2));
+
+    // Turn off
+    if (brightness <= 0) {
+      LOG(LOG_DEBUG, "WLED applyChannelValues: turning off");
+      JsonObjectPtr onState = JsonObject::newObj();
+      onState->add("on", JsonObject::newBool(false));
+      mVdc.mWledComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
+          if (Error::notOK(aError)) {
+            LOG(LOG_ERR, "Failed to set WLED device state: %s", aError->text());
+          } else {
+            LOG(LOG_DEBUG, "WLED device state set successfully");
+          }
+          mSettingState = false;
+          if (aDoneCB) {
+            aDoneCB();
+          }
+          mColorLightBehaviour->appliedColorValues();
+        });
+      return;
+    }
+
+    ChannelBehaviourPtr hueCh = mColorLightBehaviour->getChannelByType(channeltype_hue);
+    ChannelBehaviourPtr satCh = mColorLightBehaviour->getChannelByType(channeltype_saturation);
+    uint8_t redVal{}, greenVal{}, blueVal{};
+
+    hsvToRgb(hueCh->getChannelValue(), satCh->getChannelValue(), brCh->getChannelValue(),
+              /*out*/redVal, /*out*/greenVal, /*out*/blueVal);
+
+    LOG(LOG_DEBUG, "WLED applyChannelValues: hue=%.2f, sat=%.2f, val=%.2f => red=%d, green=%d, blue=%d",
+      hueCh->getChannelValue(), satCh->getChannelValue(), brCh->getChannelValue(),
+      redVal, greenVal, blueVal);
+
+    JsonObjectPtr onState = JsonObject::newObj();
+    onState->add("on", JsonObject::newBool(true));
+
+    JsonObjectPtr color0Obj = JsonObject::newObj();  // primary color
+    color0Obj->add("0", JsonObject::newInt32(redVal));
+    color0Obj->add("1", JsonObject::newInt32(greenVal));
+    color0Obj->add("2", JsonObject::newInt32(blueVal));
+    JsonObjectPtr color1Obj = JsonObject::newObj();  // secondary color (black)
+    color1Obj->add("0", JsonObject::newInt32(0));
+    color1Obj->add("1", JsonObject::newInt32(0));
+    color1Obj->add("2", JsonObject::newInt32(0));
+    JsonObjectPtr color2Obj = JsonObject::newObj();  // tertiary color (gray)
+    color2Obj->add("0", JsonObject::newInt32(32));
+    color2Obj->add("1", JsonObject::newInt32(32));
+    color2Obj->add("2", JsonObject::newInt32(32));
+
+    // add color "0" object to seg[0].col[0] lists
+    onState->add("seg", JsonObject::newArray());
+    JsonObjectPtr seg0 = JsonObject::newObj();
+    seg0->add("col", JsonObject::newArray());
+    seg0->get("col")->arrayAppend(color0Obj);
+    seg0->get("col")->arrayAppend(color1Obj);
+    seg0->get("col")->arrayAppend(color2Obj);
+    seg0->add("bri", JsonObject::newInt32((int)brightness));
+    seg0->add("fx", JsonObject::newInt32(0)); // solid
+    seg0->add("id", JsonObject::newInt32(0)); // first segment
+    onState->get("seg")->arrayAppend(seg0);
+
+    auto cctCh = mColorLightBehaviour->getChannelByType(channeltype_colortemp);
+    if (cctCh) {
+      // add CCT value if supported
+      uint8_t cctVal = (uint8_t)cctCh->getChannelValue() / 100 * 255.0;
+      seg0->add("cct", JsonObject::newInt32(cctVal));
+    }
+
+    mVdc.mWledComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
+        if (Error::notOK(aError)) {
+          LOG(LOG_ERR, "Failed to set WLED device state: %s", aError->text());
+        } else {
+          LOG(LOG_DEBUG, "WLED device state set successfully");
+        }
+        mSettingState = false;
+        if (aDoneCB) {
+          aDoneCB();
+        }
+        mColorLightBehaviour->appliedColorValues();
+      });
+    return;
   }
 
+  if (mDimmerLightBehaviour) {
+    double brightness = 0;
+    ChannelBehaviourPtr brCh = mDimmerLightBehaviour->getChannelByType(channeltype_brightness);
+    if (brCh) {
+      brightness = brCh->getChannelValue() / 100 * 255.0;
+    }
+    LOG(LOG_DEBUG, "WLED applyChannelValues: brightness=%.2f", brightness);
+
+    // Prepare state update JSON
+    JsonObjectPtr onState = JsonObject::newObj();
+
+    // Turn off
+    if (brightness <= 0) {
+      onState->add("on", JsonObject::newBool(false));
+      mVdc.mWledComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
+          if (Error::notOK(aError)) {
+            LOG(LOG_ERR, "Failed to set WLED device state: %s", aError->text());
+          } else {
+            LOG(LOG_DEBUG, "WLED device state set successfully");
+          }
+          mSettingState = false;
+          if (aDoneCB) {
+            aDoneCB();
+          }
+          mDimmerLightBehaviour->brightnessApplied();
+        });
+      return;
+    }
+    onState->add("on", JsonObject::newBool(true));
+    onState->add("bri", JsonObject::newInt32(brightness));
+    mVdc.mWledComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
+        if (Error::notOK(aError)) {
+          LOG(LOG_ERR, "Failed to set WLED device state: %s", aError->text());
+        } else {
+          LOG(LOG_DEBUG, "WLED device state set successfully");
+        }
+        mSettingState = false;
+        if (aDoneCB) {
+          aDoneCB();
+        }
+        mDimmerLightBehaviour->brightnessApplied();
+      });
+    return;
+  }
   if (aDoneCB) {
     aDoneCB();
   }
@@ -310,24 +439,69 @@ void WledDevice::handleStateResponse(JsonObjectPtr aState, ErrorPtr aError)
 
 void WledDevice::updateState(JsonObjectPtr aStateResponse)
 {
-  if (!aStateResponse || !mColorLightBehaviour) return;
+  if (!aStateResponse || !mColorLightBehaviour || !mDimmerLightBehaviour) return;
 
   LOG(LOG_DEBUG, "WLED device updateState");
 
-  // For now, just log state received
-  JsonObjectPtr stateObj = aStateResponse->get("state");
-  if (!stateObj) {
-    stateObj = aStateResponse; // Sometimes state is at top level
+  JsonObjectPtr o;
+  JsonObjectPtr state = aStateResponse->get("state");
+  if (!state) {
+    state = aStateResponse; // Sometimes state is at top level
   }
 
-  if (!stateObj) return;
-
-  // Get brightness
-  JsonObjectPtr briObj = stateObj->get("bri");
-  int bri = briObj ? briObj->int32Value() : 0;
-  double brightness = bri / 255.0;
-
-  LOG(LOG_DEBUG, "WLED state updated: brightness=%.2f", brightness);
+  updatePresenceState(true);
+  LightBehaviourPtr l = getOutput<LightBehaviour>();
+    if (l) {
+      // on with brightness or off
+      o = state->get("on");
+      if (o && o->boolValue()) {
+        // lamp is on, get brightness
+        mCurrentlyOn = yes;
+        o = state->get("bri");
+        if (o) {
+          double hb = o->int32Value(); // hue brightness from 0..255
+          if (hb<1) hb=0;
+          l->syncBrightnessFromHardware(hb, false); // only sync if no new value pending already
+        }
+      }
+      else {
+        mCurrentlyOn = o ? no : undefined; // if no "on" field was included, consider undefined
+        l->syncBrightnessFromHardware(0); // off
+      }
+      ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(l);
+      if (cl) {
+        // color information
+        auto segObj = state->get("seg");
+        auto firstSeg = segObj ? segObj->arrayGet(0) : JsonObjectPtr();
+        auto colArray = firstSeg ? firstSeg->get("col") : JsonObjectPtr();
+        auto color0 = colArray ? colArray->arrayGet(0) : JsonObjectPtr();
+        if (color0) {
+          string mode = "hs"; // default mode
+          if (mode == "hs") {
+            cl->mColorMode = colorLightModeHueSaturation;
+            auto redVal = color0->get("0")->int32Value();
+            auto greenVal = color0->get("1")->int32Value();
+            auto blueVal = color0->get("2")->int32Value();
+            auto brightnessVal = firstSeg->get("bri")->int32Value();
+            cl->mBrightness->syncChannelValue((brightnessVal)/255.0*100.0);
+            // convert RGB to HSV
+            double hueVal, satVal, valVal;
+            rgbToHsv(redVal, greenVal, blueVal,
+                     /*out*/hueVal, /*out*/satVal, /*out*/valVal);
+            cl->mHue->syncChannelValue(hueVal);
+            cl->mSaturation->syncChannelValue(satVal);
+          }
+          else if (mode=="ct") {
+            cl->mColorMode = colorLightModeCt;
+            o = firstSeg->get("cct");
+            if (o) cl->mCt->syncChannelValue(o->int32Value());
+          }
+          else {
+            cl->mColorMode = colorLightModeNone;
+          }
+        }
+      } // color
+    } // light
 }
 
 
@@ -366,21 +540,23 @@ void WledDevice::checkPresence(PresenceCB aPresenceResultHandler)
   LOG(LOG_DEBUG, "WLED device checkPresence");
 
   // query the device
-  //mVdc.mWledComm.getState(boost::bind(&WledDevice::presenceStateReceived, this, _1, _2));
+  mVdc.mWledComm.getNetwork(boost::bind(&WledDevice::presenceStateReceived, this, aPresenceResultHandler, _1, _2));
 }
 
 
 void WledDevice::presenceStateReceived(PresenceCB aPresenceResultHandler, JsonObjectPtr aDeviceInfo, ErrorPtr aError)
 {
-  bool reachable = false;
-  if (Error::isOK(aError) && aDeviceInfo) {
-    JsonObjectPtr state = aDeviceInfo->get("state");
-    if (state) {
-      JsonObjectPtr o = state->get("reachable");
-      reachable = o && o->boolValue();
-    }
+  if (Error::notOK(aError)) {
+    LOG(LOG_ERR, "Failed to get WLED device presence: %s", aError->text());
+    aPresenceResultHandler(false);
+    return;
   }
-  aPresenceResultHandler(reachable);
+
+  if (aDeviceInfo) {
+    LOG(LOG_DEBUG, "WLED device info received: %s", aDeviceInfo->json_str().c_str());
+    aPresenceResultHandler(true);
+    return;
+  }
 }
 
 #endif // ENABLE_WLED

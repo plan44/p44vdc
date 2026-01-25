@@ -91,12 +91,17 @@ namespace p44 {
     uint32_t mLedCount;               ///< number of LEDs
 
     /// light behavior
-    LightBehaviourPtr mColorLightBehaviour;
+    ColorLightBehaviourPtr mColorLightBehaviour;
+    LightBehaviourPtr mDimmerLightBehaviour;
 
     /// state
     JsonObjectPtr mLastState;         ///< last known device state
     MLTicket mUpdateTicket;           ///< ticket for state update
     bool mSettingState;               ///< flag to prevent feedback loops
+
+    // internal state
+    Tristate mCurrentlyOn; ///< current "on" status
+    uint8_t mLastSentBri; ///< last sent "bri", 0=undefined
 
   private:
 

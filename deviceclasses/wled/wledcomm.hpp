@@ -181,6 +181,9 @@ namespace p44 {
     /// get list of palettes
     void getPalettes(WledApiResultCB aResultCallback);
 
+    /// get network settings
+    void getNetwork(WledApiResultCB aResultCallback);
+
     /// queue an API call
     void queueApiCall(const string &aPath, const string &aMethod,
                       JsonObjectPtr aData, WledApiResultCB aResultCallback);
