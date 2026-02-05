@@ -202,7 +202,7 @@ namespace p44 {
     ///   allowed interaction with the hardware device is to query enough information to derive a henceforth invariable dSUID
     ///   and to construct a suitable Device object, including all contained settings, scene and behaviour objects.
     ///   This object is then *possibly* used to operate the device later (in this case it will receive load() and initializeDevice() calls),
-    //    but also might get discarded without further calls when it turns out there is already a Device with the same dSUID.
+    ///   but also might get discarded without further calls when it turns out there is already a Device with the same dSUID.
     /// @note When identify finishes, the device must be ready to load persistent settings (which means all behaviours and settings objects
     ///   need to be in place, as these define the device structure to load settings for), and then for being initialized for operation.
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) = 0;
@@ -890,7 +890,7 @@ namespace p44 {
     };
 
   } // namespace P44Script
-  #endif
+  #endif // P44SCRIPT_FULL_SUPPORT
 
 
 } // namespace p44

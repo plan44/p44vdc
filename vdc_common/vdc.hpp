@@ -26,6 +26,7 @@
 #include "p44vdc_common.hpp"
 
 #include "vdchost.hpp"
+#include "devicesettings.hpp"
 
 #include "dsuid.hpp"
 
@@ -230,6 +231,9 @@ namespace p44 {
     /// Settings
     VdcFlags mVdcFlags; ///< generic vdc flag word
     DsZoneID mDefaultZoneID; ///< default dS zone ID
+    #if ENABLE_JSONBRIDGEAPI
+    DeviceSettings::BridgingFlags mDefaultBridgingFlags; // default bridging flags for new devices
+    #endif
 
     /// periodic rescan, collecting
     MLMicroSeconds mRescanInterval; ///< rescan interval, 0 if none

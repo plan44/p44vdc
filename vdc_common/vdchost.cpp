@@ -765,12 +765,12 @@ bool VdcHost::addDevice(DevicePtr aDevice)
     MainLoop::currentMainLoop().executeNow(boost::bind(&VdcHost::duplicateIgnored, this, aDevice));
     return false; // duplicate dSUID, not added
   }
-  // device construction and dSUID is stable and will be added this way
+  // device construction and dSUID is stable and it will be added this way
   aDevice->willBeAdded();
   // set for given dSUID in the container-wide map of devices
   mDSDevices[aDevice->getDsUid()] = aDevice;
   LOG(LOG_NOTICE, "--- added device: %s (not yet initialized)",aDevice->shortDesc().c_str());
-  // load the device's persistent params
+  // load the device's persistent params (if there are any)
   aDevice->load();
   // if not collecting, initialize device right away.
   // Otherwise, initialisation will be done when collecting is complete

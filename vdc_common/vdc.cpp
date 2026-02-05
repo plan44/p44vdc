@@ -61,6 +61,9 @@ Vdc::Vdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   mMinDevicesForOptimizing(DEFAULT_MIN_DEVICES_FOR_OPTIMIZING),
   mMaxOptimizerScenes(DEFAULT_MAX_OPTIMIZER_SCENES),
   mMaxOptimizerGroups(DEFAULT_MAX_OPTIMIZER_GROUPS)
+  #if ENABLE_JSONBRIDGEAPI
+  , mDefaultBridgingFlags(DeviceSettings::bridge_none)
+  #endif // ENABLE_JSONBRIDGEAPI
 {
 }
 
@@ -1049,6 +1052,7 @@ void Vdc::identifyDevice(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, int
   }
 }
 
+
 void Vdc::identifyDeviceCB(DevicePtr aNewDevice, IdentifyDeviceCB aIdentifyCB, int aMaxRetries, MLMicroSeconds aRetryDelay, ErrorPtr aError, Device *aIdentifiedDevice)
 {
   if (Error::isOK(aError)) {
@@ -1095,11 +1099,15 @@ bool Vdc::simpleIdentifyAndAddDevice(DevicePtr aNewDevice)
     return false;
   }
   // simple identification successful
+  #if ENABLE_JSONBRIDGEAPI
+  // - apply vdc-level default bridging flags. If device is not new, addDevice will override those via load()
+  aNewDevice->mDeviceSettings->mBridgingFlags = mDefaultBridgingFlags; // default bridging for this vdc
+  #endif
   if (getVdcHost().addDevice(aNewDevice)) {
     // not a duplicate
     // - save in my own list
     mDevices.push_back(aNewDevice);
-    // added
+    // device added, but this is still before device gets initialized and load()s persistent params
     return true;
   }
   // was a duplicate or could not be added for another reason
@@ -1120,10 +1128,15 @@ void Vdc::identifyAndAddDeviceCB(StatusCB aCompletedCB, ErrorPtr aError, Device 
   if (Error::isOK(aError)) {
     // announce to global device container
     DevicePtr newDev(aIdentifiedDevice);
+    #if ENABLE_JSONBRIDGEAPI
+    // - apply vdc-level default bridging flags. If device is not new, addDevice will override those via load()
+    newDev->mDeviceSettings->mBridgingFlags = mDefaultBridgingFlags; // default bridging for this vdc
+    #endif
     if (getVdcHost().addDevice(newDev)) {
       // not a duplicate
       // - save in my own list
       mDevices.push_back(newDev);
+      // device added, but this is still before device gets initialized and load()s persistent params
     }
   }
   else {
@@ -1313,6 +1326,7 @@ enum {
   maxOptimizerGroups_key,
   hideWhenEmpty_key,
   effectSpeedOptimized_key,
+  defaultBridgingFlags_key,
   numVdcProperties
 };
 
@@ -1398,6 +1412,9 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
       { "x-p44-maxOptimizerGroups", apivalue_uint64, maxOptimizerGroups_key, OKEY(vdc_key) },
       { "x-p44-hideWhenEmpty", apivalue_bool, hideWhenEmpty_key, OKEY(vdc_key) },
       { "x-p44-effectSpeedOptimized", apivalue_bool, effectSpeedOptimized_key, OKEY(vdc_key) }
+      #if ENABLE_JSONBRIDGEAPI
+      , { "x-p44-defaultBridgingFlags", apivalue_uint64, defaultBridgingFlags_key, OKEY(vdc_key) }
+      #endif
     };
     int n = inherited::numProps(aDomain, aParentDescriptor);
     if (aPropIndex<n)
@@ -1454,6 +1471,11 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
         case effectSpeedOptimized_key:
           aPropValue->setBoolValue(getVdcFlag(vdcflag_effectSpeedOptimized));
           return true;
+        #if ENABLE_JSONBRIDGEAPI
+        case defaultBridgingFlags_key:
+          aPropValue->setUint32Value(mDefaultBridgingFlags);
+          return true;
+        #endif
       }
     }
     else {
@@ -1499,6 +1521,11 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
         case effectSpeedOptimized_key:
           setVdcFlag(vdcflag_effectSpeedOptimized, aPropValue->boolValue());
           return true;
+        #if ENABLE_JSONBRIDGEAPI
+        case defaultBridgingFlags_key:
+          setPVar(mDefaultBridgingFlags, (DeviceSettings::BridgingFlags)aPropValue->int32Value());
+          return true;
+        #endif // ENABLE_JSONBRIDGEAPI
       }
     }
   }
@@ -1546,7 +1573,11 @@ const char *Vdc::tableName()
 
 // data field definitions
 
+#if ENABLE_JSONBRIDGEAPI
+static const size_t numFields = 9;
+#else
 static const size_t numFields = 8;
+#endif
 
 size_t Vdc::numFieldDefs()
 {
@@ -1564,7 +1595,10 @@ const FieldDefinition *Vdc::getFieldDef(size_t aIndex)
     { "minCallsBeforeOptimizing", SQLITE_INTEGER },
     { "minDevicesForOptimizing", SQLITE_INTEGER },
     { "maxOptimizerScenes", SQLITE_INTEGER },
-    { "maxOptimizerGroups", SQLITE_INTEGER }
+    { "maxOptimizerGroups", SQLITE_INTEGER },
+    #if ENABLE_JSONBRIDGEAPI
+    { "defaultBridgingFlags", SQLITE_INTEGER }
+    #endif
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -1592,6 +1626,9 @@ void Vdc::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uint64_t *a
   aRow->getIfNotNull(aIndex++, mMinDevicesForOptimizing);
   aRow->getIfNotNull(aIndex++, mMaxOptimizerScenes);
   aRow->getIfNotNull(aIndex++, mMaxOptimizerGroups);
+  #if ENABLE_JSONBRIDGEAPI
+  aRow->getCastedIfNotNull<DeviceSettings::BridgingFlags, int>(aIndex++, mDefaultBridgingFlags);
+  #endif
 }
 
 
@@ -1609,6 +1646,9 @@ void Vdc::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex, const c
   aStatement.bind(aIndex++, mMinDevicesForOptimizing);
   aStatement.bind(aIndex++, mMaxOptimizerScenes);
   aStatement.bind(aIndex++, mMaxOptimizerGroups);
+  #if ENABLE_JSONBRIDGEAPI
+  aStatement.bind(aIndex++, mDefaultBridgingFlags);
+  #endif
 }
 
 // MARK: - description/shortDesc/status
