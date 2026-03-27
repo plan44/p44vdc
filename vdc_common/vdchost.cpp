@@ -2743,6 +2743,14 @@ static void globalevent_func(BuiltinFunctionContextPtr f)
   f->finish(new OneShotEventNullValue(es, "global event"));
 }
 
+// networkconnected()
+static void networkconnected_func(BuiltinFunctionContextPtr f)
+{
+  VdcHost* h = VdcHost::sharedVdcHost().get();
+  assert(h);
+  f->finish(new BoolValue(h->isNetworkConnected()));
+}
+
 
 static const BuiltinMemberDescriptor cP44VdcHostMembers[] = {
   FUNC_DEF_W_ARG(vdcapi, executable|structured),
@@ -2753,6 +2761,7 @@ static const BuiltinMemberDescriptor cP44VdcHostMembers[] = {
   FUNC_DEF_NOARG(nextversion, executable|text),
   FUNC_DEF_NOARG(macaddress, executable|text),
   FUNC_DEF_NOARG(globalevent, executable|text),
+  FUNC_DEF_NOARG(networkconnected, executable|numeric),
   BUILTINS_TERMINATOR
 };
 
