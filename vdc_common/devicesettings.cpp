@@ -92,6 +92,7 @@ void DeviceSettings::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, 
   aRow->getCastedIfNotNull<DsZoneID, int>(aIndex++, mZoneID);
   // decode my own flags
   #if ENABLE_JSONBRIDGEAPI
+  // Note: this clears bridge_flags_vdcdefault so we can detect later if we are running with vdc defaults or individual device settings
   mBridgingFlags = (BridgingFlags)((flags & deviceflags_bridgingFlagsMask) ^ deviceflags_invertedBridgingFlags);
   // TODO: if we ever want buttons/sensors/input but no output bridging, this needs to be changed
   if (mBridgingFlags==deviceflags_invertedBridgingFlags) mBridgingFlags = DeviceSettings::bridge_none; // only inverted ones set: upgrade from legacy
@@ -107,7 +108,8 @@ void DeviceSettings::bindToStatement(sqlite3pp::statement &aStatement, int &aInd
   inherited::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   // encode the flags
   #if ENABLE_JSONBRIDGEAPI
-  aCommonFlags = (aCommonFlags & deviceflags_bridgingFlagsMask) | (mBridgingFlags ^ deviceflags_invertedBridgingFlags);
+  // Note: never store bridgingflags outside the deviceflags_bridgingFlagsMask (such as: bridge_flags_vdcdefault)
+  aCommonFlags = (aCommonFlags & deviceflags_bridgingFlagsMask) | ((mBridgingFlags & deviceflags_bridgingFlagsMask) ^ deviceflags_invertedBridgingFlags);
   #endif
   // bind the fields
   aStatement.bind(aIndex++, (long long int)aCommonFlags);

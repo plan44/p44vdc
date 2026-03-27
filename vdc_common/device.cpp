@@ -250,7 +250,7 @@ void Device::setZoneID(DsZoneID aZoneId)
 DeviceSettings::BridgingFlags Device::bridgingFlags()
 {
   if (!mDeviceSettings) return DeviceSettings::bridge_none;
-  return mDeviceSettings->mBridgingFlags;
+  return mDeviceSettings->bridgingFlags();
 }
 
 
@@ -2618,7 +2618,7 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
         #if ENABLE_JSONBRIDGEAPI
         case bridgingFlags_key:
           if (!mDeviceSettings) return false;
-          aPropValue->setUint32Value(mDeviceSettings->mBridgingFlags);
+          aPropValue->setUint32Value(mDeviceSettings->bridgingFlags());
           return true;
         #endif // ENABLE_JSONBRIDGEAPI
       }
@@ -2632,7 +2632,7 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
         #if ENABLE_JSONBRIDGEAPI
         case bridgingFlags_key:
           if (!mDeviceSettings) return false;
-          if (mDeviceSettings->setPVar(mDeviceSettings->mBridgingFlags, (DeviceSettings::BridgingFlags)aPropValue->int32Value())) {
+          if (mDeviceSettings->setPVar(mDeviceSettings->mBridgingFlags, (DeviceSettings::BridgingFlags)(aPropValue->int32Value() & DeviceSettings::bridge_flags_mask))) {
             // bridge flags changed, push to bridge
             pushBridgeable();
           }

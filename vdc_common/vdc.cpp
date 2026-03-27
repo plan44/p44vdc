@@ -1091,6 +1091,30 @@ void Vdc::identifyDeviceFailed(DevicePtr aNewDevice, ErrorPtr aError, IdentifyDe
 }
 
 
+bool Vdc::addDeviceWithBridgingDefaults(DevicePtr aNewDevice)
+{
+  #if ENABLE_JSONBRIDGEAPI
+  // - apply vdc-level default bridging flags. If device is not new, addDevice will override those via load()
+  if (mDefaultBridgingFlags!=DeviceSettings::bridge_none) {
+    // there is a bridging default, set flag to save it below after load
+    aNewDevice->mDeviceSettings->mBridgingFlags = (DeviceSettings::BridgingFlags)(mDefaultBridgingFlags | DeviceSettings::bridge_flags_vdcdefault); // default bridging for this vdc
+  }
+  #endif // ENABLE_JSONBRIDGEAPI
+  // Note: addDevice includes load(), so if the device was not new, bridge_flags_vdcdefault is now reset
+  bool addedok = getVdcHost().addDevice(aNewDevice);
+  #if ENABLE_JSONBRIDGEAPI
+  if (addedok) {
+    if (aNewDevice->mDeviceSettings->mBridgingFlags & DeviceSettings::bridge_flags_vdcdefault) {
+      // these are still the vdc level defaults, need to be saved
+      aNewDevice->mDeviceSettings->markDirty();
+    }
+  }
+  #endif // ENABLE_JSONBRIDGEAPI
+  return addedok;
+}
+
+
+
 bool Vdc::simpleIdentifyAndAddDevice(DevicePtr aNewDevice)
 {
   if (!aNewDevice->identifyDevice(NoOP)) {
@@ -1099,11 +1123,7 @@ bool Vdc::simpleIdentifyAndAddDevice(DevicePtr aNewDevice)
     return false;
   }
   // simple identification successful
-  #if ENABLE_JSONBRIDGEAPI
-  // - apply vdc-level default bridging flags. If device is not new, addDevice will override those via load()
-  aNewDevice->mDeviceSettings->mBridgingFlags = mDefaultBridgingFlags; // default bridging for this vdc
-  #endif
-  if (getVdcHost().addDevice(aNewDevice)) {
+  if (addDeviceWithBridgingDefaults(aNewDevice)) {
     // not a duplicate
     // - save in my own list
     mDevices.push_back(aNewDevice);
@@ -1128,11 +1148,7 @@ void Vdc::identifyAndAddDeviceCB(StatusCB aCompletedCB, ErrorPtr aError, Device 
   if (Error::isOK(aError)) {
     // announce to global device container
     DevicePtr newDev(aIdentifiedDevice);
-    #if ENABLE_JSONBRIDGEAPI
-    // - apply vdc-level default bridging flags. If device is not new, addDevice will override those via load()
-    newDev->mDeviceSettings->mBridgingFlags = mDefaultBridgingFlags; // default bridging for this vdc
-    #endif
-    if (getVdcHost().addDevice(newDev)) {
+    if (addDeviceWithBridgingDefaults(newDev)) {
       // not a duplicate
       // - save in my own list
       mDevices.push_back(newDev);

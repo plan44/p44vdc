@@ -67,11 +67,16 @@ namespace p44 {
       bridge_inputs = 0x04, // stored inverted as bit 2 in device global flag word
       bridge_buttons = 0x08, // stored inverted as bit 3 in device global flag word
       bridge_all = 0x0F, // bridge all behaviours
-      bridge_flags_mask = 0x0F // all flags mask
+      bridge_flags_mask = 0x0F, // all flags mask
+      // note, this is an unstored, internal flag needed to detect if current bridging flags are vdc defaults
+      bridge_flags_vdcdefault = 0x80
     } BridgingFlags;
 
-    /// allow bridging via bridge API
+    /// bridging settings
     BridgingFlags mBridgingFlags;
+
+    BridgingFlags bridgingFlags() { return (BridgingFlags)(mBridgingFlags & bridge_flags_mask); };
+
     #endif // ENABLE_JSONBRIDGEAPI
 
     // persistence implementation

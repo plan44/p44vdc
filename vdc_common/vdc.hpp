@@ -712,6 +712,8 @@ namespace p44 {
     void initiateRecollect(RescanMode aRescanMode);
     void recollectDone();
 
+    bool addDeviceWithBridgingDefaults(DevicePtr aNewDevice);
+
     /// utility method for identifyAndAddDevice(s): identify device with retries
     /// @param aNewDevice the device to be identified
     /// @param aIdentifyCB will be called with the identified device object or an error (unless return value is true for instantly identifying devices)
