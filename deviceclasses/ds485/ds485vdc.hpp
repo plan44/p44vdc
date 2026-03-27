@@ -101,6 +101,9 @@ namespace p44 {
     /// scan for (collect) devices and add them to the vdc
     virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;
 
+    /// @return true if vdc is configured for having/collecting devices
+    virtual bool isConfigured() P44_OVERRIDE;
+
     /// @return human readable, language independent suffix to explain vdc functionality.
     ///   Will be appended to product name to create modelName() for vdcs
     virtual string vdcModelSuffix() const P44_OVERRIDE { return "ds485"; }

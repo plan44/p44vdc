@@ -303,6 +303,15 @@ int ProxyVdc::getRescanModes() const
 }
 
 
+
+bool ProxyVdc::isConfigured()
+{
+  // if we are connected, we're configured successfully
+  return api().connected();
+}
+
+
+
 #define NEEDED_DEVICE_PROPERTIES \
   "{\"dSUID\":null, \"name\":null, \"zoneID\": null, \"x-p44-zonename\": null, " \
   "\"outputDescription\":null, \"outputSettings\": null, \"modelFeatures\":null, " \

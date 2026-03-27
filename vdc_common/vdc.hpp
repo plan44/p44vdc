@@ -363,6 +363,9 @@ namespace p44 {
     /// @return true if vdc is currently collecting (scanning for) devices
     bool isCollecting() { return mCollecting; };
 
+    /// @return true if vdc is configured for having/collecting devices
+    virtual bool isConfigured() { return true; /* by default, vdcs need no extra configuration */ }
+
     /// handle global events
     /// @param aEvent the event to handle
     virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;

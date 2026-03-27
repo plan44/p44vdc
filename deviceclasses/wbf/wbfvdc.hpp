@@ -102,6 +102,9 @@ namespace p44 {
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
+    /// @return true if vdc is configured for having/collecting devices
+    virtual bool isConfigured() P44_OVERRIDE;
+
     /// get supported rescan modes for this vDC
     /// @return a combination of rescanmode_xxx bits
     virtual int getRescanModes() const P44_OVERRIDE;

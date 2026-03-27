@@ -194,6 +194,9 @@ namespace p44 {
     /// @param aStartupCB called when API startup done or failed
     void startupApi(WebSocketMessageCB aOnMessageCB, StatusCB aStartupCB);
 
+    /// @return true if gateway is connected and API ready to use
+    bool apiReady() { return mApiReady; };
+
     /// stop API, stop websocket
     void stopApi(StatusCB aStopCB);
 

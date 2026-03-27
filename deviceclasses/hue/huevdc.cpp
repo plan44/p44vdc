@@ -176,6 +176,13 @@ int HueVdc::getRescanModes() const
 }
 
 
+bool HueVdc::isConfigured()
+{
+  // when the api is ready this means we're configured successfully
+  return mHueComm.apiReady();
+}
+
+
 void HueVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   if (!(aRescanFlags & rescanmode_incremental)) {

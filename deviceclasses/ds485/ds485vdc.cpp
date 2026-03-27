@@ -262,6 +262,13 @@ void Ds485Vdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 }
 
 
+bool Ds485Vdc::isConfigured()
+{
+  // when we could start the dS485 operation, configuration is ok
+  return mDs485Started;
+}
+
+
 string fullDevId(const DsUid& aDsuid, const uint16_t aDevId)
 {
   string fullid(aDsuid.getBinary());

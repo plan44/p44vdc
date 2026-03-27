@@ -183,6 +183,9 @@ namespace p44 {
     /// @name executing regular API calls
     /// @{
 
+    /// @return true if gateway is connected and API ready to use
+    bool apiReady() { return mApiReady; };
+
     /// Query information from the API
     /// @param aUrlSuffix the suffix to append to the baseURL+userName (including leading slash)
     /// @param aResultHandler will be called with the result

@@ -264,6 +264,15 @@ void WbfVdc::apiIsStarted(StatusCB aCompletedCB, ErrorPtr aError)
 }
 
 
+bool WbfVdc::isConfigured()
+{
+  // API ready means paired, so configured to scan/use devices
+  return mWbfComm.apiReady();
+}
+
+
+
+
 void WbfVdc::gatewayInfoHandler(StatusCB aCompletedCB, JsonObjectPtr aResult, ErrorPtr aError)
 {
   if (aResult) {

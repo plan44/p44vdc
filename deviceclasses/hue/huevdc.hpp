@@ -117,6 +117,9 @@ namespace p44 {
     /// scan for (collect) devices and add them to the vdc
     virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;
 
+    /// @return true if vdc is configured for having/collecting devices
+    virtual bool isConfigured() P44_OVERRIDE;
+
     /// vdc level methods
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 

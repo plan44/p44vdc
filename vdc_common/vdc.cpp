@@ -1319,6 +1319,7 @@ enum {
   devices_key,
   instancenumber_key,
   rescanModes_key,
+  configured_key,
   optimizerMode_key,
   minDevicesForOptimizing_key,
   minCallsBeforeOptimizing_key,
@@ -1405,6 +1406,7 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
       { "x-p44-devices", apivalue_object+propflag_container+propflag_nowildcard, devices_key, OKEY(devices_container_key) },
       { "x-p44-instanceNo", apivalue_uint64, instancenumber_key, OKEY(vdc_key) },
       { "x-p44-rescanModes", apivalue_uint64, rescanModes_key, OKEY(vdc_key) },
+      { "x-p44-configured", apivalue_bool, configured_key, OKEY(vdc_key) },
       { "x-p44-optimizerMode", apivalue_uint64, optimizerMode_key, OKEY(vdc_key) },
       { "x-p44-minDevicesForOptimizing", apivalue_uint64, minDevicesForOptimizing_key, OKEY(vdc_key) },
       { "x-p44-minCallsBeforeOptimizing", apivalue_uint64, minCallsBeforeOptimizing_key, OKEY(vdc_key) },
@@ -1444,6 +1446,9 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
           return true;
         case rescanModes_key:
           aPropValue->setUint32Value(getRescanModes());
+          return true;
+        case configured_key:
+          aPropValue->setUint32Value(isConfigured());
           return true;
         case optimizerMode_key:
           if (mOptimizerMode==opt_unavailable) return false; // do not show the property at all

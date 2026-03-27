@@ -236,7 +236,7 @@ bool ProxyDevice::localPropertyOverride(JsonObjectPtr aProps, PropertyAccessMode
     }
     if (aProps->get("x-p44-bridgingFlags", o)) {
       #if ENABLE_JSONBRIDGEAPI
-      aProps->add("x-p44-bridgingFlags", JsonObject::newInt32(mDeviceSettings->mBridgingFlags));
+      aProps->add("x-p44-bridgingFlags", JsonObject::newInt32(mDeviceSettings->bridgingFlags()));
       #endif
     }
   }
