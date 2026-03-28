@@ -256,7 +256,14 @@ DeviceSettings::BridgingFlags Device::bridgingFlags()
 
 bool Device::bridgeable()
 {
-  return bridgingFlags()!=DeviceSettings::bridge_none;
+  // bridgeable if any behaviour wants bridging
+  if (bridgingFlags()!=DeviceSettings::bridge_none) {
+    if (mOutput && mOutput->wantsBridging()) return true;
+    for (BehaviourVector::iterator pos = mButtons.begin(); pos!=mButtons.end(); ++pos) if ((*pos)->wantsBridging()) return true;
+    for (BehaviourVector::iterator pos = mInputs.begin(); pos!=mInputs.end(); ++pos) if ((*pos)->wantsBridging()) return true;
+    for (BehaviourVector::iterator pos = mSensors.begin(); pos!=mSensors.end(); ++pos) if ((*pos)->wantsBridging()) return true;
+  }
+  return false;
 }
 
 #endif // ENABLE_JSONBRIDGEAPI
