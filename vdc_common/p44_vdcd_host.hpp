@@ -398,6 +398,7 @@ namespace p44 {
     ScriptCodeThreadPtr pausedThreadById(int aThreadId);
     void removePausedThread(ScriptCodeThreadPtr aThread);
     void scriptResultReport(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
+    void systemScriptResultReport(VdcApiRequestPtr aRequest, ScriptObjPtr aResult, SystemScriptPtr aSystemScript);
     void logCollectHandler(int aLevel, const char *aLinePrefix, const char *aLogMessage);
 
   };

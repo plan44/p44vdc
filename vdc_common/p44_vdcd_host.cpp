@@ -1883,28 +1883,16 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
           // use domain's default context if none set
           if (!ctx) ctx = domain().newContext(); // independent context
           // non-debuggable source container (text not available to IDE editor)
-          SourceContainerPtr source = new SourceContainer("scriptExec", this, code);
-          // get the main context
-          ScriptMainContextPtr mctx = ctx->scriptmain();
-          assert(mctx.get());
-          // compile
-          EvaluationFlags flags = sourcecode|regular|keepvars|concurrently|ephemeralSource|neverpause|implicitreturn;
-          ScriptCompiler compiler(ctx->domain());
-          CompiledFunctionPtr compiledcode = new CompiledFunction("interactive");
-          ScriptObjPtr res = compiler.compile(source, compiledcode, flags, mctx);
-          if (res->isErr()) {
+          SystemScriptPtr exec = new SystemScript("scriptExec", code, ctx);
+          ScriptObjPtr res = exec->run(
+            sourcecode|regular|keepvars|concurrently|ephemeralSource|neverpause|implicitreturn,
+            boost::bind(&P44ScriptManager::systemScriptResultReport, this, aRequest, _1, exec),
+            thread ? thread->threadLocals() : nullptr, // also see into the current thread's threadvars
+            maxRunTime
+          );
+          if (res && res->isErr()) {
             // compiler error
             scriptResultReport(aRequest, res);
-          }
-          else {
-            // now execute the code in the very context
-            ctx->execute(
-              compiledcode, flags,
-              boost::bind(&P44ScriptManager::scriptResultReport, this, aRequest, _1),
-              nullptr, // not chained
-              thread ? thread->threadLocals() : nullptr, // also see into the current thread's threadvars
-              maxRunTime // run time limit
-            );
           }
         }
         aError.reset(); // result is or will be sent by scriptExecHandler
@@ -1913,6 +1901,12 @@ bool P44ScriptManager::handleScriptManagerMethod(ErrorPtr &aError, VdcApiRequest
     return true;
   }
   return false;
+}
+
+
+void P44ScriptManager::systemScriptResultReport(VdcApiRequestPtr aRequest, ScriptObjPtr aResult, SystemScriptPtr aSystemScript)
+{
+  scriptResultReport(aRequest, aResult);
 }
 
 
