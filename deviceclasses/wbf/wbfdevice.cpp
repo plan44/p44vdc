@@ -209,8 +209,9 @@ WbfDevice::WbfDevice(WbfVdc *aVdcP, JsonObjectPtr aDevDesc, JsonObjectPtr aOutDe
           switch (appKind) {
             default:
             case 0: sk = shadowdevice_jalousie; break;
-            case 1: sk = shadowdevice_sunblind; break;
+            case 1: sk = shadowdevice_jalousie; break;
             case 2: sk = shadowdevice_rollerblind; break;
+            case 3: sk = shadowdevice_sunblind; break;
           }
           sb->setDeviceParams(sk, false, 0, 0, 0, false); // absolute movements
           addBehaviour(sb);
