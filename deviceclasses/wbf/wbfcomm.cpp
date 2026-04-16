@@ -305,7 +305,8 @@ void WbfComm::apiAction(WbfApiOperation::HttpMethods aMethod, const char* aUrlSu
 // MARK: - Pairing and re-finding gateway
 
 
-#define PAIRING_TIMEOUT (30*Second)
+// Note: this is a safeguard only, vdc pairing procedure has it's own timeout that will cause stopPairing to be called
+#define PAIRING_TIMEOUT (5*Minute)
 
 void WbfComm::pairGateway(StatusCB aPairingResultCB)
 {
@@ -363,7 +364,7 @@ bool WbfComm::dnsSdPairingResultHandler(ErrorPtr aError, DnsSdServiceInfoPtr aSe
 #endif // !DISABLE_DISCOVERY
 
 
-#define CLAIM_TIMEOUT (1*Minute)
+#define CLAIM_TIMEOUT (35*Second)
 
 void WbfComm::claimAccount(StatusCB aPairingResultCB, const string aResolvedHost, const string aHostName, const string aUserName)
 {
@@ -385,22 +386,23 @@ void WbfComm::claimAccount(StatusCB aPairingResultCB, const string aResolvedHost
 void WbfComm::claimResultHander(StatusCB aPairingResultCB, const string aResolvedHost, const string aHostName, JsonObjectPtr aResult, ErrorPtr aError)
 {
   if (!mSearchTicket) return; // search is over, no longer interested
-  if (!aResult) return; // no result, claim failed
-  // get the info
-  JsonObjectPtr o;
-  if (aResult->get("secret", o)) {
-    // get secret
-    mApiSecret = o->stringValue();
-    // also remember host address and name for later re-finding
-    mResolvedHost = aResolvedHost;
-    mDNSSDHostName = aHostName;
-    // successful pairing!
-    mSearchTicket.cancel();
-    aPairingResultCB(ErrorPtr());
-    return;
-  }
-  else {
-    aError = Error::err<WbfCommError>(WbfCommError::ResponseErr, "missing data or secret in claim response");
+  if (aResult) {
+    // get the info
+    JsonObjectPtr o;
+    if (aResult->get("secret", o)) {
+      // get secret
+      mApiSecret = o->stringValue();
+      // also remember host address and name for later re-finding
+      mResolvedHost = aResolvedHost;
+      mDNSSDHostName = aHostName;
+      // successful pairing!
+      mSearchTicket.cancel();
+      aPairingResultCB(ErrorPtr());
+      return;
+    }
+    else {
+      aError = Error::err<WbfCommError>(WbfCommError::ResponseErr, "missing data or secret in claim response");
+    }
   }
   // just log errors here, claiming will end with timeout
   OLOG(LOG_WARNING, "Unsuccessful attempt to claim gateway @ %s: %s", aResolvedHost.c_str(), Error::text(aError));
