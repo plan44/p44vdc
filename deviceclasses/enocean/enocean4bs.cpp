@@ -413,7 +413,7 @@ const p44::EnoceanInputDescriptor enocean4BSdescriptors[] = {
   { 0, 0x09, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_supplyVoltage,  usage_undefined,  0,  5.1, DB(3,7), DB(3,0), 100, 40*60, &batVoltSensorHandler, supplyText },
 
   // A5-09-04: Humidity, CO2 concentration, Temperature
-  // - e.g. enoluz.com
+  // - e.g. enoluz.com, Thermokon Novos 3 SR CO2 Temp_rH
   { 0, 0x09, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,          0,127.5, DB(3,7), DB(3,0), 100, 40*60, &condDB0Bit2Handler, humText },
   { 0, 0x09, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_gas_CO2,     usage_room,          0, 2550, DB(2,7), DB(2,0), 100, 40*60, &stdSensorHandler,   co2Text },
   { 0, 0x09, 0x04, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,          0,   51, DB(1,7), DB(1,0), 100, 40*60, &condDB0Bit1Handler, tempText },
