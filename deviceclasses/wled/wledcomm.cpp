@@ -113,12 +113,13 @@ void WledApiOperation::abortOperation(ErrorPtr aError)
 void WledApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError)
 {
   if (Error::notOK(aError)) {
-    SOLOG(mWledComm, LOG_WARNING, "API error: %s", mError->text());
     mError = aError;
+    mData = JsonObjectPtr(); // clear request payload — callbacks must not see it on error
+    SOLOG(mWledComm, LOG_WARNING, "API error: %s", mError->text());
   }
   else {
-    SOLOG(mWledComm, LOG_INFO, "API response: %s", JsonObject::text(aJsonResponse));
     mData = aJsonResponse;
+    SOLOG(mWledComm, LOG_INFO, "API response: %s", JsonObject::text(aJsonResponse));
   }
 
   // done
@@ -137,15 +138,35 @@ WledComm::WledComm() :
   mBaseURL(""),
   mCachedState(NULL),
   mCachedInfo(NULL)
+  #if ENABLE_JSON_WEBSOCKET
+  , mWebsocketClient(NULL),
+    mWebsocketEnabled(false)
+  #endif
 {
   mJsonClient.isMemberVariable();
   mJsonClient.setTimeout(5*Second); // 5s timeout for WLED API calls
+  
+  #if ENABLE_JSON_WEBSOCKET
+  // Initialize WebSocket client (but don't connect yet).
+  // Only setMessageCallback here — the status callback is registered via the
+  // connect() call in websocketConnect() to avoid double-firing on connect events.
+  mWebsocketClient = new JsonWebsocketClient(MainLoop::currentMainLoop());
+  mWebsocketClient->setMessageCallback(
+    boost::bind(&WledComm::onWebsocketMessage, this, _1, _2)
+  );
+  #endif
 }
 
 
 
 WledComm::~WledComm()
 {
+  #if ENABLE_JSON_WEBSOCKET
+  // Disconnect WebSocket if connected
+  if (mWebsocketClient) {
+    mWebsocketClient->disconnect();
+  }
+  #endif
   // Destructor - parent class OperationQueue will be destructed automatically
 }
 
@@ -244,5 +265,160 @@ void WledComm::discoverDevices(WledDiscoveryResultCB aResultCallback)
     aResultCallback("", NULL, ErrorPtr());
   }
 }
+
+
+#if ENABLE_JSON_WEBSOCKET
+
+void WledComm::enableWebsocket(bool aEnable)
+{
+  OLOG(LOG_INFO, "WebSocket support %s", aEnable ? "enabled" : "disabled");
+  mWebsocketEnabled = aEnable;
+  
+  if (!aEnable) {
+    // Disable WebSocket - disconnect if connected
+    websocketDisconnect();
+  }
+}
+
+
+bool WledComm::isWebsocketConnected() const
+{
+  if (!mWebsocketClient) return false;
+  return mWebsocketClient->isConnected();
+}
+
+
+void WledComm::websocketConnect(WledWebsocketStatusCB aStatusCallback)
+{
+  if (!mWebsocketEnabled) {
+    OLOG(LOG_WARNING, "WebSocket not enabled");
+    if (aStatusCallback) {
+      aStatusCallback(false, ErrorPtr(new WledCommError(WledCommError::InvalidDeviceState)));
+    }
+    return;
+  }
+
+  if (mBaseURL.empty()) {
+    OLOG(LOG_WARNING, "Device URL not set");
+    if (aStatusCallback) {
+      aStatusCallback(false, ErrorPtr(new WledCommError(WledCommError::InvalidDeviceState)));
+    }
+    return;
+  }
+
+  // Store the callback for later
+  if (aStatusCallback) {
+    mWebsocketStatusCB = aStatusCallback;
+  }
+
+  // Build WebSocket URL from HTTP URL
+  // Convert "http://192.168.1.100/json" to "ws://192.168.1.100/ws"
+  string wsUrl = mBaseURL;
+  size_t httpPos = wsUrl.find("http://");
+  if (httpPos == 0) {
+    wsUrl.replace(0, 7, "ws://");
+  } else {
+    size_t httpsPos = wsUrl.find("https://");
+    if (httpsPos == 0) {
+      wsUrl.replace(0, 8, "wss://");
+    }
+  }
+  
+  // Remove "/json" if present and replace with "/ws"
+  size_t jsonPos = wsUrl.rfind("/json");
+  if (jsonPos != string::npos) {
+    wsUrl.erase(jsonPos);
+  }
+  wsUrl += "/ws";
+
+  OLOG(LOG_INFO, "Connecting to WebSocket: %s", wsUrl.c_str());
+
+  // The connect() callback is the sole status handler — no setStatusCallback() in
+  // the constructor, so this fires exactly once per event.
+  mWebsocketClient->connect(wsUrl, boost::bind(&WledComm::onWebsocketConnected, this, _1, _2));
+}
+
+
+void WledComm::websocketDisconnect()
+{
+  if (mWebsocketClient) {
+    OLOG(LOG_INFO, "Disconnecting WebSocket");
+    mWebsocketClient->disconnect();
+  }
+}
+
+
+void WledComm::setWebsocketUpdateCallback(WledWebsocketUpdateCB aUpdateCallback)
+{
+  mWebsocketUpdateCB = aUpdateCallback;
+}
+
+
+void WledComm::onWebsocketMessage(JsonObjectPtr aMessage, ErrorPtr aError)
+{
+  if (Error::notOK(aError)) {
+    OLOG(LOG_WARNING, "WebSocket message error: %s", aError->text());
+    return;
+  }
+
+  if (!aMessage) {
+    OLOG(LOG_WARNING, "Empty WebSocket message");
+    return;
+  }
+
+  OLOG(LOG_DEBUG, "WebSocket message received: %s", aMessage->json_str().c_str());
+
+  // Update cached state from WebSocket message
+  // WLED sends: {"state": {...}, "info": {...}} or just {"state": {...}}
+  JsonObjectPtr stateObj;
+  if (aMessage->get("state", stateObj)) {
+    mCachedState = stateObj;
+    OLOG(LOG_INFO, "State updated from WebSocket");
+  }
+
+  JsonObjectPtr infoObj;
+  if (aMessage->get("info", infoObj)) {
+    mCachedInfo = infoObj;
+    OLOG(LOG_INFO, "Info updated from WebSocket");
+  }
+
+  // Call the registered callback if any
+  if (mWebsocketUpdateCB) {
+    mWebsocketUpdateCB(aMessage, ErrorPtr());
+  }
+}
+
+
+void WledComm::onWebsocketConnected(bool aConnected, ErrorPtr aError)
+{
+  if (aConnected) {
+    OLOG(LOG_NOTICE, "WebSocket connected to device");
+    
+    // Request initial state
+    JsonObjectPtr requestObj = JsonObject::newObj();
+    requestObj->add("v", JsonObject::newBool(true)); // Request full state
+    bool sent = mWebsocketClient->sendJson(requestObj, [this](JsonObjectPtr aResponse, ErrorPtr aError) {
+      if (Error::notOK(aError)) {
+        OLOG(LOG_WARNING, "Error sending initial state request");
+      }
+    });
+    
+    if (!sent) {
+      OLOG(LOG_WARNING, "Failed to queue initial state request");
+    }
+  } else {
+    OLOG(LOG_NOTICE, "WebSocket disconnected from device");
+    if (Error::notOK(aError)) {
+      OLOG(LOG_WARNING, "WebSocket error: %s", aError->text());
+    }
+  }
+
+  // Call the registered callback if any
+  if (mWebsocketStatusCB) {
+    mWebsocketStatusCB(aConnected, aError);
+  }
+}
+
+#endif // ENABLE_JSON_WEBSOCKET
 
 #endif // ENABLE_WLED

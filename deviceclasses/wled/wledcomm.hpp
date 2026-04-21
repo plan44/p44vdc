@@ -31,6 +31,10 @@
 #include "operationqueue.hpp"
 #include "macaddress.hpp"
 
+#if ENABLE_JSON_WEBSOCKET
+#include "jsonwebsocketclient.hpp"
+#endif
+
 // Enable DNS-SD discovery for WLED devices
 #if !defined(WLED_DNSSD_DISCOVERY) && !DISABLE_DISCOVERY
   #define WLED_DNSSD_DISCOVERY 1
@@ -89,6 +93,16 @@ namespace p44 {
   /// @param aError error if any
   /// @return true to continue browsing for more devices, false to stop
   typedef boost::function<bool (string aDeviceURL, JsonObjectPtr aDeviceInfo, ErrorPtr aError)> WledDiscoveryResultCB;
+
+  /// Callback for WebSocket state updates
+  /// @param aStateUpdate the state object from WLED device
+  /// @param aError error if any
+  typedef boost::function<void (JsonObjectPtr aStateUpdate, ErrorPtr aError)> WledWebsocketUpdateCB;
+
+  /// Callback for WebSocket connection status
+  /// @param aConnected true if connected, false if disconnected
+  /// @param aError error if any
+  typedef boost::function<void (bool aConnected, ErrorPtr aError)> WledWebsocketStatusCB;
 
 
   /// WLED API operation
@@ -192,12 +206,48 @@ namespace p44 {
     /// @param aResultCallback 
     void discoverDevices(WledDiscoveryResultCB aResultCallback);
 
+    #if ENABLE_JSON_WEBSOCKET
+    /// Enable/disable WebSocket support for this device
+    /// @param aEnable true to enable, false to disable
+    void enableWebsocket(bool aEnable);
+
+    /// Check if WebSocket is enabled
+    /// @return true if WebSocket is enabled
+    bool isWebsocketEnabled() const { return mWebsocketEnabled; }
+
+    /// Check if WebSocket is currently connected
+    /// @return true if WebSocket connection is active
+    bool isWebsocketConnected() const;
+
+    /// Connect to WLED device via WebSocket
+    /// @param aStatusCallback optional callback for connection status changes
+    void websocketConnect(WledWebsocketStatusCB aStatusCallback = WledWebsocketStatusCB());
+
+    /// Disconnect WebSocket from WLED device
+    void websocketDisconnect();
+
+    /// Set callback for WebSocket state updates
+    /// @param aUpdateCallback callback invoked when device state changes via WebSocket
+    void setWebsocketUpdateCallback(WledWebsocketUpdateCB aUpdateCallback);
+    #endif // ENABLE_JSON_WEBSOCKET
+
   private:
 
     string mBaseURL;                  ///< http://device-ip/json
     JsonWebClient mJsonClient;        ///< JSON web client for API calls
     JsonObjectPtr mCachedState;       ///< Last known state
     JsonObjectPtr mCachedInfo;        ///< Device info cache
+
+    #if ENABLE_JSON_WEBSOCKET
+    JsonWebsocketClientPtr mWebsocketClient;    ///< WebSocket connection
+    bool mWebsocketEnabled;                     ///< WebSocket enabled for this device
+    WledWebsocketUpdateCB mWebsocketUpdateCB;   ///< Callback for state updates
+    WledWebsocketStatusCB mWebsocketStatusCB;   ///< Callback for connection status
+    
+    // WebSocket message handlers
+    void onWebsocketMessage(JsonObjectPtr aMessage, ErrorPtr aError);
+    void onWebsocketConnected(bool aConnected, ErrorPtr aError);
+    #endif // ENABLE_JSON_WEBSOCKET
   };
 
 

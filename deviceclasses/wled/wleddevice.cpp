@@ -111,6 +111,12 @@ WledDevice::WledDevice(WledVdc *aVdcP, JsonObjectPtr aDeviceInfo) :
   mHasCct(false),
   mLedCount(0),
   mSettingState(false)
+  #if ENABLE_JSON_WEBSOCKET
+  , mWebsocketEnabled(false),
+  mNormalPollInterval(10*Second),
+  mReducedPollInterval(60*Second),
+  mWebsocketUpdatePending(false)
+  #endif
 {
   LOG(LOG_DEBUG, "Creating WLED device: %s", aDeviceInfo->json_str().c_str());
 
@@ -174,11 +180,23 @@ WledDevice::WledDevice(WledVdc *aVdcP, JsonObjectPtr aDeviceInfo) :
 
   LOG(LOG_INFO, "WLED device created: %s (RGB:%d, RGBW:%d, CCT:%d, LEDs:%d)",
     mDeviceName.c_str(), mHasRgb, mHasRgbw, mHasCct, mLedCount);
+
+  #if ENABLE_JSON_WEBSOCKET
+  // Enable WebSocket connection for state updates
+  mVdc.mWledComm.enableWebsocket(true);
+  enableWebsocket(true);
+  #endif
 }
 
 
 WledDevice::~WledDevice()
 {
+  #if ENABLE_JSON_WEBSOCKET
+  // Cleanup WebSocket connection if active
+  if (mWebsocketEnabled) {
+    websocketDisconnect();
+  }
+  #endif
 }
 
 
@@ -254,11 +272,59 @@ bool WledDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   LOG(LOG_DEBUG, "WLED device identify");
 
-  // Call callback with error NULL and this device
   if (aIdentifyCB) {
     aIdentifyCB(ErrorPtr(), this);
   }
   return true;
+}
+
+
+void WledDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
+{
+  #if ENABLE_JSON_WEBSOCKET
+  if (mWebsocketEnabled && mVdc.mWledComm.isWebsocketConnected()) {
+    // WebSocket is already connected and has already pushed current state — a separate
+    // HTTP query would compete for the device's limited TCP connections and is redundant.
+    inherited::initializeDevice(aCompletedCB, aFactoryReset);
+    return;
+  }
+  #endif
+  // WebSocket not available: fall back to HTTP query for initial state sync
+  mVdc.mWledComm.getState(boost::bind(&WledDevice::deviceStateReceived, this, aCompletedCB, aFactoryReset, _1, _2));
+}
+
+
+void WledDevice::deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, JsonObjectPtr aState, ErrorPtr aError)
+{
+  if (Error::isOK(aError) && aState) {
+    updateState(aState);
+  }
+  // let the base class finish initialization (stores settings, fires callback)
+  inherited::initializeDevice(aCompletedCB, aFactoryReset);
+}
+
+
+void WledDevice::syncChannelValues(SimpleCB aDoneCB)
+{
+  #if ENABLE_JSON_WEBSOCKET
+  if (mWebsocketEnabled && mVdc.mWledComm.isWebsocketConnected()) {
+    // WebSocket delivers state in real time — channel values are already current.
+    // Skip HTTP query to avoid overloading the device's TCP connection limit.
+    inherited::syncChannelValues(aDoneCB);
+    return;
+  }
+  #endif
+  // WebSocket not available: query current hardware state via HTTP before scene save
+  mVdc.mWledComm.getState(boost::bind(&WledDevice::channelValuesReceived, this, aDoneCB, _1, _2));
+}
+
+
+void WledDevice::channelValuesReceived(SimpleCB aDoneCB, JsonObjectPtr aState, ErrorPtr aError)
+{
+  if (Error::isOK(aError) && aState) {
+    updateState(aState);
+  }
+  inherited::syncChannelValues(aDoneCB);
 }
 
 
@@ -270,144 +336,142 @@ void WledDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     if (aDoneCB) aDoneCB();
     return;
   }
-
   mSettingState = true;
 
-  uint8_t brightness = 0;
+  // Get the transition time from the framework (max across all pending channels)
+  MLMicroSeconds tt = 0;
+  needsToApplyChannels(&tt);
+  int64_t wledTt = tt / (100 * MilliSecond); // WLED "tt" field: units of 100 ms
+
+  JsonObjectPtr onState = JsonObject::newObj();
+  // Always include transition time so we override WLED's internal default
+  onState->add("tt", JsonObject::newInt64(wledTt));
+
   if (mColorLightBehaviour) {
     ChannelBehaviourPtr brCh = mColorLightBehaviour->getChannelByType(channeltype_brightness);
-    if (brCh) {
-      brightness = (uint8_t)(brCh->getChannelValue() / 100 * 255.0);
-    }
+    double bri = brCh ? brCh->getChannelValue() : 0;
+    uint8_t wledBri = (uint8_t)(bri / 100.0 * 255.0);
 
     // Turn off
-    if (brightness <= 0) {
-      LOG(LOG_DEBUG, "WLED applyChannelValues: turning off");
-      JsonObjectPtr onState = JsonObject::newObj();
+    if (wledBri == 0) {
+      LOG(LOG_DEBUG, "WLED applyChannelValues: turning off (tt=%lld00ms)", (long long)wledTt);
       onState->add("on", JsonObject::newBool(false));
       mVdc.mWledComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
-          if (Error::notOK(aError)) {
-            LOG(LOG_ERR, "Failed to set WLED device state: %s", aError->text());
-          } else {
-            LOG(LOG_DEBUG, "WLED device state set successfully");
-          }
-          mSettingState = false;
-          if (aDoneCB) {
-            aDoneCB();
-          }
-          mColorLightBehaviour->appliedColorValues();
-        });
+        if (Error::notOK(aError)) LOG(LOG_ERR, "Failed to set WLED state: %s", aError->text());
+        mSettingState = false;
+        mColorLightBehaviour->appliedColorValues();
+        if (aDoneCB) aDoneCB();
+      });
       return;
     }
 
-    ChannelBehaviourPtr hueCh = mColorLightBehaviour->getChannelByType(channeltype_hue);
-    ChannelBehaviourPtr satCh = mColorLightBehaviour->getChannelByType(channeltype_saturation);
-    uint8_t redVal{}, greenVal{}, blueVal{};
-
-    hsvToRgb(hueCh->getChannelValue(), satCh->getChannelValue(), brCh->getChannelValue(),
-              /*out*/redVal, /*out*/greenVal, /*out*/blueVal);
-
-    LOG(LOG_DEBUG, "WLED applyChannelValues: hue=%.2f, sat=%.2f, val=%.2f => red=%d, green=%d, blue=%d",
-      hueCh->getChannelValue(), satCh->getChannelValue(), brCh->getChannelValue(),
-      redVal, greenVal, blueVal);
-
-    JsonObjectPtr onState = JsonObject::newObj();
     onState->add("on", JsonObject::newBool(true));
+    onState->add("bri", JsonObject::newInt32(wledBri));
 
-    JsonObjectPtr color0Obj = JsonObject::newObj();  // primary color
-    color0Obj->add("0", JsonObject::newInt32(redVal));
-    color0Obj->add("1", JsonObject::newInt32(greenVal));
-    color0Obj->add("2", JsonObject::newInt32(blueVal));
-    JsonObjectPtr color1Obj = JsonObject::newObj();  // secondary color (black)
-    color1Obj->add("0", JsonObject::newInt32(0));
-    color1Obj->add("1", JsonObject::newInt32(0));
-    color1Obj->add("2", JsonObject::newInt32(0));
-    JsonObjectPtr color2Obj = JsonObject::newObj();  // tertiary color (gray)
-    color2Obj->add("0", JsonObject::newInt32(32));
-    color2Obj->add("1", JsonObject::newInt32(32));
-    color2Obj->add("2", JsonObject::newInt32(32));
-
-    // add color "0" object to seg[0].col[0] lists
-    onState->add("seg", JsonObject::newArray());
+    // Build segment 0 object
     JsonObjectPtr seg0 = JsonObject::newObj();
-    seg0->add("col", JsonObject::newArray());
-    seg0->get("col")->arrayAppend(color0Obj);
-    seg0->get("col")->arrayAppend(color1Obj);
-    seg0->get("col")->arrayAppend(color2Obj);
-    seg0->add("bri", JsonObject::newInt32((int)brightness));
-    seg0->add("fx", JsonObject::newInt32(0)); // solid
-    seg0->add("id", JsonObject::newInt32(0)); // first segment
-    onState->get("seg")->arrayAppend(seg0);
+    seg0->add("id", JsonObject::newInt32(0));
+    seg0->add("fx", JsonObject::newInt32(0)); // solid effect
 
-    auto cctCh = mColorLightBehaviour->getChannelByType(channeltype_colortemp);
-    if (cctCh) {
-      // add CCT value if supported
-      uint8_t cctVal = (uint8_t)cctCh->getChannelValue() / 100 * 255.0;
-      seg0->add("cct", JsonObject::newInt32(cctVal));
+    // Derive color mode from which channels have pending values
+    mColorLightBehaviour->deriveColorMode();
+
+    if (mColorLightBehaviour->mColorMode == colorLightModeCt) {
+      // CCT mode: send color temperature to WLED cct field (0=warm/2000K, 255=cold/6500K)
+      ChannelBehaviourPtr cctCh = mColorLightBehaviour->getChannelByType(channeltype_colortemp);
+      if (cctCh) {
+        double mired = cctCh->getChannelValue();
+        // Map mired 500(warm/2000K)->0, 153(cold/6500K)->255
+        int wledCct = (int)((500.0 - mired) / (500.0 - 153.0) * 255.0 + 0.5);
+        if (wledCct < 0) wledCct = 0;
+        if (wledCct > 255) wledCct = 255;
+        LOG(LOG_DEBUG, "WLED applyChannelValues: CT mode mired=%.0f => cct=%d", mired, wledCct);
+        seg0->add("cct", JsonObject::newInt32(wledCct));
+      }
+    }
+    else {
+      // HS mode (default): convert HSV to RGB and send as JSON arrays
+      ChannelBehaviourPtr hueCh = mColorLightBehaviour->getChannelByType(channeltype_hue);
+      ChannelBehaviourPtr satCh = mColorLightBehaviour->getChannelByType(channeltype_saturation);
+      double hue = hueCh ? hueCh->getChannelValue() : 0;
+      double sat = satCh ? satCh->getChannelValue() : 0;
+      uint8_t r{}, g{}, b{};
+      hsvToRgb(hue, sat, bri, r, g, b);
+      LOG(LOG_DEBUG, "WLED applyChannelValues: HS mode hue=%.2f sat=%.2f bri=%.2f => r=%d g=%d b=%d",
+        hue, sat, bri, r, g, b);
+
+      // WLED JSON API: col is array of [R,G,B] or [R,G,B,W] arrays
+      // For RGBW devices append W=0 (hardware white; let WLED's auto-white handle mixing)
+      JsonObjectPtr col = JsonObject::newArray();
+      JsonObjectPtr c0 = JsonObject::newArray(); // primary color
+      c0->arrayAppend(JsonObject::newInt32(r));
+      c0->arrayAppend(JsonObject::newInt32(g));
+      c0->arrayAppend(JsonObject::newInt32(b));
+      if (mHasRgbw) c0->arrayAppend(JsonObject::newInt32(0)); // W channel
+      JsonObjectPtr c1 = JsonObject::newArray(); // secondary (off)
+      c1->arrayAppend(JsonObject::newInt32(0));
+      c1->arrayAppend(JsonObject::newInt32(0));
+      c1->arrayAppend(JsonObject::newInt32(0));
+      if (mHasRgbw) c1->arrayAppend(JsonObject::newInt32(0));
+      JsonObjectPtr c2 = JsonObject::newArray(); // tertiary (off)
+      c2->arrayAppend(JsonObject::newInt32(0));
+      c2->arrayAppend(JsonObject::newInt32(0));
+      c2->arrayAppend(JsonObject::newInt32(0));
+      if (mHasRgbw) c2->arrayAppend(JsonObject::newInt32(0));
+      col->arrayAppend(c0);
+      col->arrayAppend(c1);
+      col->arrayAppend(c2);
+      seg0->add("col", col);
+
+      // Also set CCT if device supports it
+      if (mHasCct) {
+        ChannelBehaviourPtr cctCh = mColorLightBehaviour->getChannelByType(channeltype_colortemp);
+        if (cctCh) {
+          double mired = cctCh->getChannelValue();
+          int wledCct = (int)((500.0 - mired) / (500.0 - 153.0) * 255.0 + 0.5);
+          if (wledCct < 0) wledCct = 0;
+          if (wledCct > 255) wledCct = 255;
+          seg0->add("cct", JsonObject::newInt32(wledCct));
+        }
+      }
     }
 
+    JsonObjectPtr segArray = JsonObject::newArray();
+    segArray->arrayAppend(seg0);
+    onState->add("seg", segArray);
+
     mVdc.mWledComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
-        if (Error::notOK(aError)) {
-          LOG(LOG_ERR, "Failed to set WLED device state: %s", aError->text());
-        } else {
-          LOG(LOG_DEBUG, "WLED device state set successfully");
-        }
-        mSettingState = false;
-        if (aDoneCB) {
-          aDoneCB();
-        }
-        mColorLightBehaviour->appliedColorValues();
-      });
+      if (Error::notOK(aError)) LOG(LOG_ERR, "Failed to set WLED state: %s", aError->text());
+      mSettingState = false;
+      mColorLightBehaviour->appliedColorValues();
+      if (aDoneCB) aDoneCB();
+    });
     return;
   }
 
   if (mDimmerLightBehaviour) {
-    double brightness = 0;
     ChannelBehaviourPtr brCh = mDimmerLightBehaviour->getChannelByType(channeltype_brightness);
-    if (brCh) {
-      brightness = brCh->getChannelValue() / 100 * 255.0;
-    }
-    LOG(LOG_DEBUG, "WLED applyChannelValues: brightness=%.2f", brightness);
+    double bri = brCh ? brCh->getChannelValue() : 0;
+    uint8_t wledBri = (uint8_t)(bri / 100.0 * 255.0);
+    LOG(LOG_DEBUG, "WLED applyChannelValues: dimmer bri=%.2f => wledBri=%d (tt=%lld00ms)", bri, wledBri, (long long)wledTt);
 
-    // Prepare state update JSON
-    JsonObjectPtr onState = JsonObject::newObj();
-
-    // Turn off
-    if (brightness <= 0) {
+    if (wledBri == 0) {
       onState->add("on", JsonObject::newBool(false));
-      mVdc.mWledComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
-          if (Error::notOK(aError)) {
-            LOG(LOG_ERR, "Failed to set WLED device state: %s", aError->text());
-          } else {
-            LOG(LOG_DEBUG, "WLED device state set successfully");
-          }
-          mSettingState = false;
-          if (aDoneCB) {
-            aDoneCB();
-          }
-          mDimmerLightBehaviour->brightnessApplied();
-        });
-      return;
+    } else {
+      onState->add("on", JsonObject::newBool(true));
+      onState->add("bri", JsonObject::newInt32(wledBri));
     }
-    onState->add("on", JsonObject::newBool(true));
-    onState->add("bri", JsonObject::newInt32(brightness));
     mVdc.mWledComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
-        if (Error::notOK(aError)) {
-          LOG(LOG_ERR, "Failed to set WLED device state: %s", aError->text());
-        } else {
-          LOG(LOG_DEBUG, "WLED device state set successfully");
-        }
-        mSettingState = false;
-        if (aDoneCB) {
-          aDoneCB();
-        }
-        mDimmerLightBehaviour->brightnessApplied();
-      });
+      if (Error::notOK(aError)) LOG(LOG_ERR, "Failed to set WLED state: %s", aError->text());
+      mSettingState = false;
+      mDimmerLightBehaviour->brightnessApplied();
+      if (aDoneCB) aDoneCB();
+    });
     return;
   }
-  if (aDoneCB) {
-    aDoneCB();
-  }
+
+  mSettingState = false;
+  if (aDoneCB) aDoneCB();
 }
 
 
@@ -439,69 +503,74 @@ void WledDevice::handleStateResponse(JsonObjectPtr aState, ErrorPtr aError)
 
 void WledDevice::updateState(JsonObjectPtr aStateResponse)
 {
-  if (!aStateResponse || !mColorLightBehaviour || !mDimmerLightBehaviour) return;
+  if (!aStateResponse) return;
 
   LOG(LOG_DEBUG, "WLED device updateState");
 
-  JsonObjectPtr o;
+  // state can be wrapped in a "state" key or be at top level
   JsonObjectPtr state = aStateResponse->get("state");
-  if (!state) {
-    state = aStateResponse; // Sometimes state is at top level
-  }
+  if (!state) state = aStateResponse;
 
   updatePresenceState(true);
+
   LightBehaviourPtr l = getOutput<LightBehaviour>();
-    if (l) {
-      // on with brightness or off
-      o = state->get("on");
-      if (o && o->boolValue()) {
-        // lamp is on, get brightness
-        mCurrentlyOn = yes;
-        o = state->get("bri");
-        if (o) {
-          double hb = o->int32Value(); // hue brightness from 0..255
-          if (hb<1) hb=0;
-          l->syncBrightnessFromHardware(hb, false); // only sync if no new value pending already
+  if (!l) return;
+
+  // on/off and global brightness (0-255 → 0-100)
+  JsonObjectPtr o = state->get("on");
+  if (o && o->boolValue()) {
+    mCurrentlyOn = yes;
+    o = state->get("bri");
+    if (o) {
+      double hb = o->int32Value() / 255.0 * 100.0;
+      l->syncBrightnessFromHardware(hb, false);
+    }
+  }
+  else {
+    mCurrentlyOn = o ? no : undefined;
+    l->syncBrightnessFromHardware(0, false);
+  }
+
+  ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(l);
+  if (cl) {
+    auto segObj = state->get("seg");
+    auto firstSeg = segObj ? segObj->arrayGet(0) : JsonObjectPtr();
+    if (firstSeg) {
+      auto colArray = firstSeg->get("col");
+      auto color0 = colArray ? colArray->arrayGet(0) : JsonObjectPtr();
+      auto cctObj = firstSeg->get("cct");
+
+      if (!mHasRgb && !mHasRgbw && mHasCct) {
+        // CCT-only device: read cct field (0=warm/500mired, 255=cold/153mired)
+        cl->mColorMode = colorLightModeCt;
+        if (cctObj) {
+          double wledCct = cctObj->int32Value();
+          double mired = 500.0 - (wledCct / 255.0) * (500.0 - 153.0);
+          cl->mCt->syncChannelValue(mired);
         }
       }
-      else {
-        mCurrentlyOn = o ? no : undefined; // if no "on" field was included, consider undefined
-        l->syncBrightnessFromHardware(0); // off
-      }
-      ColorLightBehaviourPtr cl = boost::dynamic_pointer_cast<ColorLightBehaviour>(l);
-      if (cl) {
-        // color information
-        auto segObj = state->get("seg");
-        auto firstSeg = segObj ? segObj->arrayGet(0) : JsonObjectPtr();
-        auto colArray = firstSeg ? firstSeg->get("col") : JsonObjectPtr();
-        auto color0 = colArray ? colArray->arrayGet(0) : JsonObjectPtr();
-        if (color0) {
-          string mode = "hs"; // default mode
-          if (mode == "hs") {
-            cl->mColorMode = colorLightModeHueSaturation;
-            auto redVal = color0->get("0")->int32Value();
-            auto greenVal = color0->get("1")->int32Value();
-            auto blueVal = color0->get("2")->int32Value();
-            auto brightnessVal = firstSeg->get("bri")->int32Value();
-            cl->mBrightness->syncChannelValue((brightnessVal)/255.0*100.0);
-            // convert RGB to HSV
-            double hueVal, satVal, valVal;
-            rgbToHsv(redVal, greenVal, blueVal,
-                     /*out*/hueVal, /*out*/satVal, /*out*/valVal);
-            cl->mHue->syncChannelValue(hueVal);
-            cl->mSaturation->syncChannelValue(satVal);
-          }
-          else if (mode=="ct") {
-            cl->mColorMode = colorLightModeCt;
-            o = firstSeg->get("cct");
-            if (o) cl->mCt->syncChannelValue(o->int32Value());
-          }
-          else {
-            cl->mColorMode = colorLightModeNone;
-          }
+      else if (color0) {
+        // RGB device: col[0] is [R,G,B] array
+        JsonObjectPtr r0 = color0->arrayGet(0);
+        JsonObjectPtr g0 = color0->arrayGet(1);
+        JsonObjectPtr b0 = color0->arrayGet(2);
+        uint8_t r = r0 ? (uint8_t)r0->int32Value() : 0;
+        uint8_t g = g0 ? (uint8_t)g0->int32Value() : 0;
+        uint8_t b = b0 ? (uint8_t)b0->int32Value() : 0;
+        cl->mColorMode = colorLightModeHueSaturation;
+        double hueVal, satVal, valVal;
+        rgbToHsv(r, g, b, hueVal, satVal, valVal);
+        cl->mHue->syncChannelValue(hueVal);
+        cl->mSaturation->syncChannelValue(satVal);
+        // Also sync CCT if device supports it
+        if (mHasCct && cctObj) {
+          double wledCct = cctObj->int32Value();
+          double mired = 500.0 - (wledCct / 255.0) * (500.0 - 153.0);
+          cl->mCt->syncChannelValue(mired);
         }
-      } // color
-    } // light
+      }
+    }
+  }
 }
 
 
@@ -558,5 +627,166 @@ void WledDevice::presenceStateReceived(PresenceCB aPresenceResultHandler, JsonOb
     return;
   }
 }
+
+
+#if ENABLE_JSON_WEBSOCKET
+
+void WledDevice::enableWebsocket(bool aEnable)
+{
+  LOG(LOG_DEBUG, "WledDevice enableWebsocket: %d", aEnable);
+  
+  if (aEnable == mWebsocketEnabled) {
+    return; // No change needed
+  }
+  
+  mWebsocketEnabled = aEnable;
+  
+  if (aEnable) {
+    // Enable WebSocket for this device
+    LOG(LOG_INFO, "Enabling WebSocket for device: %s", mDeviceName.c_str());
+    websocketConnect();
+  } else {
+    // Disable WebSocket
+    LOG(LOG_INFO, "Disabling WebSocket for device: %s", mDeviceName.c_str());
+    websocketDisconnect();
+  }
+  
+  updatePollingFrequency();
+}
+
+
+bool WledDevice::isWebsocketConnected() const
+{
+  // Query actual WebSocket connection status from WledComm
+  if (!mWebsocketEnabled) {
+    return false; // Not enabled = not connected
+  }
+  
+  // Return actual connection status from WledComm's WebSocket client
+  return mVdc.mWledComm.isWebsocketConnected();
+}
+
+
+void WledDevice::websocketConnect()
+{
+  if (!mWebsocketEnabled) {
+    LOG(LOG_WARNING, "WebSocket not enabled for device: %s", mDeviceName.c_str());
+    return;
+  }
+  
+  LOG(LOG_DEBUG, "Requesting WebSocket connection for device: %s", mDeviceName.c_str());
+  
+  // Register update callback and request connection from WledComm
+  #if ENABLE_JSON_WEBSOCKET
+  mVdc.mWledComm.setWebsocketUpdateCallback(
+    boost::bind(&WledDevice::onWebsocketUpdate, this, _1, _2)
+  );
+  
+  mVdc.mWledComm.websocketConnect(
+    boost::bind(&WledDevice::onWebsocketStatus, this, _1, _2)
+  );
+  #endif
+  
+  updatePollingFrequency();
+}
+
+
+void WledDevice::websocketDisconnect()
+{
+  LOG(LOG_DEBUG, "Requesting WebSocket disconnection for device: %s", mDeviceName.c_str());
+  
+  #if ENABLE_JSON_WEBSOCKET
+  mVdc.mWledComm.websocketDisconnect();
+  #endif
+  
+  updatePollingFrequency();
+}
+
+
+void WledDevice::updatePollingFrequency()
+{
+  if (!mWebsocketEnabled) {
+    LOG(LOG_DEBUG, "Polling frequency for device: %s (WebSocket disabled, using normal polling)", 
+      mDeviceName.c_str());
+    return;
+  }
+  
+  bool connected = isWebsocketConnected();
+  
+  LOG(LOG_DEBUG, "Polling frequency for device: %s (WebSocket: %s)", 
+    mDeviceName.c_str(), connected ? "connected, using reduced polling" : "disconnected, using normal polling");
+  
+  // Current implementation logs polling status and stores desired interval in member variables
+  // These intervals can be used by future implementations to:
+  // 1. Dynamically adjust VDC-level polling frequency based on device status
+  // 2. Implement device-specific polling strategies
+  // 3. Track polling statistics per device
+  
+  // When WebSocket connected: mReducedPollInterval (60 seconds)
+  // When WebSocket disconnected: mNormalPollInterval (10 seconds)
+  // Future Phase 4+ enhancements:
+  // - Pass polling preference to VDC container
+  // - Implement adaptive polling based on aggregated device status
+  // - Add per-device polling adjustments to VDC periodic collection
+}
+
+
+void WledDevice::onWebsocketUpdate(JsonObjectPtr aState, ErrorPtr aError)
+{
+  if (Error::notOK(aError)) {
+    LOG(LOG_ERR, "WebSocket update error for device %s: %s", 
+      mDeviceName.c_str(), aError->text());
+    mWebsocketUpdatePending = false;
+    return;
+  }
+  
+  if (!aState) {
+    LOG(LOG_WARNING, "Empty state received via WebSocket for device: %s", mDeviceName.c_str());
+    mWebsocketUpdatePending = false;
+    return;
+  }
+  
+  // Prevent feedback loops while we're setting state
+  if (mSettingState) {
+    LOG(LOG_DEBUG, "Ignoring WebSocket update while setting state on device: %s", mDeviceName.c_str());
+    mWebsocketUpdatePending = false;
+    return;
+  }
+  
+  // Check for duplicate updates
+  if (mWebsocketUpdatePending) {
+    LOG(LOG_DEBUG, "WebSocket update already pending for device: %s", mDeviceName.c_str());
+    return;
+  }
+  
+  mWebsocketUpdatePending = true;
+  
+  LOG(LOG_DEBUG, "Processing WebSocket state update for device: %s - %s", 
+    mDeviceName.c_str(), aState->json_str().c_str());
+  
+  // Update device state from WebSocket message
+  updateState(aState);
+  
+  mWebsocketUpdatePending = false;
+}
+
+
+void WledDevice::onWebsocketStatus(bool aConnected, ErrorPtr aError)
+{
+  if (Error::notOK(aError)) {
+    LOG(LOG_ERR, "WebSocket status error for device %s: %s", 
+      mDeviceName.c_str(), aError->text());
+    updatePollingFrequency();
+    return;
+  }
+  
+  LOG(LOG_INFO, "WebSocket status changed for device %s: %s", 
+    mDeviceName.c_str(), aConnected ? "connected" : "disconnected");
+  
+  // Optimize polling based on WebSocket connection status
+  updatePollingFrequency();
+}
+
+#endif // ENABLE_JSON_WEBSOCKET
 
 #endif // ENABLE_WLED

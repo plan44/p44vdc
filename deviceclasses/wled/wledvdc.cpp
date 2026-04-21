@@ -111,11 +111,8 @@ void WledVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   LOG(LOG_DEBUG, "Setting up periodic WLED device recollection");
   setPeriodicRecollection(30*Second, rescanmode_incremental);
 
-  // Get stored device hostname/IP from DB or config
-  // TODO: Load from persistent config
-
-  // Initialize connection to WLED device
-  initializeConnection(aCompletedCB);
+  // signal ready — device collection happens via scanForDevices()
+  if (aCompletedCB) aCompletedCB(ErrorPtr());
 }
 
 
@@ -128,11 +125,11 @@ void WledVdc::initializeConnection(StatusCB aCompletedCB)
     return;
   }
 
-  // Set up device URL (assuming http on port 80)
-  string deviceURL = string_format("http://%s/json", mDeviceHostname.c_str());
+  // Base URL is just http://hostname — queueApiCall() appends /json/<path>
+  string deviceURL = string_format("http://%s", mDeviceHostname.c_str());
   mWledComm.setDeviceURL(deviceURL);
 
-  // Query device info to verify connection
+  // Query device info to verify connection and create device object
   mWledComm.getInfo(boost::bind(&WledVdc::handleInfoResponse, this, _1, _2, aCompletedCB));
 }
 
@@ -178,12 +175,9 @@ void WledVdc::createOrUpdateDevice(JsonObjectPtr aInfo, StatusCB aCompletedCB)
     uniqueId = macObj->stringValue();
   }
 
-  // For now, create a single device per VDC
-  // Find or create device
   WledDevicePtr device;
-
   for (auto &entry : mWledDevices) {
-    if (entry.second) {
+    if (entry.first == uniqueId) {
       device = entry.second;
       break;
     }
@@ -232,11 +226,32 @@ void WledVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   LOG(LOG_INFO, "WLED VDC scanning for devices");
 
+  if (!(aRescanFlags & rescanmode_incremental)) {
+    // full collect — remove existing devices
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
+    mWledDevices.clear();
+  }
+
+  // Load stored device hostname from DB
+  SQLiteTGQuery qry(mDb);
+  if (Error::isOK(qry.prefixedPrepare("SELECT wledDeviceURL, wledDeviceHostname FROM $PREFIX_globs"))) {
+    sqlite3pp::query::iterator i = qry.begin();
+    if (i != qry.end()) {
+      mDeviceURL = nonNullCStr(i->get<const char*>(0));
+      mDeviceHostname = nonNullCStr(i->get<const char*>(1));
+    }
+  }
+  LOG(LOG_INFO, "WLED stored hostname='%s'", mDeviceHostname.c_str());
+
   // If auto-discovery is enabled and no specific device configured, discover devices
   if (mAutoDiscovery && mDeviceHostname.empty()) {
     performDiscovery(aCompletedCB);
   } else if (!mDeviceHostname.empty()) {
-    // TODO: scan list of ip's from command line
+    // Ensure the comm layer has the device URL — it may not be set on a fresh start
+    // where the hostname was loaded from DB but initializeConnection() was never called.
+    if (mWledComm.getDeviceURL().empty()) {
+      mWledComm.setDeviceURL(string_format("http://%s", mDeviceHostname.c_str()));
+    }
     performScan(aCompletedCB);
   } else {
     // Neither discovery enabled nor device configured
@@ -286,7 +301,11 @@ ErrorPtr WledVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod,
     mDeviceHostname = hostname->stringValue();
     LOG(LOG_INFO, "WLED device hostname set to: %s", mDeviceHostname.c_str());
 
-    // Re-initialize connection
+    // Persist to database
+    mDb.prefixedExecute("UPDATE $PREFIX_globs SET wledDeviceHostname='%q'",
+      mDeviceHostname.c_str());
+
+    // Re-initialize connection to the new device
     initializeConnection(NULL);
 
     return ErrorPtr();
@@ -331,16 +350,20 @@ bool WledVdc::handleDiscoveryHandler(ErrorPtr aError, DnsSdServiceInfoPtr aServi
   }
 
   if (aServiceInfo) {
-    // Build device URL from service info
+    // Base URL: http://hostname — queueApiCall() will append /json/<path>
     string deviceURL = string_format("http://%s", aServiceInfo->hostaddress.c_str());
     LOG(LOG_INFO, "Discovered WLED device at %s", deviceURL.c_str());
-    
-    // Set device URL and fetch full device info via API
+
+    // Persist the discovered hostname so we reconnect after restart
+    mDeviceHostname = aServiceInfo->hostaddress;
+    mDb.prefixedExecute("UPDATE $PREFIX_globs SET wledDeviceHostname='%q'",
+      mDeviceHostname.c_str());
+
     mWledComm.setDeviceURL(deviceURL);
     mWledComm.getInfo(boost::bind(&WledVdc::collectedLightsHandler, this, _1, _2));
   }
 
-  return true; // continue browsing for more devices
+  return false; // stop browsing for more devices, we support only one device per VDC for now
 }
 
 

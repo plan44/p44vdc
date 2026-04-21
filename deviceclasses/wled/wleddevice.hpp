@@ -30,6 +30,10 @@
 #include "colorlightbehaviour.hpp"
 #include "jsonobject.hpp"
 
+#if ENABLE_JSON_WEBSOCKET
+#include "jsonwebsocketclient.hpp"
+#endif
+
 using namespace std;
 
 namespace p44 {
@@ -65,8 +69,14 @@ namespace p44 {
     /// identify the device (e.g., blink or light up)
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
 
+    /// initialize device, query current state from hardware
+    virtual void initializeDevice(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
+
     /// apply channel values
     virtual void applyChannelValues(SimpleCB aDoneCB, bool aForDimming) P44_OVERRIDE;
+
+    /// sync channel values from hardware (called before scene save)
+    virtual void syncChannelValues(SimpleCB aDoneCB) P44_OVERRIDE;
 
     /// handle vdc-level method calls
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
@@ -102,6 +112,10 @@ namespace p44 {
     // internal state
     Tristate mCurrentlyOn; ///< current "on" status
     uint8_t mLastSentBri; ///< last sent "bri", 0=undefined
+    
+    #if ENABLE_JSON_WEBSOCKET
+    bool mWebsocketUpdatePending;     ///< flag to prevent duplicate state processing
+    #endif
 
   private:
 
@@ -117,6 +131,12 @@ namespace p44 {
     /// handle state response from device
     void handleStateResponse(JsonObjectPtr aState, ErrorPtr aError);
 
+    /// handler for initializeDevice() state response
+    void deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, JsonObjectPtr aState, ErrorPtr aError);
+
+    /// handler for syncChannelValues() state response
+    void channelValuesReceived(SimpleCB aDoneCB, JsonObjectPtr aState, ErrorPtr aError);
+
     /// convert WLED RGB color to HSV
     static void rgbToHsv(uint8_t aRed, uint8_t aGreen, uint8_t aBlue,
                          double &aHue, double &aSaturation, double &aValue);
@@ -130,6 +150,42 @@ namespace p44 {
 
     /// build WLED state update from channel values
     JsonObjectPtr buildStateUpdate();
+
+    #if ENABLE_JSON_WEBSOCKET
+    
+    /// WebSocket state update callback - receives state changes from WebSocket
+    void onWebsocketUpdate(JsonObjectPtr aState, ErrorPtr aError);
+    
+    /// WebSocket connection status callback
+    void onWebsocketStatus(bool aConnected, ErrorPtr aError);
+    
+    /// Enable/disable WebSocket for this device
+    void enableWebsocket(bool aEnable);
+    
+    /// Get WebSocket enabled state
+    bool isWebsocketEnabled() const { return mWebsocketEnabled; }
+    
+    /// Get WebSocket connection state
+    bool isWebsocketConnected() const;
+    
+    /// Request WebSocket connection
+    void websocketConnect();
+    
+    /// Request WebSocket disconnection
+    void websocketDisconnect();
+    
+    /// Update polling frequency based on WebSocket status
+    void updatePollingFrequency();
+    
+    // WebSocket members
+  private:
+    
+    bool mWebsocketEnabled;           ///< WebSocket feature enabled for this device
+    MLMicroSeconds mNormalPollInterval;    ///< Normal polling interval (when WebSocket not active)
+    MLMicroSeconds mReducedPollInterval;   ///< Reduced polling interval (when WebSocket active)
+    
+    #endif // ENABLE_JSON_WEBSOCKET
+    
   };
 
 } // namespace p44

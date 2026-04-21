@@ -19,6 +19,15 @@ WLED_HEADERS = \
   wledvdc.hpp \
   wleddevice.hpp
 
+# WebSocket support (optional)
+if ENABLE_JSON_WEBSOCKET
+WLED_SOURCES += \
+  wledwebsocket.cpp
+
+WLED_HEADERS += \
+  wledwebsocket.hpp
+endif
+
 # Conditionally add to main build
 vdc_sources += $(addprefix deviceclasses/wled/, $(WLED_SOURCES))
 nobase_include_HEADERS += $(addprefix deviceclasses/wled/, $(WLED_HEADERS))
