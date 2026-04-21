@@ -29,10 +29,7 @@
 
 #include "colorlightbehaviour.hpp"
 #include "jsonobject.hpp"
-
-#if ENABLE_JSON_WEBSOCKET
-#include "jsonwebsocketclient.hpp"
-#endif
+#include "wledcomm.hpp"
 
 using namespace std;
 
@@ -51,7 +48,10 @@ namespace p44 {
 
   public:
 
-    WledDevice(WledVdc *aVdcP, JsonObjectPtr aDeviceInfo);
+    /// @param aVdcP  parent VDC
+    /// @param aHostname  hostname or IP address of the WLED device
+    /// @param aDeviceInfo  /json/info response from the device
+    WledDevice(WledVdc *aVdcP, const string &aHostname, JsonObjectPtr aDeviceInfo);
     virtual ~WledDevice();
 
     /// set the log level offset on this logging object
@@ -87,6 +87,7 @@ namespace p44 {
   protected:
 
     WledVdc &mVdc;                    ///< reference to parent VDC
+    WledComm mComm;                   ///< per-device communication layer
 
     /// device information
     string mDeviceName;               ///< user friendly device name
@@ -112,7 +113,7 @@ namespace p44 {
     // internal state
     Tristate mCurrentlyOn; ///< current "on" status
     uint8_t mLastSentBri; ///< last sent "bri", 0=undefined
-    
+
     #if ENABLE_JSON_WEBSOCKET
     bool mWebsocketUpdatePending;     ///< flag to prevent duplicate state processing
     #endif
@@ -152,40 +153,40 @@ namespace p44 {
     JsonObjectPtr buildStateUpdate();
 
     #if ENABLE_JSON_WEBSOCKET
-    
+
     /// WebSocket state update callback - receives state changes from WebSocket
     void onWebsocketUpdate(JsonObjectPtr aState, ErrorPtr aError);
-    
+
     /// WebSocket connection status callback
     void onWebsocketStatus(bool aConnected, ErrorPtr aError);
-    
+
     /// Enable/disable WebSocket for this device
     void enableWebsocket(bool aEnable);
-    
+
     /// Get WebSocket enabled state
     bool isWebsocketEnabled() const { return mWebsocketEnabled; }
-    
+
     /// Get WebSocket connection state
     bool isWebsocketConnected() const;
-    
+
     /// Request WebSocket connection
     void websocketConnect();
-    
+
     /// Request WebSocket disconnection
     void websocketDisconnect();
-    
+
     /// Update polling frequency based on WebSocket status
     void updatePollingFrequency();
-    
+
     // WebSocket members
   private:
-    
+
     bool mWebsocketEnabled;           ///< WebSocket feature enabled for this device
     MLMicroSeconds mNormalPollInterval;    ///< Normal polling interval (when WebSocket not active)
     MLMicroSeconds mReducedPollInterval;   ///< Reduced polling interval (when WebSocket active)
-    
+
     #endif // ENABLE_JSON_WEBSOCKET
-    
+
   };
 
 } // namespace p44

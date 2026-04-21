@@ -25,7 +25,7 @@
 
 #if ENABLE_WLED
 
-#define WLED_DB_VERSION 1
+#define WLED_DB_VERSION 2
 
 using namespace p44;
 
@@ -37,15 +37,27 @@ string WledPersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
   string sql;
 
   if (aFromVersion < 1) {
-    // create table group from scratch
-    // - use standard globs table for schema version
+    // Initial schema — create globs table and add legacy single-device columns
     sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
-    // - add fields to globs table
     sql.append(
       "ALTER TABLE $PREFIX_globs ADD wledDeviceURL TEXT;"
       "ALTER TABLE $PREFIX_globs ADD wledDeviceHostname TEXT;"
     );
     aToVersion = 1;
+  }
+
+  if (aFromVersion == 1) {
+    // Version 2: per-device table for multi-device support.
+    // Also migrates any existing single-device hostname from the globs table.
+    sql.append(
+      "CREATE TABLE $PREFIX_wledDevices (mac TEXT NOT NULL PRIMARY KEY, hostname TEXT NOT NULL);"
+      // Copy old single-device hostname, using hostname as MAC placeholder (will be
+      // replaced with real MAC on first successful connection).
+      "INSERT OR IGNORE INTO $PREFIX_wledDevices (mac, hostname)"
+      "  SELECT wledDeviceHostname, wledDeviceHostname FROM $PREFIX_globs"
+      "  WHERE wledDeviceHostname IS NOT NULL AND wledDeviceHostname != '';"
+    );
+    aToVersion = 2;
   }
 
   return sql;
@@ -59,29 +71,17 @@ WledVdc::WledVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   mAutoDiscovery(true)
 {
   LOG(LOG_DEBUG, "WledVdc constructor: instance %d, tag %d", aInstanceNumber, aTag);
-  mWledComm.isMemberVariable();
 }
 
 
 WledVdc::~WledVdc()
 {
-  // Destructor
 }
 
 
 void WledVdc::setLogLevelOffset(int aLogLevelOffset)
 {
-  mWledComm.setLogLevelOffset(aLogLevelOffset);
   inherited::setLogLevelOffset(aLogLevelOffset);
-}
-
-
-P44LoggingObj* WledVdc::getTopicLogObject(const string aTopic)
-{
-  if (uequals(aTopic, "wledcomm")) {
-    return &mWledComm;
-  }
-  return inherited::getTopicLogObject(aTopic);
 }
 
 
@@ -95,11 +95,8 @@ void WledVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   LOG(LOG_NOTICE, ">>> WLED VDC initialize() called (instance %d)", getInstanceNumber());
 
-  // Load persistent params
   load();
 
-  // Initialize database
-  LOG(LOG_DEBUG, "Initializing WLED persistence...");
   ErrorPtr err = initializePersistence(mDb, WLED_DB_VERSION, 1);
   if (Error::notOK(err)) {
     LOG(LOG_ERR, "Failed to initialize WLED database: %s", err->text());
@@ -107,214 +104,170 @@ void WledVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
     return;
   }
 
-  // Setup periodic device recollection
-  LOG(LOG_DEBUG, "Setting up periodic WLED device recollection");
   setPeriodicRecollection(30*Second, rescanmode_incremental);
 
-  // signal ready — device collection happens via scanForDevices()
   if (aCompletedCB) aCompletedCB(ErrorPtr());
 }
 
 
-void WledVdc::initializeConnection(StatusCB aCompletedCB)
+void WledVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
-  if (mDeviceHostname.empty()) {
-    // No device configured yet
-    LOG(LOG_INFO, "No WLED device hostname configured");
-    if (aCompletedCB) aCompletedCB(ErrorPtr());
-    return;
-  }
+  LOG(LOG_INFO, "WLED VDC scanning for devices (flags=0x%x)", aRescanFlags);
 
-  // Base URL is just http://hostname — queueApiCall() appends /json/<path>
-  string deviceURL = string_format("http://%s", mDeviceHostname.c_str());
-  mWledComm.setDeviceURL(deviceURL);
-
-  // Query device info to verify connection and create device object
-  mWledComm.getInfo(boost::bind(&WledVdc::handleInfoResponse, this, _1, _2, aCompletedCB));
-}
-
-
-void WledVdc::handleInfoResponse(JsonObjectPtr aInfo, ErrorPtr aError, StatusCB aCompletedCB)
-{
-  if (Error::notOK(aError)) {
-    LOG(LOG_ERR, "Failed to get WLED device info: %s", aError->text());
-    if (aCompletedCB) aCompletedCB(aError);
-    return;
-  }
-
-  if (!aInfo) {
-    if (aCompletedCB) aCompletedCB(Error::err<WledCommError>(WledCommError::InvalidResponse));
-    return;
-  }
-
-  LOG(LOG_INFO, "WLED device info retrieved successfully");
-
-  // Create or update device
-  createOrUpdateDevice(aInfo, aCompletedCB);
-}
-
-
-void WledVdc::createOrUpdateDevice(JsonObjectPtr aInfo, StatusCB aCompletedCB)
-{
-  if (!aInfo) {
-    if (aCompletedCB) aCompletedCB(ErrorPtr());
-    return;
-  }
-
-  // Check if device already exists
-  string deviceName = "WLED Device";
-  string uniqueId = "";
-  
-  JsonObjectPtr nameObj = aInfo->get("name");
-  if (nameObj) {
-    deviceName = nameObj->stringValue();
-  }
-  
-  JsonObjectPtr macObj = aInfo->get("mac");
-  if (macObj) {
-    uniqueId = macObj->stringValue();
-  }
-
-  WledDevicePtr device;
-  for (auto &entry : mWledDevices) {
-    if (entry.first == uniqueId) {
-      device = entry.second;
-      break;
+  if (!(aRescanFlags & rescanmode_incremental)) {
+    removeDevices(aRescanFlags & rescanmode_clearsettings);
+    mWledDevices.clear();
+    if (aRescanFlags & rescanmode_clearsettings) {
+      mDb.prefixedExecute("DELETE FROM $PREFIX_wledDevices");
     }
   }
 
-  if (!device) {
-    // Create new device
-    device = new WledDevice(this, aInfo);
-    mWledDevices[uniqueId] = device;
-    simpleIdentifyAndAddDevice(device);
-    LOG(LOG_INFO, "WLED device created: %s", deviceName.c_str());
-  } else {
-    // Update existing device
-    device->updateInfo(aInfo);
-    LOG(LOG_INFO, "WLED device updated: %s", deviceName.c_str());
+  // Load all known (mac, hostname) pairs from DB
+  typedef vector<pair<string,string>> DeviceList;
+  auto knownDevices = std::make_shared<DeviceList>();
+
+  SQLiteTGQuery qry(mDb);
+  if (Error::isOK(qry.prefixedPrepare("SELECT mac, hostname FROM $PREFIX_wledDevices"))) {
+    for (sqlite3pp::query::iterator i = qry.begin(); i != qry.end(); ++i) {
+      string mac      = nonNullCStr(i->get<const char*>(0));
+      string hostname = nonNullCStr(i->get<const char*>(1));
+      if (!hostname.empty()) {
+        knownDevices->push_back({mac, hostname});
+      }
+    }
+  }
+  LOG(LOG_INFO, "WLED: %zu known device(s) in DB", knownDevices->size());
+
+  if (knownDevices->empty()) {
+    // No stored devices — run discovery if enabled
+    if (mAutoDiscovery) {
+      performDiscovery(aCompletedCB);
+    } else {
+      if (aCompletedCB) aCompletedCB(ErrorPtr());
+    }
+    return;
   }
 
-  if (aCompletedCB) aCompletedCB(ErrorPtr());
+  // Reconnect all known devices; use a shared countdown to call aCompletedCB when all done.
+  auto countdown = std::make_shared<int>((int)knownDevices->size());
+  for (auto &kv : *knownDevices) {
+    string hostname = kv.second;
+    connectToDevice(hostname, [this, aCompletedCB, countdown, aRescanFlags](ErrorPtr err) {
+      if (--(*countdown) == 0) {
+        // After all known devices reconnected, optionally also discover new ones
+        if ((aRescanFlags & rescanmode_exhaustive) && mAutoDiscovery) {
+          performDiscovery(aCompletedCB);
+        } else {
+          if (aCompletedCB) aCompletedCB(ErrorPtr());
+        }
+      }
+    });
+  }
+}
+
+
+void WledVdc::connectToDevice(const string &aHostname, StatusCB aCompletedCB)
+{
+  LOG(LOG_INFO, "WLED: connecting to device at '%s'", aHostname.c_str());
+
+  // Create a temporary WledComm just for the discovery query.
+  // The WledComm shared_ptr is captured in the lambda and lives until the callback fires.
+  WledCommPtr comm = new WledComm();
+  comm->setDeviceURL(string_format("http://%s", aHostname.c_str()));
+
+  comm->getInfo([this, aHostname, comm, aCompletedCB](JsonObjectPtr aInfo, ErrorPtr aError) {
+    if (Error::notOK(aError) || !aInfo) {
+      LOG(LOG_WARNING, "WLED: cannot reach device at '%s': %s",
+          aHostname.c_str(), aError ? aError->text() : "no info");
+      if (aCompletedCB) aCompletedCB(aError ? aError : Error::err<WledCommError>(WledCommError::NoDeviceInfo));
+      return;
+    }
+
+    // Extract MAC address as unique device key
+    string mac;
+    JsonObjectPtr macObj = aInfo->get("mac");
+    if (macObj) mac = macObj->stringValue();
+    if (mac.empty()) mac = aHostname; // fallback: use hostname as key
+
+    // Persist the mapping — remove any placeholder row first (where mac == hostname),
+    // then insert/replace the real entry
+    mDb.prefixedExecute(
+      "DELETE FROM $PREFIX_wledDevices WHERE mac = hostname AND hostname = '%q'",
+      aHostname.c_str()
+    );
+    mDb.prefixedExecute(
+      "INSERT OR REPLACE INTO $PREFIX_wledDevices (mac, hostname) VALUES ('%q', '%q')",
+      mac.c_str(), aHostname.c_str()
+    );
+
+    // Create or update WledDevice
+    auto it = mWledDevices.find(mac);
+    if (it != mWledDevices.end()) {
+      it->second->updateInfo(aInfo);
+      LOG(LOG_INFO, "WLED: updated existing device mac=%s at %s", mac.c_str(), aHostname.c_str());
+    } else {
+      WledDevicePtr device = new WledDevice(this, aHostname, aInfo);
+      mWledDevices[mac] = device;
+      simpleIdentifyAndAddDevice(device);
+      JsonObjectPtr n = aInfo->get("name");
+      if (n) device->initializeName(n->stringValue());
+      LOG(LOG_INFO, "WLED: added new device mac=%s at %s", mac.c_str(), aHostname.c_str());
+    }
+
+    if (aCompletedCB) aCompletedCB(ErrorPtr());
+  });
 }
 
 
 string WledVdc::hardwareGUID()
 {
-  string guid = string_format("wled_%d", getInstanceNumber());
-  return guid;
+  return string_format("wled_%d", getInstanceNumber());
 }
 
 
 bool WledVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
-  if (getIcon("vdc_wled", aIcon, aWithData, aResolutionPrefix)) {
-    return true;
-  }
+  if (getIcon("vdc_wled", aIcon, aWithData, aResolutionPrefix)) return true;
   return inherited::getDeviceIcon(aIcon, aWithData, aResolutionPrefix);
 }
 
 
 string WledVdc::getExtraInfo()
 {
-  string info = string_format("wled: %s", mDeviceHostname.c_str());
-  return info;
-}
-
-
-void WledVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
-{
-  LOG(LOG_INFO, "WLED VDC scanning for devices");
-
-  if (!(aRescanFlags & rescanmode_incremental)) {
-    // full collect — remove existing devices
-    removeDevices(aRescanFlags & rescanmode_clearsettings);
-    mWledDevices.clear();
-  }
-
-  // Load stored device hostname from DB
-  SQLiteTGQuery qry(mDb);
-  if (Error::isOK(qry.prefixedPrepare("SELECT wledDeviceURL, wledDeviceHostname FROM $PREFIX_globs"))) {
-    sqlite3pp::query::iterator i = qry.begin();
-    if (i != qry.end()) {
-      mDeviceURL = nonNullCStr(i->get<const char*>(0));
-      mDeviceHostname = nonNullCStr(i->get<const char*>(1));
-    }
-  }
-  LOG(LOG_INFO, "WLED stored hostname='%s'", mDeviceHostname.c_str());
-
-  // If auto-discovery is enabled and no specific device configured, discover devices
-  if (mAutoDiscovery && mDeviceHostname.empty()) {
-    performDiscovery(aCompletedCB);
-  } else if (!mDeviceHostname.empty()) {
-    // Ensure the comm layer has the device URL — it may not be set on a fresh start
-    // where the hostname was loaded from DB but initializeConnection() was never called.
-    if (mWledComm.getDeviceURL().empty()) {
-      mWledComm.setDeviceURL(string_format("http://%s", mDeviceHostname.c_str()));
-    }
-    performScan(aCompletedCB);
-  } else {
-    // Neither discovery enabled nor device configured
-    if (aCompletedCB) aCompletedCB(ErrorPtr());
-  }
-}
-
-
-void WledVdc::performScan(StatusCB aCompletedCB)
-{
-  // Try to get current state from device
-  mWledComm.getInfo(boost::bind(&WledVdc::handleInfoResponse, this, _1, _2, aCompletedCB));
+  return string_format("wled: %zu device(s)", mWledDevices.size());
 }
 
 
 void WledVdc::removeDevice(DevicePtr aDevice, bool aForget)
 {
-  LOG(LOG_INFO, "WLED VDC removing device");
-
-  // Find and remove device from map
   for (auto it = mWledDevices.begin(); it != mWledDevices.end(); ++it) {
     if (it->second == aDevice) {
+      if (aForget) {
+        mDb.prefixedExecute(
+          "DELETE FROM $PREFIX_wledDevices WHERE mac = '%q'",
+          it->first.c_str()
+        );
+      }
       mWledDevices.erase(it);
       break;
     }
   }
-
   inherited::removeDevice(aDevice, aForget);
 }
 
 
 ErrorPtr WledVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
 {
-  ErrorPtr err;
-
   if (uequals(aMethod, "setDeviceHostname")) {
-    // Set the hostname/IP of the WLED device
-    if (!aParams) {
-      return ErrorPtr();
-    }
+    // Manually add/refresh a WLED device by hostname or IP
+    if (!aParams) return ErrorPtr();
+    ApiValuePtr hostnameParam = aParams->get("hostname");
+    if (!hostnameParam) return ErrorPtr();
 
-    ApiValuePtr hostname = aParams->get("hostname");
-    if (!hostname) {
-      return ErrorPtr();
-    }
-
-    mDeviceHostname = hostname->stringValue();
-    LOG(LOG_INFO, "WLED device hostname set to: %s", mDeviceHostname.c_str());
-
-    // Persist to database
-    mDb.prefixedExecute("UPDATE $PREFIX_globs SET wledDeviceHostname='%q'",
-      mDeviceHostname.c_str());
-
-    // Re-initialize connection to the new device
-    initializeConnection(NULL);
-
+    string hostname = hostnameParam->stringValue();
+    LOG(LOG_INFO, "WLED: setDeviceHostname called with '%s'", hostname.c_str());
+    connectToDevice(hostname, NULL); // async, no completion needed
     return ErrorPtr();
-  }
-  else if (uequals(aMethod, "getDeviceInfo")) {
-    // Return current device info
-    ErrorPtr respErr = ErrorPtr();
-    // Could return device info here, but for now just acknowledge the request
-    return respErr;
   }
 
   return inherited::handleMethod(aRequest, aMethod, aParams);
@@ -323,17 +276,16 @@ ErrorPtr WledVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod,
 
 void WledVdc::performDiscovery(StatusCB aCompletedCB)
 {
-  LOG(LOG_INFO, "Starting WLED device discovery");
-
   #if WLED_DNSSD_DISCOVERY
-  LOG(LOG_INFO, "Starting WLED device discovery via DNS-SD");
-  // Browse for _wled._tcp services
-  DnsSdManager::sharedDnsSdManager().browse("_wled._tcp", boost::bind(&WledVdc::handleDiscoveryHandler, this, _1, _2, aCompletedCB));
+  LOG(LOG_INFO, "WLED: starting DNS-SD discovery for _wled._tcp");
+  DnsSdManager::sharedDnsSdManager().browse(
+    "_wled._tcp",
+    boost::bind(&WledVdc::handleDiscoveryHandler, this, _1, _2, aCompletedCB)
+  );
   #else
   LOG(LOG_WARNING, "WLED DNS-SD discovery is disabled");
   if (aCompletedCB) {
-    ErrorPtr error = Error::err<WledCommError>(WledCommError::DeviceNotFound);
-    aCompletedCB(error);
+    aCompletedCB(Error::err<WledCommError>(WledCommError::DeviceNotFound));
   }
   #endif
 }
@@ -343,48 +295,23 @@ bool WledVdc::handleDiscoveryHandler(ErrorPtr aError, DnsSdServiceInfoPtr aServi
 {
   if (Error::notOK(aError)) {
     LOG(LOG_ERR, "WLED discovery error: %s", aError->text());
-    if (aCompletedCB) {
-      aCompletedCB(aError);
-    }
+    if (aCompletedCB) aCompletedCB(aError);
     return false; // stop browsing on error
   }
 
-  if (aServiceInfo) {
-    // Base URL: http://hostname — queueApiCall() will append /json/<path>
-    string deviceURL = string_format("http://%s", aServiceInfo->hostaddress.c_str());
-    LOG(LOG_INFO, "Discovered WLED device at %s", deviceURL.c_str());
+  if (aServiceInfo && !aServiceInfo->disappeared) {
+    string hostname = aServiceInfo->hostaddress;
+    LOG(LOG_INFO, "WLED: DNS-SD found device at '%s'", hostname.c_str());
 
-    // Persist the discovered hostname so we reconnect after restart
-    mDeviceHostname = aServiceInfo->hostaddress;
-    mDb.prefixedExecute("UPDATE $PREFIX_globs SET wledDeviceHostname='%q'",
-      mDeviceHostname.c_str());
-
-    mWledComm.setDeviceURL(deviceURL);
-    mWledComm.getInfo(boost::bind(&WledVdc::collectedLightsHandler, this, _1, _2));
+    connectToDevice(hostname, [this, aCompletedCB](ErrorPtr err) {
+      // Signal aCompletedCB once the first successful device is added.
+      // Browsing continues in parallel (we returned true below), so more devices
+      // may arrive after aCompletedCB fires — that is intentional.
+      if (aCompletedCB) aCompletedCB(ErrorPtr());
+    });
   }
 
-  return false; // stop browsing for more devices, we support only one device per VDC for now
-}
-
-
-void WledVdc::collectedLightsHandler(JsonObjectPtr aResult, ErrorPtr aError)
-{
-  OLOG(LOG_INFO, "wled light = \n%s", aResult ? aResult->c_strValue() : "<none>");
-
-  if (aResult) {
-    string uniqueID;
-    JsonObjectPtr o = aResult->get("deviceId");
-    if (o) uniqueID = o->stringValue();
-
-    // create device now
-    WledDevicePtr newDev = WledDevicePtr(new WledDevice(this, aResult));
-    if (simpleIdentifyAndAddDevice(newDev)) {
-      // actually added, no duplicate, set the name
-      // (otherwise, this is an incremental collect and we knew this light already)
-      JsonObjectPtr n = aResult->get("name");
-      if (n) newDev->initializeName(n->stringValue());
-    }
-  }
+  return true; // continue browsing for additional WLED devices
 }
 
 #endif // ENABLE_WLED

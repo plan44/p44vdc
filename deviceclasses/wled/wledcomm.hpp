@@ -161,7 +161,6 @@ namespace p44 {
   {
     typedef OperationQueue inherited;
     friend class WledApiOperation;
-    friend class WledVdc;
 
   public:
 

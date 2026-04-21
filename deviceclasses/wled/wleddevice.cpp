@@ -103,7 +103,7 @@ void WledDevice::hsvToRgb(double aHue, double aSaturation, double aValue,
 
 // MARK: - WledDevice
 
-WledDevice::WledDevice(WledVdc *aVdcP, JsonObjectPtr aDeviceInfo) :
+WledDevice::WledDevice(WledVdc *aVdcP, const string &aHostname, JsonObjectPtr aDeviceInfo) :
   inherited(aVdcP),
   mVdc(*aVdcP),
   mHasRgb(false),
@@ -118,7 +118,10 @@ WledDevice::WledDevice(WledVdc *aVdcP, JsonObjectPtr aDeviceInfo) :
   mWebsocketUpdatePending(false)
   #endif
 {
-  LOG(LOG_DEBUG, "Creating WLED device: %s", aDeviceInfo->json_str().c_str());
+  mComm.isMemberVariable();
+  mComm.setDeviceURL(string_format("http://%s", aHostname.c_str()));
+
+  LOG(LOG_DEBUG, "Creating WLED device: %s", aDeviceInfo ? aDeviceInfo->json_str().c_str() : "<no info>");
 
   // Get device info from JSON
   if (aDeviceInfo) {
@@ -183,7 +186,7 @@ WledDevice::WledDevice(WledVdc *aVdcP, JsonObjectPtr aDeviceInfo) :
 
   #if ENABLE_JSON_WEBSOCKET
   // Enable WebSocket connection for state updates
-  mVdc.mWledComm.enableWebsocket(true);
+  mComm.enableWebsocket(true);
   enableWebsocket(true);
   #endif
 }
@@ -202,6 +205,7 @@ WledDevice::~WledDevice()
 
 void WledDevice::setLogLevelOffset(int aLogLevelOffset)
 {
+  mComm.setLogLevelOffset(aLogLevelOffset);
   inherited::setLogLevelOffset(aLogLevelOffset);
 }
 
@@ -282,7 +286,7 @@ bool WledDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 void WledDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 {
   #if ENABLE_JSON_WEBSOCKET
-  if (mWebsocketEnabled && mVdc.mWledComm.isWebsocketConnected()) {
+  if (mWebsocketEnabled && mComm.isWebsocketConnected()) {
     // WebSocket is already connected and has already pushed current state — a separate
     // HTTP query would compete for the device's limited TCP connections and is redundant.
     inherited::initializeDevice(aCompletedCB, aFactoryReset);
@@ -290,7 +294,7 @@ void WledDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
   }
   #endif
   // WebSocket not available: fall back to HTTP query for initial state sync
-  mVdc.mWledComm.getState(boost::bind(&WledDevice::deviceStateReceived, this, aCompletedCB, aFactoryReset, _1, _2));
+  mComm.getState(boost::bind(&WledDevice::deviceStateReceived, this, aCompletedCB, aFactoryReset, _1, _2));
 }
 
 
@@ -307,7 +311,7 @@ void WledDevice::deviceStateReceived(StatusCB aCompletedCB, bool aFactoryReset, 
 void WledDevice::syncChannelValues(SimpleCB aDoneCB)
 {
   #if ENABLE_JSON_WEBSOCKET
-  if (mWebsocketEnabled && mVdc.mWledComm.isWebsocketConnected()) {
+  if (mWebsocketEnabled && mComm.isWebsocketConnected()) {
     // WebSocket delivers state in real time — channel values are already current.
     // Skip HTTP query to avoid overloading the device's TCP connection limit.
     inherited::syncChannelValues(aDoneCB);
@@ -315,7 +319,7 @@ void WledDevice::syncChannelValues(SimpleCB aDoneCB)
   }
   #endif
   // WebSocket not available: query current hardware state via HTTP before scene save
-  mVdc.mWledComm.getState(boost::bind(&WledDevice::channelValuesReceived, this, aDoneCB, _1, _2));
+  mComm.getState(boost::bind(&WledDevice::channelValuesReceived, this, aDoneCB, _1, _2));
 }
 
 
@@ -356,7 +360,7 @@ void WledDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     if (wledBri == 0) {
       LOG(LOG_DEBUG, "WLED applyChannelValues: turning off (tt=%lld00ms)", (long long)wledTt);
       onState->add("on", JsonObject::newBool(false));
-      mVdc.mWledComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
+      mComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
         if (Error::notOK(aError)) LOG(LOG_ERR, "Failed to set WLED state: %s", aError->text());
         mSettingState = false;
         mColorLightBehaviour->appliedColorValues();
@@ -440,7 +444,7 @@ void WledDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     segArray->arrayAppend(seg0);
     onState->add("seg", segArray);
 
-    mVdc.mWledComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
+    mComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
       if (Error::notOK(aError)) LOG(LOG_ERR, "Failed to set WLED state: %s", aError->text());
       mSettingState = false;
       mColorLightBehaviour->appliedColorValues();
@@ -461,7 +465,7 @@ void WledDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       onState->add("on", JsonObject::newBool(true));
       onState->add("bri", JsonObject::newInt32(wledBri));
     }
-    mVdc.mWledComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
+    mComm.setState(onState, [this, aDoneCB](JsonObjectPtr aResponse, ErrorPtr aError) {
       if (Error::notOK(aError)) LOG(LOG_ERR, "Failed to set WLED state: %s", aError->text());
       mSettingState = false;
       mDimmerLightBehaviour->brightnessApplied();
@@ -479,7 +483,7 @@ void WledDevice::queryState()
 {
   LOG(LOG_DEBUG, "WLED device queryState");
 
-  mVdc.mWledComm.getState(boost::bind(&WledDevice::handleStateResponse, this, _1, _2));
+  mComm.getState(boost::bind(&WledDevice::handleStateResponse, this, _1, _2));
 }
 
 
@@ -609,7 +613,7 @@ void WledDevice::checkPresence(PresenceCB aPresenceResultHandler)
   LOG(LOG_DEBUG, "WLED device checkPresence");
 
   // query the device
-  mVdc.mWledComm.getNetwork(boost::bind(&WledDevice::presenceStateReceived, this, aPresenceResultHandler, _1, _2));
+  mComm.getNetwork(boost::bind(&WledDevice::presenceStateReceived, this, aPresenceResultHandler, _1, _2));
 }
 
 
@@ -663,7 +667,7 @@ bool WledDevice::isWebsocketConnected() const
   }
   
   // Return actual connection status from WledComm's WebSocket client
-  return mVdc.mWledComm.isWebsocketConnected();
+  return mComm.isWebsocketConnected();
 }
 
 
@@ -678,11 +682,11 @@ void WledDevice::websocketConnect()
   
   // Register update callback and request connection from WledComm
   #if ENABLE_JSON_WEBSOCKET
-  mVdc.mWledComm.setWebsocketUpdateCallback(
+  mComm.setWebsocketUpdateCallback(
     boost::bind(&WledDevice::onWebsocketUpdate, this, _1, _2)
   );
   
-  mVdc.mWledComm.websocketConnect(
+  mComm.websocketConnect(
     boost::bind(&WledDevice::onWebsocketStatus, this, _1, _2)
   );
   #endif
@@ -696,7 +700,7 @@ void WledDevice::websocketDisconnect()
   LOG(LOG_DEBUG, "Requesting WebSocket disconnection for device: %s", mDeviceName.c_str());
   
   #if ENABLE_JSON_WEBSOCKET
-  mVdc.mWledComm.websocketDisconnect();
+  mComm.websocketDisconnect();
   #endif
   
   updatePollingFrequency();

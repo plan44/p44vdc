@@ -58,14 +58,11 @@ namespace p44 {
     friend class WledDevice;
 
     WledPersistence mDb;
-    WledComm mWledComm;
 
     /// @name persistent parameters
     /// @{
 
-    string mDeviceHostname;         ///< hostname or IP of WLED device
-    string mDeviceURL;              ///< cached device URL
-    bool mAutoDiscovery;            ///< enable/disable auto-discovery
+    bool mAutoDiscovery;              ///< enable/disable DNS-SD auto-discovery
 
     /// @}
 
@@ -73,9 +70,9 @@ namespace p44 {
     /// @{
 
     typedef map<string, WledDevicePtr> WledDeviceMap;
-    WledDeviceMap mWledDevices;     ///< map of WLED devices
+    WledDeviceMap mWledDevices;       ///< known devices, keyed by MAC address
 
-    MLTicket mRefreshTicket;        ///< for periodic state refresh
+    MLTicket mRefreshTicket;          ///< for periodic state refresh
 
     /// @}
 
@@ -85,11 +82,7 @@ namespace p44 {
     virtual ~WledVdc();
 
     /// set the log level offset on this logging object (and possibly contained sub-objects)
-    /// @param aLogLevelOffset the new log level offset
     virtual void setLogLevelOffset(int aLogLevelOffset) P44_OVERRIDE;
-
-    /// get logging object for a named topic
-    virtual P44LoggingObj* getTopicLogObject(const string aTopic) P44_OVERRIDE;
 
     /// initialize the device container
     virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
@@ -100,6 +93,9 @@ namespace p44 {
     /// scan for (collect) devices and add them to the vdc
     virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;
 
+    /// rescan modes supported
+    virtual int getRescanModes() const P44_OVERRIDE { return rescanmode_incremental+rescanmode_normal+rescanmode_exhaustive; }
+
     /// remove a device
     void removeDevice(DevicePtr aDevice, bool aForget) P44_OVERRIDE;
 
@@ -107,10 +103,6 @@ namespace p44 {
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// Get icon data or name
-    /// @param aIcon string to put result into
-    /// @param aWithData if set, PNG data is returned, otherwise only name
-    /// @param aResolutionPrefix resolution prefix for icon file name
-    /// @return true if icon could be retrieved
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
 
     /// Get extra info to be displayed for vdc
@@ -119,8 +111,7 @@ namespace p44 {
     /// Get hardware GUID
     virtual string hardwareGUID() P44_OVERRIDE;
 
-        /// @return human readable, language independent suffix to explain vdc functionality.
-    ///   Will be appended to product name to create modelName() for vdcs
+    /// @return human readable, language independent suffix to explain vdc functionality.
     virtual string vdcModelSuffix() const P44_OVERRIDE { return "wled"; }
 
     /// @return human readable model version specific to that vDC
@@ -128,29 +119,17 @@ namespace p44 {
 
   private:
 
-    /// internal method to initialize the connection to WLED device
-    void initializeConnection(StatusCB aCompletedCB);
+    /// Connect to a WLED device by hostname/IP, query its info, create or update the
+    /// WledDevice object and persist the MAC+hostname mapping.
+    /// @param aHostname  IP address or hostname of the WLED device
+    /// @param aCompletedCB  called when done (may be NULL)
+    void connectToDevice(const string &aHostname, StatusCB aCompletedCB);
 
-    /// handle info response
-    void handleInfoResponse(JsonObjectPtr aInfo, ErrorPtr aError, StatusCB aCompletedCB);
-
-    /// create or update a device from WLED info
-    void createOrUpdateDevice(JsonObjectPtr aInfo, StatusCB aCompletedCB);
-
-    /// scan for devices
-    void performScan(StatusCB aCompletedCB);
-
-    /// perform auto-discovery of WLED devices
+    /// perform auto-discovery of WLED devices via DNS-SD
     void performDiscovery(StatusCB aCompletedCB);
 
-    /// handle discovery result
+    /// DNS-SD browse result callback — returns true to continue browsing
     bool handleDiscoveryHandler(ErrorPtr aError, DnsSdServiceInfoPtr aServiceInfo, StatusCB aCompletedCB);
-
-    /// handle collected lights from discovery
-    void collectedLightsHandler(JsonObjectPtr aResult, ErrorPtr aError);
-
-    /// handle device state change
-    void handleDeviceStateChange(WledDevicePtr aDevice, JsonObjectPtr aNewState);
   };
 
 } // namespace p44
