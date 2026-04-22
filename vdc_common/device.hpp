@@ -195,7 +195,7 @@ namespace p44 {
     ///   At the time when the callback is called, the device must have a stable dSUID and internal setup.
     /// @return true can be returned when the device identification/setup is instant. This means that aIdentifyCB is not called, and
     ///   the device is immediately used. When returning true, the device must already have a stable dSUID and internal setup.
-    ///   In a vdc which uses simpleIdentifyAndAddDevice(), returning false will cause the device not be added but immediately deleted. 
+    ///   In a vdc which uses simpleIdentifyAndAddDevice(), returning false will cause the device not be added but immediately deleted.
     /// @note identifyDevice() will only be called on a new Device object during the process of adding a device to a vDC.
     /// @note identifyDevice() MAY NOT perform any action on the (hardware) device that would modify its state. When re-scanning
     ///   for hardware devices, identifyDevice() will often target already known and registered devices. identifyDevice()'s only
@@ -293,7 +293,7 @@ namespace p44 {
     virtual string modelName() P44_OVERRIDE { return "vdSD - virtual device"; }
 
     /// @return unique ID for the functional model of this entity
-    /// @note this is usually created as a hash including the relevant vDC-API visible representation of the device 
+    /// @note this is usually created as a hash including the relevant vDC-API visible representation of the device
     virtual string modelUID() P44_OVERRIDE;
 
     /// device class (for grouping functionally equivalent single devices)
@@ -406,7 +406,7 @@ namespace p44 {
     OutputBehaviourPtr getOutput();
 
     /// get scenes
-    /// @return NULL if device has no scenes, scene device settings otherwise 
+    /// @return NULL if device has no scenes, scene device settings otherwise
     SceneDeviceSettingsPtr getScenes() { return boost::dynamic_pointer_cast<SceneDeviceSettings>(mDeviceSettings); };
 
     /// send a signal needed for some devices to get learned into other devices, or query availability of teach-in signals
@@ -604,11 +604,13 @@ namespace p44 {
     /// flag all channels unconditionally for re-applying to hardware
     void invalidateAllChannels();
 
+    #if P44SCRIPT_FULL_SUPPORT
     /// @return /// previously applied scene number, can be INVALID\_SCENE\_NO
     SceneNo previousSceneNo() { return mPreviousSceneNo; };
 
     /// @return  currently applied or in-progress-to-be-applied scene, can be INVALID\_SCENE\_NO
     SceneNo currentSceneNo() { return mCurrentSceneNo; };
+    #endif
 
     /// abort any currently ongoing scene action
     /// @note base class just calls stopSceneActions() on the output
@@ -729,7 +731,7 @@ namespace p44 {
     ///   a direct remote control for a lamp) are included. Just reading a channel state does not call this method.
     /// @note implementation must use channel's syncChannelValue() method
     virtual void syncChannelValues(SimpleCB aDoneCB) { if (aDoneCB) aDoneCB(); /* assume caches up-to-date */ };
-    
+
     /// @}
 
     /// @name group-optimized notifications for calling scenes and dimming
@@ -810,7 +812,7 @@ namespace p44 {
     virtual void getDeviceConfigurations(DeviceConfigurationsVector &aConfigurations, StatusCB aStatusCB);
 
     /// @}
-    
+
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;

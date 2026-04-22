@@ -114,9 +114,11 @@ Device::Device(Vdc *aVdcP) :
   mApplyInProgress(false),
   mDoReportApply(false),
   mMissedApplyAttempts(0),
-  mUpdateInProgress(false),
-  mPreviousSceneNo(INVALID_SCENE_NO),
-  mCurrentSceneNo(INVALID_SCENE_NO)
+  mUpdateInProgress(false)
+  #if P44SCRIPT_FULL_SUPPORT
+  ,mPreviousSceneNo(INVALID_SCENE_NO)
+  ,mCurrentSceneNo(INVALID_SCENE_NO)
+  #endif
 {
   assert(aVdcP);
 }

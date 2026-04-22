@@ -59,9 +59,11 @@ size_t DeviceSettings::numFieldDefs()
 // global device flag definitons
 enum {
   // device global
+  #if ENABLE_JSONBRIDGEAPI
   // - bits 0..3 are used for bridging flags (see BridgingFlags)
   deviceflags_bridgingFlagsMask = DeviceSettings::bridge_flags_mask, ///< bridging flags
   deviceflags_invertedBridgingFlags = DeviceSettings::bridge_flags_mask & ~DeviceSettings::bridge_output, ///< all input flags are stored inverted, output bit is stored as-is
+  #endif
   // - bits 4..7 are reserved for future use
   deviceflags_max = 0x0080, ///< highest device flag reserved at the root class level
 };
