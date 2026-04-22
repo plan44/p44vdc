@@ -677,7 +677,7 @@ void EnoceanD20620Handler::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
       uint8_t tilt = ENOBYTE(2, dataP, datasize);
       // update position if not unknown
       if (ps!=0x08 && ps!=0x09 && tilt<=100) {
-        OutputBehaviourPtr o = dynamic_pointer_cast<OutputBehaviour>(mBehaviour);
+        OutputBehaviourPtr o = boost::dynamic_pointer_cast<OutputBehaviour>(mBehaviour);
         if (o) {
           ChannelBehaviourPtr c = o->getChannelByIndex(0);
           if (c) c->syncChannelValue(tilt);
