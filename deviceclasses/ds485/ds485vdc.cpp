@@ -223,7 +223,7 @@ const char *Ds485Vdc::vdcClassIdentifier() const
 }
 
 
-string Ds485Vdc::webuiURLString()
+string Ds485Vdc::webuiURLString() const
 {
   if (mDs485Comm.mDs485HostIP.empty()) return inherited::webuiURLString();
   return string_format("http://%s", mDs485Comm.mDs485HostIP.c_str());

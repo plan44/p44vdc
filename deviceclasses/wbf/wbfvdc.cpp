@@ -84,7 +84,7 @@ string WbfVdc::getExtraInfo()
 }
 
 
-string WbfVdc::hardwareGUID()
+string WbfVdc::hardwareGUID() const
 {
   string s;
   if (!mSerialNo.empty()) {
@@ -95,7 +95,7 @@ string WbfVdc::hardwareGUID()
 
 
 
-string WbfVdc::vendorName()
+string WbfVdc::vendorName() const
 {
   return "Feller";
 }

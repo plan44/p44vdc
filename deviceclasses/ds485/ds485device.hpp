@@ -123,16 +123,16 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// @return hardware GUID in URN format to identify the hardware INSTANCE as uniquely as possible
-    virtual string hardwareGUID() P44_OVERRIDE;
+    virtual string hardwareGUID() const P44_OVERRIDE;
 
     /// @return vendor name
-    virtual string vendorName() P44_OVERRIDE;
+    virtual string vendorName() const P44_OVERRIDE;
 
     /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString() P44_OVERRIDE;
+    virtual string webuiURLString() const P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

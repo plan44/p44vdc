@@ -499,7 +499,7 @@ namespace p44 {
     void selfTest(StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED, bool aNoTestableHw);
 
     /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString() P44_OVERRIDE;
+    virtual string webuiURLString() const P44_OVERRIDE;
 
     /// @return human readable product version string of next available (installable) product version, if any
     virtual string nextModelVersion() const P44_OVERRIDE;

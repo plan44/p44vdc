@@ -280,13 +280,13 @@ void HueDevice::dimChannel(ChannelBehaviourPtr aChannel, VdcDimMode aDimMode, bo
 }
 
 
-string HueDevice::modelName()
+string HueDevice::modelName() const
 {
   return mHueModel;
 }
 
 
-string HueDevice::hardwareGUID()
+string HueDevice::hardwareGUID() const
 {
   if (!mUniqueID.empty())
     return string_format("hueuid:%s", mUniqueID.c_str());
@@ -300,7 +300,7 @@ string HueDevice::modelVersion() const
 }
 
 
-string HueDevice::vendorName()
+string HueDevice::vendorName() const
 {
   return mHueVendor;
 };

@@ -184,7 +184,7 @@ namespace p44 {
     virtual ~Device();
 
     /// get vdc
-    Vdc& getVdc();
+    Vdc& getVdc() const;
 
 
     /// identify a device up to the point that it knows its dSUID and internal structure.
@@ -290,7 +290,7 @@ namespace p44 {
     virtual string deviceTypeIdentifier() const { return "unspecified"; };
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE { return "vdSD - virtual device"; }
+    virtual string modelName() const P44_OVERRIDE { return "vdSD - virtual device"; }
 
     /// @return unique ID for the functional model of this entity
     /// @note this is usually created as a hash including the relevant vDC-API visible representation of the device
@@ -313,7 +313,7 @@ namespace p44 {
 
     /// @return Vendor name for display purposes
     /// @note if not empty, value will be used by vendorId() default implementation to create vendorname:xxx URN schema id
-    virtual string vendorName() P44_OVERRIDE;
+    virtual string vendorName() const P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

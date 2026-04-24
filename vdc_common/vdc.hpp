@@ -492,7 +492,7 @@ namespace p44 {
 
     /// @return human readable, language independent model name/short description
     /// @note base class will construct this from global product name and vdcModelSuffix()
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// @return human readable model name/short description
     virtual string vdcModelSuffix() const = 0;
@@ -516,17 +516,17 @@ namespace p44 {
     virtual const char *entityType() const P44_OVERRIDE { return "vDC"; }
 
     /// @return hardware version string or NULL if none
-    virtual string hardwareVersion() P44_OVERRIDE { return ""; }
+    virtual string hardwareVersion() const P44_OVERRIDE { return ""; }
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
-    virtual string hardwareGUID() P44_OVERRIDE { return ""; }
+    virtual string hardwareGUID() const P44_OVERRIDE { return ""; }
 
     /// @return OEM GUID in URN format to identify hardware as uniquely as possible
-    virtual string oemGUID() P44_OVERRIDE { return ""; }
+    virtual string oemGUID() const P44_OVERRIDE { return ""; }
 
     /// @return Vendor name for display purposes
     /// @note if not empty, value will be used by vendorId() default implementation to create vendorname:xxx URN schema id
-    virtual string vendorName() P44_OVERRIDE;
+    virtual string vendorName() const P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

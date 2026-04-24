@@ -178,12 +178,12 @@ namespace p44 {
     /// get the ZF sender address identifying the hardware that contains this logical device
     /// @return ZF device ID/address
     /// Note: for actors this is the modem's sender address that is used to operate the actor
-    ZfAddress getAddress();
+    ZfAddress getAddress() const;
 
     /// get the ZF subdevice number that identifies this logical device among other logical devices in the same
     ///   physical ZF device (having the same ZF deviceID/address)
     /// @return Zf device ID/address
-    ZfSubDevice getSubDevice();
+    ZfSubDevice getSubDevice() const;
 
     /// get the ZF device type
     /// @return ZF device type
@@ -198,16 +198,16 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
-    virtual string hardwareGUID() P44_OVERRIDE;
+    virtual string hardwareGUID() const P44_OVERRIDE;
 
 //    /// @return model GUID in URN format to identify model of hardware device as uniquely as possible
 //    virtual string hardwareModelGUID() P44_OVERRIDE;
 
     /// @return Vendor name if known
-    virtual string vendorName() P44_OVERRIDE;
+    virtual string vendorName() const P44_OVERRIDE;
 
     /// Get an indication how good/critical the operation state of the device is (such as radio strenght, battery level)
     /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
@@ -268,7 +268,7 @@ namespace p44 {
     ZfButtonDevice(ZfVdc *aVdcP, ZfDeviceType aDeviceType);
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// device specific packet processing
     virtual void processPacket(ZfPacketPtr aPacket) P44_OVERRIDE;
@@ -288,7 +288,7 @@ namespace p44 {
     ZfSimpleContact(ZfVdc *aVdcP);
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// device specific packet processing
     virtual void processPacket(ZfPacketPtr aPacket) P44_OVERRIDE;

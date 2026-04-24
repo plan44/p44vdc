@@ -106,7 +106,7 @@ namespace p44 {
     virtual string modelName() { return "myStrom switch"; }
 
     /// @return Vendor ID in URN format to identify vendor as uniquely as possible
-    virtual string vendorName() { return "mystrom.ch"; };
+    virtual string vendorName() const { return "mystrom.ch"; };
 
     /// @}
 

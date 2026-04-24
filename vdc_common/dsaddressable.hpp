@@ -274,7 +274,7 @@ namespace p44 {
     /// @{
 
     /// @return human readable, language independent model name/short description
-    virtual string modelName() = 0;
+    virtual string modelName() const = 0;
 
     /// @return human readable version string of the device or vDC model
     /// @note base class implementation returns version string of vdc host by default.
@@ -288,7 +288,7 @@ namespace p44 {
     ///   Base class implementation returns hardwareGUID with the schema identifier removed. If there
     ///   is no hardwareGUID, the dSUID is returned.
     ///   Derived classes might have a more elaborate way to present a user facing device ID
-    virtual string displayId();
+    virtual string displayId() const;
 
 
     /// @return unique ID for the functional model of this entity
@@ -303,8 +303,8 @@ namespace p44 {
     /// @return the entity type (one of dSD|vdSD|vDC|dSM|vdSM|dSS|*)
     virtual const char* entityType() const { return "*"; };
 
-    /// @return hardware version string or NULL if none
-    virtual string hardwareVersion() { return ""; };
+    /// @return hardware version string or empty string if none
+    virtual string hardwareVersion() const { return ""; };
 
     /// @return hardware GUID in URN format to identify the hardware INSTANCE as uniquely as possible
     /// @note Already defined schemas for hardwareGUID are
@@ -313,7 +313,7 @@ namespace p44 {
     /// - uuid:UUUUUUU = UUID
     /// - macaddress:MM:MM:MM:MM:MM:MM = MAC Address in hex
     /// - p44serial:ssssss = P44 device serial number
-    virtual string hardwareGUID() { return ""; };
+    virtual string hardwareGUID() const { return ""; };
 
     /// @return model GUID in URN format to identify MODEL of the connected hardware device as uniquely as possible
     /// @note model GUID must be equal between all devices of the same model/class/kind, where "same" should be
@@ -324,30 +324,30 @@ namespace p44 {
     /// - enoceaneep:RRFFTT = 6 hex digits enOcean EEP
     /// - gs1:(01)ggggg = GS1 formatted GTIN
     /// - uuid:UUUUUUU = UUID
-    virtual string hardwareModelGUID() { return ""; };
+    virtual string hardwareModelGUID() const { return ""; };
 
     /// @return OEM GUID in URN format to identify the OEM product INSTANCE (the product that encloses/uses the technical
     ///   device, such as a particular designer lamp) as uniquely as possible
     /// @note see hardwareGUID for possible schemas
-    virtual string oemGUID() { return ""; };
+    virtual string oemGUID() const { return ""; };
 
     /// @return OEM model GUID in URN format to identify the OEM product MODEL hardware as uniquely as possible
     /// @note see hardwareModelGUID for possible schemas
-    virtual string oemModelGUID() { return ""; };
+    virtual string oemModelGUID() const { return ""; };
 
     /// @return Vendor ID in URN format to identify vendor as uniquely as possible
     /// Already defined schemas for vendorId are
     /// - enoceanvendor:VVV[:nnn] = 3 hex digits enOcean vendor ID, optionally followed by vendor name (if known)
     /// - vendorname:nnnnn = vendor name in plain text
     /// @note default implementation uses vendorName() (if not empty) to create vendorname:xxx URN schema id
-    virtual string vendorId();
+    virtual string vendorId() const;
 
     /// @return Vendor name for display purposes
     /// @note if not empty, value will be used by vendorId() default implementation to create vendorname:xxx URN schema id
-    virtual string vendorName() { return ""; };
+    virtual string vendorName() const { return ""; };
 
     /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString();
+    virtual string webuiURLString() const;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

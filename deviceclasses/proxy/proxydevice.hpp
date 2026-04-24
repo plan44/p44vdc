@@ -78,10 +78,10 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString() P44_OVERRIDE;
+    virtual string webuiURLString() const P44_OVERRIDE;
 
     /// @}
 

@@ -93,10 +93,10 @@ namespace p44 {
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
 
     /// @return hardware GUID in URN format to identify the hardware INSTANCE as uniquely as possible
-    virtual string hardwareGUID() P44_OVERRIDE;
+    virtual string hardwareGUID() const P44_OVERRIDE;
 
     /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString() P44_OVERRIDE;
+    virtual string webuiURLString() const P44_OVERRIDE;
 
     /// get supported rescan modes for this vDC. This indicates (usually to a web-UI) which
     /// of the flags to collectDevices() make sense for this vDC.

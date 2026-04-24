@@ -1621,7 +1621,7 @@ void DaliSingleControllerDevice::daliDeviceSummary(ApiValuePtr aInfo) const
 }
 
 
-string DaliSingleControllerDevice::modelName()
+string DaliSingleControllerDevice::modelName() const
 {
   string s = "DALI";
   if (mDaliController->mSupportsDT8) {
@@ -1640,7 +1640,7 @@ string DaliSingleControllerDevice::modelName()
 
 
 
-string DaliSingleControllerDevice::hardwareGUID()
+string DaliSingleControllerDevice::hardwareGUID() const
 {
   if (mDaliController->mDeviceInfo->mDevInfStatus<=DaliDeviceInfo::devinf_only_gtin)
     return ""; // none
@@ -1650,7 +1650,7 @@ string DaliSingleControllerDevice::hardwareGUID()
 }
 
 
-string DaliSingleControllerDevice::hardwareModelGUID()
+string DaliSingleControllerDevice::hardwareModelGUID() const
 {
   if (mDaliController->mDeviceInfo->mGtin==0)
     return ""; // none
@@ -1659,7 +1659,7 @@ string DaliSingleControllerDevice::hardwareModelGUID()
 }
 
 
-string DaliSingleControllerDevice::oemGUID()
+string DaliSingleControllerDevice::oemGUID() const
 {
   if (mDaliController->mDeviceInfo->mOemGtin==0 || mDaliController->mDeviceInfo->mOemSerialNo==0)
     return ""; // none
@@ -1668,7 +1668,7 @@ string DaliSingleControllerDevice::oemGUID()
 }
 
 
-string DaliSingleControllerDevice::oemModelGUID()
+string DaliSingleControllerDevice::oemModelGUID() const
 {
   if (mDaliController->mDeviceInfo->mOemGtin==0)
     return ""; // none
@@ -1900,7 +1900,7 @@ void DaliCompositeDevice::updateNextDimmer(StatusCB aCompletedCB, bool aFactoryR
 
 
 
-DaliBusDevicePtr DaliCompositeDevice::firstBusDevice()
+DaliBusDevicePtr DaliCompositeDevice::firstBusDevice() const
 {
   for (DimmerIndex idx=dimmer_red; idx<numDimmers; idx++) {
     if (mDimmers[idx]) {
@@ -2123,7 +2123,7 @@ void DaliCompositeDevice::daliDeviceSummary(ApiValuePtr aInfo) const
 
 
 
-string DaliCompositeDevice::hardwareGUID()
+string DaliCompositeDevice::hardwareGUID() const
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
   if (!dimmer || dimmer->mDeviceInfo->mGtin==0 || dimmer->mDeviceInfo->mSerialNo==0)
@@ -2133,7 +2133,7 @@ string DaliCompositeDevice::hardwareGUID()
 }
 
 
-string DaliCompositeDevice::hardwareModelGUID()
+string DaliCompositeDevice::hardwareModelGUID() const
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
   if (!dimmer || dimmer->mDeviceInfo->mGtin==0)
@@ -2143,7 +2143,7 @@ string DaliCompositeDevice::hardwareModelGUID()
 }
 
 
-string DaliCompositeDevice::oemGUID()
+string DaliCompositeDevice::oemGUID() const
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
   if (!dimmer || dimmer->mDeviceInfo->mOemGtin==0|| dimmer->mDeviceInfo->mOemSerialNo==0)
@@ -2153,7 +2153,7 @@ string DaliCompositeDevice::oemGUID()
 }
 
 
-string DaliCompositeDevice::oemModelGUID()
+string DaliCompositeDevice::oemModelGUID() const
 {
   DaliBusDevicePtr dimmer = firstBusDevice();
   if (!dimmer || dimmer->mDeviceInfo->mOemGtin==0)
@@ -2486,7 +2486,7 @@ void DaliInputDevice::inputReleased(int aInputNo)
 
 
 /// @return human readable model name/short description
-string DaliInputDevice::modelName()
+string DaliInputDevice::modelName() const
 {
   string m = "DALI ";
   switch (mInputType) {

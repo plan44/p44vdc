@@ -356,7 +356,7 @@ namespace p44 {
     DaliOutputDevice(DaliVdc *aVdcP);
 
     /// @return Vendor name for display purposes
-    virtual string vendorName() P44_OVERRIDE { return ""; }; // Prevent displaying vdc vendor for devices
+    virtual string vendorName() const P44_OVERRIDE { return ""; }; // Prevent displaying vdc vendor for devices
 
     /// @return type of DALI device
     virtual DaliDeviceTypes daliTechnicalType() const = 0;
@@ -479,19 +479,19 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
-    virtual string hardwareGUID() P44_OVERRIDE;
+    virtual string hardwareGUID() const P44_OVERRIDE;
 
     /// @return model GUID in URN format to identify hardware model of device as uniquely as possible
-    virtual string hardwareModelGUID() P44_OVERRIDE;
+    virtual string hardwareModelGUID() const P44_OVERRIDE;
 
     /// @return OEM GUID in URN format to identify OEM hardware INSTANCE as uniquely as possible
-    virtual string oemGUID() P44_OVERRIDE;
+    virtual string oemGUID() const P44_OVERRIDE;
 
     /// @return OEM GUID in URN format to identify OEM hardware MODEL as uniquely as possible
-    virtual string oemModelGUID() P44_OVERRIDE;
+    virtual string oemModelGUID() const P44_OVERRIDE;
 
     /// Get an indication how good/critical the operation state of the device is (such as lamp failure or reachability on the bus)
     /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
@@ -637,19 +637,19 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE { return "DALI composite color light"; }
+    virtual string modelName() const P44_OVERRIDE { return "DALI composite color light"; }
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
-    virtual string hardwareGUID() P44_OVERRIDE;
+    virtual string hardwareGUID() const P44_OVERRIDE;
 
     /// @return model GUID in URN format to identify model of device as uniquely as possible
-    virtual string hardwareModelGUID() P44_OVERRIDE;
+    virtual string hardwareModelGUID() const P44_OVERRIDE;
 
     /// @return OEM GUID in URN format to identify OEM hardware INSTANCE as uniquely as possible
-    virtual string oemGUID() P44_OVERRIDE;
+    virtual string oemGUID() const P44_OVERRIDE;
 
     /// @return OEM GUID in URN format to identify OEM hardware MODEL as uniquely as possible
-    virtual string oemModelGUID() P44_OVERRIDE;
+    virtual string oemModelGUID() const P44_OVERRIDE;
 
     /// Get an indication how good/critical the operation state of the device is (such as lamp failure or reachability on the bus)
     /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
@@ -710,7 +710,7 @@ namespace p44 {
   private:
 
     void updateNextDimmer(StatusCB aCompletedCB, bool aFactoryReset, DimmerIndex aDimmerIndex, ErrorPtr aError);
-    DaliBusDevicePtr firstBusDevice();
+    DaliBusDevicePtr firstBusDevice() const;
 
     void checkPresenceResponse(PresenceCB aPresenceResultHandler, DaliBusDevicePtr aDimmer);
     void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
@@ -784,10 +784,10 @@ namespace p44 {
     virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "dali_input"; };
 
     /// @return Vendor name for display purposes
-    virtual string vendorName() P44_OVERRIDE { return ""; }; // Prevent displaying vdc vendor for devices
+    virtual string vendorName() const P44_OVERRIDE { return ""; }; // Prevent displaying vdc vendor for devices
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

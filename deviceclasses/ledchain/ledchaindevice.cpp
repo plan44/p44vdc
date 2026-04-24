@@ -478,7 +478,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
 
 
 
-string LedChainDevice::modelName()
+string LedChainDevice::modelName() const
 {
   if (mLightType==lighttype_simplearea)
     return "Static LED Matrix Area";

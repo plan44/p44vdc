@@ -85,14 +85,14 @@ string ProxyDevice::deviceTypeIdentifier() const
 }
 
 
-string ProxyDevice::modelName()
+string ProxyDevice::modelName() const
 {
   // Note: when read via API, clients (e.g. WebUI) will get actual device's values, not this
   return "proxy device";
 }
 
 
-string ProxyDevice::webuiURLString()
+string ProxyDevice::webuiURLString() const
 {
   // Note: when read via API, clients (e.g. WebUI) will get actual device's values, not this
   // So this is only in case for some reason API access did not work

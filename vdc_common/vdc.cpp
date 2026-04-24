@@ -199,7 +199,7 @@ bool Vdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPr
 }
 
 
-string Vdc::vendorName()
+string Vdc::vendorName() const
 {
   // default to same vendor as vdc host (device container)
   return getVdcHost().vendorName();
@@ -218,7 +218,7 @@ string Vdc::modelVersion() const
 }
 
 
-string Vdc::modelName()
+string Vdc::modelName() const
 {
   // derive the descriptive name
   // "%M %m"

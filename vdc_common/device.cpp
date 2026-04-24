@@ -133,7 +133,7 @@ Device::~Device()
 }
 
 
-Vdc& Device::getVdc()
+Vdc& Device::getVdc() const
 {
   return *mVdcP;
 }
@@ -271,7 +271,7 @@ bool Device::bridgeable()
 #endif // ENABLE_JSONBRIDGEAPI
 
 
-string Device::vendorName()
+string Device::vendorName() const
 {
   // default to same vendor as class container
   return mVdcP->vendorName();

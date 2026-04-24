@@ -64,13 +64,13 @@ bool ZfDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 
 
-ZfAddress ZfDevice::getAddress()
+ZfAddress ZfDevice::getAddress() const
 {
   return zfAddress;
 }
 
 
-ZfSubDevice ZfDevice::getSubDevice()
+ZfSubDevice ZfDevice::getSubDevice() const
 {
   return subDevice;
 }
@@ -88,20 +88,20 @@ void ZfDevice::deriveDsUid()
 }
 
 
-string ZfDevice::hardwareGUID()
+string ZfDevice::hardwareGUID() const
 {
   return string_format("zfaddress:%08X", getAddress());
 }
 
 
-string ZfDevice::modelName()
+string ZfDevice::modelName() const
 {
   // base class "model", derived classes might have nicer model names
   return string_format("ZF device type %d", zfDeviceType);
 }
 
 
-string ZfDevice::vendorName()
+string ZfDevice::vendorName() const
 {
   return "ZF Friedrichshafen AG";
 }
@@ -458,7 +458,7 @@ ZfButtonDevice::ZfButtonDevice(ZfVdc *aVdcP, ZfDeviceType aDeviceType) :
 }
 
 
-string ZfButtonDevice::modelName()
+string ZfButtonDevice::modelName() const
 {
   return "ZF button";
 }
@@ -487,7 +487,7 @@ ZfSimpleContact::ZfSimpleContact(ZfVdc *aVdcP) :
 }
 
 
-string ZfSimpleContact::modelName()
+string ZfSimpleContact::modelName() const
 {
   return "ZF simple contact";
 }

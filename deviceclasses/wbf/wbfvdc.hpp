@@ -132,11 +132,11 @@ namespace p44 {
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
     /// - uuid:UUUUUUU = UUID
     /// - http:xxxx = API
-    virtual string hardwareGUID() P44_OVERRIDE;
+    virtual string hardwareGUID() const P44_OVERRIDE;
 
     /// @return Vendor name for display purposes
     /// @note if not empty, value will be used by vendorId() default implementation to create vendorname:xxx URN schema id
-    virtual string vendorName() P44_OVERRIDE;
+    virtual string vendorName() const P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

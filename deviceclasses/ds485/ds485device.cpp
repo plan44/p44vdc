@@ -84,25 +84,25 @@ string Ds485Device::deviceTypeIdentifier() const
 }
 
 
-string Ds485Device::modelName()
+string Ds485Device::modelName() const
 {
   return "dS terminal block"; // intentionally, old way to write dS
 }
 
 
-string Ds485Device::hardwareGUID()
+string Ds485Device::hardwareGUID() const
 {
   return "dsid:"+mDSUID.getDSIdString();
 }
 
 
-string Ds485Device::webuiURLString()
+string Ds485Device::webuiURLString() const
 {
   return getVdc().webuiURLString();
 }
 
 
-string Ds485Device::vendorName()
+string Ds485Device::vendorName() const
 {
   return "digitalSTROM"; // intentionally, old way to write dS
 }

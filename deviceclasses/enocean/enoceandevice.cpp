@@ -112,13 +112,13 @@ EnoceanVdc &EnoceanDevice::getEnoceanVdc()
 }
 
 
-EnoceanAddress EnoceanDevice::getAddress()
+EnoceanAddress EnoceanDevice::getAddress() const
 {
   return mEnoceanAddress;
 }
 
 
-EnoceanSubDevice EnoceanDevice::getSubDevice()
+EnoceanSubDevice EnoceanDevice::getSubDevice() const
 {
   return mSubDevice;
 }
@@ -139,13 +139,13 @@ void EnoceanDevice::setEEPInfo(EnoceanProfile aEEProfile, EnoceanManufacturer aE
 }
 
 
-EnoceanProfile EnoceanDevice::getEEProfile()
+EnoceanProfile EnoceanDevice::getEEProfile() const
 {
   return mEeProfile;
 }
 
 
-EnoceanManufacturer EnoceanDevice::getEEManufacturer()
+EnoceanManufacturer EnoceanDevice::getEEManufacturer() const
 {
   return mEeManufacturer;
 }
@@ -162,33 +162,33 @@ void EnoceanDevice::deriveDsUid()
 }
 
 
-string EnoceanDevice::hardwareGUID()
+string EnoceanDevice::hardwareGUID() const
 {
   return string_format("enoceanaddress:%08X", getAddress());
 }
 
 
-string EnoceanDevice::hardwareModelGUID()
+string EnoceanDevice::hardwareModelGUID() const
 {
   return string_format("enoceaneep:%06X", EEP_PURE(getEEProfile()));
 }
 
 
-string EnoceanDevice::modelName()
+string EnoceanDevice::modelName() const
 {
   const char *mn = EnoceanComm::manufacturerName(mEeManufacturer);
   return string_format("%s%sEnOcean %s (%02X-%02X-%02X)", mn ? mn : "", mn ? " " : "", mEeFunctionDesc.c_str(), EEP_RORG(mEeProfile), EEP_FUNC(mEeProfile), EEP_TYPE(mEeProfile));
 }
 
 
-string EnoceanDevice::vendorId()
+string EnoceanDevice::vendorId() const
 {
   const char *mn = EnoceanComm::manufacturerName(mEeManufacturer);
   return string_format("enoceanvendor:%03X%s%s", mEeManufacturer, mn ? ":" : "", mn ? mn : "");
 }
 
 
-string EnoceanDevice::vendorName()
+string EnoceanDevice::vendorName() const
 {
   const char *mn = EnoceanComm::manufacturerName(mEeManufacturer);
   return mn ? mn : "";

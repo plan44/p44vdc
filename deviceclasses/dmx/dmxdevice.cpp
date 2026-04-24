@@ -340,7 +340,7 @@ void DmxDevice::deriveDsUid()
 }
 
 
-string DmxDevice::modelName()
+string DmxDevice::modelName() const
 {
   if (mDmxType==dmx_dimmer)
     return "DMX512 Dimmer";

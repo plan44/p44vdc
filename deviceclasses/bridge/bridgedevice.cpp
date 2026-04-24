@@ -208,7 +208,7 @@ void BridgeDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResult
 }
 
 
-string BridgeDevice::modelName()
+string BridgeDevice::modelName() const
 {
   switch (mBridgeDeviceType) {
     case bridgedevice_onoff: return "on-off bridge";

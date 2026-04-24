@@ -165,22 +165,22 @@ namespace p44 {
     virtual string deviceTypeIdentifier() const  P44_OVERRIDE { return mTypeIdentifier; };
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// @return human readable version string of the device model
     virtual string modelVersion() const P44_OVERRIDE;
 
     /// @return Vendor name if known
-    virtual string vendorName() P44_OVERRIDE;
+    virtual string vendorName() const P44_OVERRIDE;
 
     /// @return OEM model GUID in URN format to identify the OEM product MODEL hardware as uniquely as possible
-    virtual string oemModelGUID() P44_OVERRIDE;
+    virtual string oemModelGUID() const P44_OVERRIDE;
 
     /// @return hardware GUID in URN format to identify the hardware INSTANCE as uniquely as possible
     /// @note this gets populated if the initmessage contains a uniqueid in URN format
     ///   (that is, starts with an alphanum string of 3 or more chars immediately followed by a colon as a schema prefix).
     ///   Current dSS uses the string following the schema prefix as "shortID" for display purposes.
-    virtual string hardwareGUID() P44_OVERRIDE { return mHardwareGUID; };
+    virtual string hardwareGUID() const P44_OVERRIDE { return mHardwareGUID; };
 
     /// device class (for grouping functionally equivalent single devices)
     /// @note usually, only single devices do have a deviceClass
@@ -202,7 +202,7 @@ namespace p44 {
     virtual uint32_t deviceClassVersion() P44_OVERRIDE { return mDevClassVersion; }
 
     /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString() P44_OVERRIDE;
+    virtual string webuiURLString() const P44_OVERRIDE;
 
     #if ENABLE_JSONBRIDGEAPI
     /// This string may help the bridge to determine how to bridge this device.
@@ -396,7 +396,7 @@ namespace p44 {
     /// @return human readable, language independent model name/short description
     /// @note when no specific modelNameString is set via external API,
     ///   base class will construct this from global product name and vdcModelSuffix()
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// @return human readable model version specific to that vDC, meaning for example a firmware version
     ///    of external hardware governing the access to a device bus/network such as a hue bridge.
@@ -404,7 +404,7 @@ namespace p44 {
     virtual string vdcModelVersion() const P44_OVERRIDE;
 
     /// @return URL for Web-UI (for access from local LAN)
-    virtual string webuiURLString() P44_OVERRIDE;
+    virtual string webuiURLString() const P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

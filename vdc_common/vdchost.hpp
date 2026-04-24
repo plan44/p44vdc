@@ -433,7 +433,7 @@ namespace p44 {
 
     /// get IPv4 address relevant for connection status
     /// @return IPv4 as a 32-bit int, or 0 if none found
-    uint32_t getIpV4Address();
+    uint32_t getIpV4Address() const;
 
     /// global setting for persisting (and restoring after reboot) last output channel states
     /// @return true if output channel states should be saved/restored
@@ -566,7 +566,7 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE { return mProductName.size()>0 ? mProductName : "vDC host"; }
+    virtual string modelName() const P44_OVERRIDE { return mProductName.size()>0 ? mProductName : "vDC host"; }
 
     /// @return human readable product version string
     /// @note it is important to override this here in vdchost, because would loop otherwise when base class calls vdchost's implementation
@@ -581,18 +581,18 @@ namespace p44 {
     /// @return the entity type (one of dSD|vdSD|vDChost|vDC|dSM|vdSM|dSS|*)
     virtual const char *entityType() const P44_OVERRIDE { return "vDChost"; }
 
-    /// @return hardware version string or NULL if none
-    virtual string hardwareVersion() P44_OVERRIDE { return ""; }
+    /// @return hardware version string or empty string if none
+    virtual string hardwareVersion() const P44_OVERRIDE { return ""; }
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
-    virtual string hardwareGUID() P44_OVERRIDE { return ""; }
+    virtual string hardwareGUID() const P44_OVERRIDE { return ""; }
 
     /// @return OEM GUID in URN format to identify hardware as uniquely as possible
-    virtual string oemGUID() P44_OVERRIDE { return ""; }
+    virtual string oemGUID() const P44_OVERRIDE { return ""; }
 
     /// @return Vendor ID in URN format to identify vendor as uniquely as possible
     /// @note class containers and devices will inherit this (vdc host's) vendor name if not overridden
-    virtual string vendorName() P44_OVERRIDE { return "plan44.ch"; };
+    virtual string vendorName() const P44_OVERRIDE { return "plan44.ch"; };
 
     /// @return the human readable hardware id (such as a serial number) of the vdc host product as a whole
     string getDeviceHardwareId() const { return mDeviceHardwareId; };
@@ -605,7 +605,7 @@ namespace p44 {
 
     /// @return URL for Web-UI (for access from local LAN)
     /// @note it is important to override this here in vdchost, because would loop otherwise when base class calls vdchost's implementation
-    virtual string webuiURLString() P44_OVERRIDE { return ""; }
+    virtual string webuiURLString() const P44_OVERRIDE { return ""; }
 
     /// @}
 

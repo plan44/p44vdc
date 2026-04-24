@@ -168,7 +168,7 @@ bool CustomDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 }
 
 
-string CustomDevice::modelName()
+string CustomDevice::modelName() const
 {
   return mModelNameString;
 }
@@ -183,19 +183,19 @@ string CustomDevice::modelVersion() const
 }
 
 
-string CustomDevice::vendorName()
+string CustomDevice::vendorName() const
 {
   return mVendorNameString;
 }
 
 
-string CustomDevice::oemModelGUID()
+string CustomDevice::oemModelGUID() const
 {
   return mOemModelGUIDString;
 }
 
 
-string CustomDevice::webuiURLString()
+string CustomDevice::webuiURLString() const
 {
   if (!mConfigUrl.empty())
     return mConfigUrl;
@@ -1550,7 +1550,7 @@ CustomVdc::CustomVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
 }
 
 
-string CustomVdc::modelName()
+string CustomVdc::modelName() const
 {
   if (!mModelNameString.empty())
     return mModelNameString;
@@ -1574,7 +1574,7 @@ bool CustomVdc::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolu
 
 
 
-string CustomVdc::webuiURLString()
+string CustomVdc::webuiURLString() const
 {
   if (!mConfigUrl.empty())
     return mConfigUrl;

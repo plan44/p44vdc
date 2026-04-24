@@ -190,12 +190,12 @@ namespace p44 {
     /// get the ELDAT sender address identifying the hardware that contains this logical device
     /// @return ELDAT device ID/address
     /// Note: for actors this is the modem's sender address that is used to operate the actor
-    EldatAddress getAddress();
+    EldatAddress getAddress() const;
 
     /// get the Eldat subdevice number that identifies this logical device among other logical devices in the same
     ///   physical Eldat device (having the same Eldat deviceID/address)
     /// @return Eldat device ID/address
-    EldatSubDevice getSubDevice();
+    EldatSubDevice getSubDevice() const;
 
     /// get the Eldat device type
     /// @return Eldat device type
@@ -213,16 +213,16 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
-    virtual string hardwareGUID() P44_OVERRIDE;
+    virtual string hardwareGUID() const P44_OVERRIDE;
 
 //    /// @return model GUID in URN format to identify model of hardware device as uniquely as possible
 //    virtual string hardwareModelGUID() P44_OVERRIDE;
 
     /// @return Vendor name if known
-    virtual string vendorName() P44_OVERRIDE;
+    virtual string vendorName() const P44_OVERRIDE;
 
     /// Get an indication how good/critical the operation state of the device is (such as radio strenght, battery level)
     /// @return 0..100 with 0=out of operation, 100=fully operating, <0 = unknown
@@ -283,7 +283,7 @@ namespace p44 {
     EldatButtonDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceType);
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// device specific function handling
     virtual void handleFunction(EldatFunction aFunction) P44_OVERRIDE;
@@ -307,7 +307,7 @@ namespace p44 {
     EldatMotionDetector(EldatVdc *aVdcP);
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// device specific function handling
     virtual void handleFunction(EldatFunction aFunction) P44_OVERRIDE;
@@ -328,7 +328,7 @@ namespace p44 {
     EldatWindowContact(EldatVdc *aVdcP, bool aOffOnType, bool aWithStatus);
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// device specific function handling
     virtual void handleFunction(EldatFunction aFunction) P44_OVERRIDE;
@@ -350,7 +350,7 @@ namespace p44 {
     EldatWindowHandle(EldatVdc *aVdcP, bool aOffOnType, bool aWithStatus);
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// device specific function handling
     virtual void handleFunction(EldatFunction aFunction) P44_OVERRIDE;
@@ -370,7 +370,7 @@ namespace p44 {
     EldatRemoteControlDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceType);
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// device type identifier
     /// @return constant identifier for this type of device (one container might contain more than one type)

@@ -91,7 +91,7 @@ string HueVdc::getExtraInfo()
 }
 
 
-string HueVdc::hardwareGUID()
+string HueVdc::hardwareGUID() const
 {
   string s;
   if (mBridgeMacAddress) {
@@ -103,7 +103,7 @@ string HueVdc::hardwareGUID()
 
 
 
-string HueVdc::vendorName()
+string HueVdc::vendorName() const
 {
   return "Philips/Signify";
 }

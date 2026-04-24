@@ -118,7 +118,7 @@ namespace p44 {
 
     /// @return hardware GUID in URN format to identify hardware as uniquely as possible
     /// - enoceanaddress:XXXXXXXX = 8 hex digits enOcean device address
-    virtual string hardwareGUID() P44_OVERRIDE { return string_format("enoceanaddress:%08X", mEnoceanComm.modemAddress()); };
+    virtual string hardwareGUID() const P44_OVERRIDE { return string_format("enoceanaddress:%08X", mEnoceanComm.modemAddress()); };
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

@@ -187,7 +187,7 @@ void EvaluatorDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectRes
 }
 
 
-string EvaluatorDevice::modelName()
+string EvaluatorDevice::modelName() const
 {
   switch (mEvaluatorType) {
     case evaluator_rocker: return "evaluated up/down button";

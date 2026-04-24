@@ -66,13 +66,13 @@ EldatVdc &EldatDevice::getEldatVdc()
 
 
 
-EldatAddress EldatDevice::getAddress()
+EldatAddress EldatDevice::getAddress() const
 {
   return mEldatAddress;
 }
 
 
-EldatSubDevice EldatDevice::getSubDevice()
+EldatSubDevice EldatDevice::getSubDevice() const
 {
   return mSubDevice;
 }
@@ -90,20 +90,20 @@ void EldatDevice::deriveDsUid()
 }
 
 
-string EldatDevice::hardwareGUID()
+string EldatDevice::hardwareGUID() const
 {
   return string_format("eldataddress:%08X", getAddress());
 }
 
 
-string EldatDevice::modelName()
+string EldatDevice::modelName() const
 {
   // base class "model", derived classes might have nicer model names
   return string_format("ELDAT device type %d", mEldatDeviceType);
 }
 
 
-string EldatDevice::vendorName()
+string EldatDevice::vendorName() const
 {
   return "ELDAT GmbH";
 }
@@ -470,7 +470,7 @@ EldatButtonDevice::EldatButtonDevice(EldatVdc *aVdcP, EldatDeviceType aDeviceTyp
 }
 
 
-string EldatButtonDevice::modelName()
+string EldatButtonDevice::modelName() const
 {
   if (mEldatDeviceType==eldat_rocker)
     return "ELDAT two-way button";
@@ -537,7 +537,7 @@ EldatMotionDetector::EldatMotionDetector(EldatVdc *aVdcP) :
 }
 
 
-string EldatMotionDetector::modelName()
+string EldatMotionDetector::modelName() const
 {
   return "ELDAT motion detector";
 }
@@ -563,7 +563,7 @@ EldatWindowContact::EldatWindowContact(EldatVdc *aVdcP, bool aOffOnType, bool aW
 }
 
 
-string EldatWindowContact::modelName()
+string EldatWindowContact::modelName() const
 {
   return "ELDAT window contact";
 }
@@ -592,7 +592,7 @@ EldatWindowHandle::EldatWindowHandle(EldatVdc *aVdcP, bool aOffOnType, bool aWit
 }
 
 
-string EldatWindowHandle::modelName()
+string EldatWindowHandle::modelName() const
 {
   return "ELDAT window handle";
 }
@@ -621,7 +621,7 @@ EldatRemoteControlDevice::EldatRemoteControlDevice(EldatVdc *aVdcP, EldatDeviceT
 }
 
 
-string EldatRemoteControlDevice::modelName()
+string EldatRemoteControlDevice::modelName() const
 {
   if (mEldatDeviceType==eldat_ABlight)
     return "ELDAT on/off light";

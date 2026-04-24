@@ -430,7 +430,7 @@ bool VdcHost::isApiConnected()
 }
 
 
-uint32_t VdcHost::getIpV4Address()
+uint32_t VdcHost::getIpV4Address() const
 {
   return ipv4Address(mIfNameForConn.c_str());
 }

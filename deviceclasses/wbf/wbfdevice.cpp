@@ -454,13 +454,13 @@ void WbfDevice::initializeDevice(StatusCB aCompletedCB, bool aFactoryReset)
 }
 
 
-string WbfDevice::modelName()
+string WbfDevice::modelName() const
 {
   return string_format("%s (%s)", mWbfCommNames.c_str(), mWbfCommRefs.c_str());
 }
 
 
-string WbfDevice::hardwareGUID()
+string WbfDevice::hardwareGUID() const
 {
   return string_format("wbfid:%s", mWbfId.c_str());
 }
@@ -472,7 +472,7 @@ string WbfDevice::modelVersion() const
 }
 
 
-string WbfDevice::vendorName()
+string WbfDevice::vendorName() const
 {
   return "Feller";
 };

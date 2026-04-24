@@ -125,10 +125,10 @@ namespace p44 {
     /// @{
 
     /// @return human readable model name/short description
-    virtual string modelName() P44_OVERRIDE;
+    virtual string modelName() const P44_OVERRIDE;
 
     /// @return Vendor ID in URN format to identify vendor as uniquely as possible
-    virtual string vendorName() P44_OVERRIDE { return "plan44.ch"; };
+    virtual string vendorName() const P44_OVERRIDE { return "plan44.ch"; };
 
     /// @}
 

@@ -260,7 +260,7 @@ void DigitalIODevice::deriveDsUid()
 }
 
 
-string DigitalIODevice::modelName()
+string DigitalIODevice::modelName() const
 {
   switch (mDigitalIoType) {
     case digitalio_button: return "Button digital input";

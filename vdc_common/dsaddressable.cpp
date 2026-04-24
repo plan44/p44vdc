@@ -62,7 +62,7 @@ string DsAddressable::modelVersion() const
 }
 
 
-string DsAddressable::displayId()
+string DsAddressable::displayId() const
 {
   string schema, id;
   if (!keyAndValue(hardwareGUID(), schema, id, ':')) {
@@ -780,7 +780,7 @@ bool DsAddressable::getDeviceIcon(string &aIcon, bool aWithData, const char *aRe
 }
 
 
-string DsAddressable::vendorId()
+string DsAddressable::vendorId() const
 {
   // by default, use vendorname: URN schema
   if (!vendorName().empty())
@@ -791,7 +791,7 @@ string DsAddressable::vendorId()
 
 
 
-string DsAddressable::webuiURLString()
+string DsAddressable::webuiURLString() const
 {
   // Note: it is important to override this at vdchost level, because would loop otherwise
   return getVdcHost().webuiURLString(); // by default, return vDC host's config URL

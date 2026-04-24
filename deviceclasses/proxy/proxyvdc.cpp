@@ -192,7 +192,7 @@ void ProxyVdc::bridgeApiIDQueryHandler(ErrorPtr aError, JsonObjectPtr aJsonMsg)
 }
 
 
-string ProxyVdc::hardwareGUID()
+string ProxyVdc::hardwareGUID() const
 {
   return mProxiedDeviceSerial.empty() ? "" : string_format("p44serial:%s", mProxiedDeviceSerial.c_str());
 }
@@ -215,7 +215,7 @@ const char *ProxyVdc::vdcClassIdentifier() const
 }
 
 
-string ProxyVdc::webuiURLString()
+string ProxyVdc::webuiURLString() const
 {
   if (!mProxiedDeviceConfigUrl.empty())
     return mProxiedDeviceConfigUrl;

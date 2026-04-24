@@ -133,7 +133,7 @@ namespace p44 {
 
 //    /// @return hardware GUID in URN format to identify hardware as uniquely as possible
 //    /// - zfaddress:XXXXXXXX = 8 hex digits ZF device address
-//    virtual string hardwareGUID() P44_OVERRIDE { return string_format("zfaddress:%08X", zfComm.modemAddress()); };
+//    virtual string hardwareGUID() const P44_OVERRIDE { return string_format("zfaddress:%08X", zfComm.modemAddress()); };
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

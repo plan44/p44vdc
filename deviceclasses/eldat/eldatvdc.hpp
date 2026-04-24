@@ -138,7 +138,7 @@ namespace p44 {
 
 //    /// @return hardware GUID in URN format to identify hardware as uniquely as possible
 //    /// - eldataddress:XXXXXXXX = 8 hex digits Eldat device address
-//    virtual string hardwareGUID() P44_OVERRIDE { return string_format("eldataddress:%08X", eldatComm.modemAddress()); };
+//    virtual string hardwareGUID() const P44_OVERRIDE { return string_format("eldataddress:%08X", eldatComm.modemAddress()); };
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
