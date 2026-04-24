@@ -44,6 +44,9 @@ namespace p44 {
     /// constructor
     Enocean4BSDevice(EnoceanVdc *aVdcP);
 
+    /// @return true to allow channels to process packet of aRorg type
+    virtual bool acceptRadioOrg(RadioOrg aRorg) P44_OVERRIDE { return aRorg==rorg_4BS; }
+
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
     virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "enocean_4bs"; };

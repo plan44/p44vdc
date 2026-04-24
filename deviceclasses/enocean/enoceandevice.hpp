@@ -152,6 +152,12 @@ namespace p44 {
     int16_t mLastRSSI; ///< RSSI of last packet received (including learn telegram)
     uint8_t mLastRepeaterCount; ///< last packet's repeater count (including learn telegram)
 
+    uint8_t mSWVersion[4]; ///< software version as reported by Signal MID 7
+    uint8_t mHWVersion[4]; ///< hardware version as reported by Signal MID 7
+    uint8_t mEnergyStatus; ///< energy status in %, INVALID\_PERCENTAGE if not valid
+    uint8_t mBackupStatus; ///< backup battery status in %, INVALID\_PERCENTAGE if not valid
+    uint8_t mHarvestPerf; ///< harvester performance status in %, INVALID\_PERCENTAGE if not valid
+
     #if ENABLE_ENOCEAN_SECURE
     EnOceanSecurityPtr mSecurityInfo; ///< security info. If this is set, the device must NOT respond to non-secure packets!
     #endif
@@ -242,6 +248,12 @@ namespace p44 {
     );
     
 
+    /// @return human readable version string of the device model
+    virtual string modelVersion() const P44_OVERRIDE;
+
+    /// @return hardware version string or empty string if none
+    virtual string hardwareVersion() const P44_OVERRIDE;
+
     /// set the enocean address identifying the device
     /// @param aAddress 32bit enocean device address/ID
     /// @param aChannel channel number (multiple logical EnoceanDevices might exists for the same EnoceanAddress)
@@ -289,8 +301,13 @@ namespace p44 {
     void updateRadioMetrics(Esp3PacketPtr aEsp3PacketPtr);
 
     /// device specific radio packet handling
-    /// @note base class implementation passes packet to all registered channels
-    virtual void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
+    void handleSignalPacket(Esp3PacketPtr aEsp3PacketPtr);
+
+    /// device specific radio packet handling
+    void handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr);
+
+    /// @return true to allow channels to process packet of aRorg type
+    virtual bool acceptRadioOrg(RadioOrg aRorg) = 0;
 
     /// signal that we need an outgoing packet at next possible occasion
     /// @note will cause output data from channel handlers to be collected

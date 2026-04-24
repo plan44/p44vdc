@@ -78,6 +78,8 @@ string EnoceanChannelHandler::logContextPrefix()
 // MARK: - EnoceanDevice
 
 #define INVALID_RSSI (-999)
+#define INVALID_PERCENTAGE (0xFF)
+#define INVALID_VERSION_MAJ (0xFF)
 
 EnoceanDevice::EnoceanDevice(EnoceanVdc *aVdcP) :
   Device(aVdcP),
@@ -92,9 +94,16 @@ EnoceanDevice::EnoceanDevice(EnoceanVdc *aVdcP) :
   mEeFunctionDesc = "device"; // generic description is "device"
   mIconBaseName = "enocean";
   mGroupColoredIcon = true;
+  // reception status
   mLastPacketTime = MainLoop::now(); // consider packet received at time of creation (to avoid devices starting inactive)
   mLastRSSI = INVALID_RSSI; // not valid
   mLastRepeaterCount = 0; // dummy
+  // signalled info
+  mHWVersion[0] = INVALID_VERSION_MAJ;
+  mSWVersion[0] = INVALID_VERSION_MAJ;
+  mEnergyStatus = INVALID_PERCENTAGE;
+  mHarvestPerf = INVALID_PERCENTAGE;
+  mBackupStatus = INVALID_PERCENTAGE;
 }
 
 
@@ -333,9 +342,19 @@ void EnoceanDevice::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
 {
   OLOG(LOG_INFO, "now starts processing EnOcean packet:\n%s", aEsp3PacketPtr->description().c_str());
   updateRadioMetrics(aEsp3PacketPtr);
-  // pass to every channel
-  for (EnoceanChannelHandlerVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
-    (*pos)->handleRadioPacket(aEsp3PacketPtr);
+  RadioOrg rorg = aEsp3PacketPtr->eepRorg();
+  // process generic signals
+  if (rorg==rorg_SIG) {
+    handleSignalPacket(aEsp3PacketPtr);
+  }
+  else if (!acceptRadioOrg(rorg)) {
+    OLOG(LOG_WARNING, "sent packet with unexpected RORG 0x%02X -> ignored", rorg);
+  }
+  else {
+    // pass to every channel
+    for (EnoceanChannelHandlerVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
+      (*pos)->handleRadioPacket(aEsp3PacketPtr);
+    }
   }
   // if device cannot be updated whenever output value change is requested, send updates after receiving a message
   if (mPendingDeviceUpdate || mUpdateAtEveryReceive) {
@@ -345,6 +364,63 @@ void EnoceanDevice::handleRadioPacket(Esp3PacketPtr aEsp3PacketPtr)
     sendOutgoingUpdate();
   }
 }
+
+
+void EnoceanDevice::handleSignalPacket(Esp3PacketPtr aEsp3PacketPtr)
+{
+  // generic signal packet
+  size_t len = aEsp3PacketPtr->radioUserDataLength();
+  uint8_t* data = aEsp3PacketPtr->radioUserData();
+  uint8_t mid = 0;
+  if (data) {
+    mid = data[0];
+  }
+  switch (mid) {
+    case 0x06: // Energy status of device
+      if (len>=2) {
+        uint8_t esta = data[1]; // 0..100 = % energy status
+        if (esta<100) {
+          mEnergyStatus = esta;
+          OLOG(LOG_INFO, "signals energy status: %d%%", mEnergyStatus);
+        }
+      }
+      break;
+    case 0x07: // HW/FW versions
+      if (len>=9) {
+        memcpy(mSWVersion, data+1, 4);
+        memcpy(mHWVersion, data+5, 4);
+        OLOG(LOG_INFO, "signals device versions");
+      }
+      break;
+    case 0x08: // Heartbeat,
+      // NOP: important information is arrival of the packet, which has updated timestamp and rssi already
+      OLOG(LOG_INFO, "signals heartbeat");
+      break;
+    case 0x0D: // Energy delivery of the harvester
+      if (len>=2) {
+        uint8_t hsta = data[1]>>4; // bits 7..4 = status
+        if (hsta<5) {
+          mHarvestPerf = 25*(4-hsta); // status=0=very good .. status=4=very bad mapped to 0..100%
+          OLOG(LOG_INFO, "signals harverster performance: (%d) %d%%", hsta, mHarvestPerf);
+        }
+      }
+      break;
+    case 0x10: // Backup battery status
+      if (len>=2) {
+        uint8_t bsta = data[1]; // 0..100 = % energy status
+        if (bsta<100) {
+          mBackupStatus = bsta;
+          OLOG(LOG_INFO, "signals backup battery status: %d%%", mBackupStatus);
+        }
+      }
+      break;
+    default:
+      OLOG(LOG_INFO, "signals unhandled MID 0x%02X", mid);
+      break;
+  }
+}
+
+
 
 
 bool EnoceanDevice::isAlive()
@@ -383,6 +459,14 @@ int EnoceanDevice::opStateLevel()
       if (chOpState<opState) opState = chOpState; // lowest channel state determines overall state
     }
   }
+  // if energy status is worse than RSSI, take that
+  if (mEnergyStatus!=INVALID_PERCENTAGE && mEnergyStatus<opState) opState = mEnergyStatus;
+  if (mBackupStatus!=INVALID_PERCENTAGE && mBackupStatus<opState) opState = mBackupStatus;
+  // harvester status is not that relevant, as it can be temporarily bad
+  if (mHarvestPerf!=INVALID_PERCENTAGE && mHarvestPerf<opState) {
+    // just scale back operation to 75% max
+    opState = opState * (300+mHarvestPerf) / 400;
+  }
   return opState;
 }
 
@@ -404,6 +488,10 @@ string EnoceanDevice::getOpStateText()
   else {
     t += "unseen";
   }
+  // append enery related info from signal messages
+  if (mEnergyStatus!=INVALID_PERCENTAGE) string_format_append(t, ", Energy=%d%%", mEnergyStatus);
+  if (mHarvestPerf!=INVALID_PERCENTAGE) string_format_append(t, ", Harvest=%d%%", mHarvestPerf);
+  if (mBackupStatus!=INVALID_PERCENTAGE) string_format_append(t, ", Bat=%d%%", mBackupStatus);
   // append info from enocean handlers
   for (EnoceanChannelHandlerVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
     string ht = (*pos)->getOpStateText();
@@ -429,7 +517,7 @@ string EnoceanDevice::description()
       mSecurityInfo->mSecurityLevelFormat & 0x07 ? " DATA_ENC" : ""
     );
   }
-  #endif
+  #endif // ENABLE_ENOCEAN_SECURE
   string_format_append(s, "\n- Enocean Address = 0x%08X, subDevice=%d", mEnoceanAddress, mSubDevice);
   const char *mn = EnoceanComm::manufacturerName(mEeManufacturer);
   string_format_append(s,
@@ -448,6 +536,21 @@ string EnoceanDevice::description()
   }
   return s;
 }
+
+
+string EnoceanDevice::modelVersion() const
+{
+  if (mSWVersion[0]!=INVALID_VERSION_MAJ) return string_format("%d.%d.%d.%d", mSWVersion[0], mSWVersion[1], mSWVersion[2], mSWVersion[3]);
+  return "";
+}
+
+
+string EnoceanDevice::hardwareVersion() const
+{
+  if (mHWVersion[0]!=INVALID_VERSION_MAJ) return string_format("%d.%d.%d.%d", mHWVersion[0], mHWVersion[1], mHWVersion[2], mHWVersion[3]);
+  return "";
+}
+
 
 
 // MARK: - profile variants

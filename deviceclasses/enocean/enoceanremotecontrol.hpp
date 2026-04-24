@@ -66,6 +66,9 @@ namespace p44 {
     /// @param aDsuidIndexStep step between dSUID subdevice indices (default is 1, historically 2 for dual 2-way rocker switches)
     EnoceanRemoteControlDevice(EnoceanVdc *aVdcP, uint8_t aDsuidIndexStep = 1);
 
+    /// @return true to allow channels to process packet of aRorg type
+    virtual bool acceptRadioOrg(RadioOrg aRorg) P44_OVERRIDE { return false; /* does not accept any packets */ }
+
     /// device type identifier
 		/// @return constant identifier for this type of device (one container might contain more than one type)
     virtual string deviceTypeIdentifier() const P44_OVERRIDE { return "enocean_remotecontrol"; };

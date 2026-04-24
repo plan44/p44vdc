@@ -97,6 +97,7 @@ namespace p44 {
     rorg_4BS = 0xA5, ///< 4 Byte Communication
     rorg_VLD = 0xD2, ///< Variable Length Data
     rorg_MSC = 0xD1, ///< Manufacturer specific communication
+    rorg_SIG = 0xD0, ///< Signal message
     rorg_ADT = 0xA6, ///< Adressing Destination Telegram
     rorg_UTE = 0xD4, ///< UTE - Universal TEach-in
     rorg_SM_LRN_REQ = 0xC6, ///< Smart Ack Learn Request
