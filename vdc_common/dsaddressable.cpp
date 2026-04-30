@@ -469,7 +469,7 @@ void DsAddressable::updatePresenceState(bool aPresent)
     if (api) {
       ApiValuePtr q = api->newApiValue();
       q = q->wrapNull("active");
-      pushNotification(api, q, ApiValuePtr(), VDC_API_DOMAIN);
+      pushNotification(api, q, ApiValuePtr());
     }
     // also push change in presence to bridgeAPI
     #if ENABLE_JSONBRIDGEAPI

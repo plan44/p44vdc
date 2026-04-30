@@ -359,7 +359,7 @@ bool DynamicDeviceActions::pushActionChange(DeviceActionPtr aAction, bool aRemov
     ApiValuePtr q = api->newApiValue();
     q = q->wrapNull(aAction->getId())->wrapAs("dynamicActionDescriptions");
     // let pushNotification execute the query and
-    return sd.pushNotification(api, q, ApiValuePtr(), aRemoved);
+    return sd.pushNotification(api, q, ApiValuePtr(), aRemoved); // note: forwarding query as-is to report removal
   }
   // no API, cannot not push
   return false;
@@ -1049,7 +1049,7 @@ bool DeviceState::pushWithEvents(DeviceEventsList aEventList)
       events->add((*pos)->eventId, event);
       SOLOG((*singleDeviceP), LOG_NOTICE, "- pushing event '%s' along with state change", (*pos)->eventId.c_str());
     }
-    return singleDeviceP->pushNotification(api, query, events, VDC_API_DOMAIN);
+    return singleDeviceP->pushNotification(api, query, events);
   }
   else {
     for (DeviceEventsList::iterator pos=aEventList.begin(); pos!=aEventList.end(); ++pos) {
