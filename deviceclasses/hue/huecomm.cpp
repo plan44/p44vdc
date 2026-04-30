@@ -103,7 +103,10 @@ bool HueApiOperation::initiate()
   if (mMethod==PUT) {
     SOLOG(mHueComm, LOG_INFO, "Sending API action (PUT) command: %s: %s", mUrl.c_str(), JsonObject::text(mData));
   }
-  mHueComm.mBridgeAPIComm.jsonRequest(mUrl.c_str(), boost::bind(&HueApiOperation::processAnswer, this, _1, _2), methodStr, mData);
+  if (!mHueComm.mBridgeAPIComm.jsonRequest(mUrl.c_str(), boost::bind(&HueApiOperation::processAnswer, this, _1, _2), methodStr, mData)) {
+    SOLOG(mHueComm, LOG_ERR, "http client busy: cannot initiate API action (%s) command; %s: %s", methodStr, mUrl.c_str(), JsonObject::text(mData));
+    return false; // could not initiate, should retry later
+  }
   // executed
   return inherited::initiate();
 }
