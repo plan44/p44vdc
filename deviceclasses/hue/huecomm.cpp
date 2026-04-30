@@ -356,7 +356,7 @@ public:
           // old digiESP platform does not have proper crypto for https with hue bridge
           aServiceInfo->port = 80; // degrade to plain http
         }
-        #endif
+        #endif // P44_BUILD_DIGI
         string url = aServiceInfo->url()+"/"+HUE_API_V1_PATH;
         if (aBridgeSearchId.empty()) {
           SOLOG(mHueComm, LOG_INFO, "DNS-SD: bridge device found at %s, bridgeid=%s", aServiceInfo->url().c_str(), b->second.c_str());
@@ -383,7 +383,7 @@ public:
         hueComm.searchBridgesViaHueCloud(boost::bind(&BridgeFinder::nupnpDiscoveryHandler, this, _1, aBridgeSearchId));
       }
       else
-      #endif
+      #endif // HUE_CLOUD_DISCOVERY
       {
         candidatesCollectedFor(aBridgeSearchId);
       }
@@ -522,7 +522,7 @@ public:
           searchBridgesViaHueCloud("");
         }
         else
-        #endif
+        #endif // HUE_CLOUD_DISCOVERY
         {
           // just process the local SSDP results
           processBridgeCandidates("");

@@ -352,7 +352,7 @@ bool OutputBehaviour::pushOutputState(bool aDS, bool aBridges)
       requestedPushDone = false;
     }
   }
-  #endif
+  #endif // ENABLE_JSONBRIDGEAPI
   // true if requested pushes are done or irrelevant (e.g. bridge push requested w/o bridging enabled at all)
   return requestedPushDone;
 }

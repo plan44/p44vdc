@@ -1349,7 +1349,7 @@ void Device::serializerWatchdog()
     updatingChannelsComplete();
     FOCUSLOG("##### Force-ending complete");
   }
-  #endif
+  #endif // SERIALIZER_WATCHDOG
 }
 
 
