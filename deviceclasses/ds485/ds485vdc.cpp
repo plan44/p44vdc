@@ -475,7 +475,7 @@ void Ds485Vdc::ds485MessageHandler(const DsUid& aSource, const DsUid& aTarget, c
           case EVENT_DEVICE_SENSOR_EVENT: {
             uint8_t eventIdx;
             if ((pli = Ds485Comm::payload_get8(aPayload, pli, eventIdx))==0) return;
-            POLOG(dev, LOG_WARNING, "dS485 Sensor event not yet handled: event index=%d", eventIdx);
+            POLOG(dev, LOG_INFO, "dS485 Sensor event not handled: event index=%d", eventIdx);
             break;
           }
         }
