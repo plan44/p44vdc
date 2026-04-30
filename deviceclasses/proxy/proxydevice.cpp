@@ -405,7 +405,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
         pushNotification(api, pushedprops, ApiValuePtr(), true);
       }
     }
-    #endif
+    #endif // ENABLE_JSONBRIDGEAPI
   }
   // properties we need for multicast addressing
   // - zone ID

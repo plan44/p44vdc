@@ -235,7 +235,7 @@ void ButtonBehaviour::setGroup(DsGroup aGroup)
         mDevice.pushNotification(api, q, ApiValuePtr());
       }
     }
-    #endif
+    #endif // ENABLE_JSONBRIDGEAPI
   }
 }
 
@@ -253,7 +253,7 @@ void ButtonBehaviour::setChannel(DsChannelType aChannel)
         mDevice.pushNotification(api, q, ApiValuePtr());
       }
     }
-    #endif
+    #endif // ENABLE_JSONBRIDGEAPI
   }
 }
 

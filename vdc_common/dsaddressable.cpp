@@ -481,7 +481,7 @@ void DsAddressable::updatePresenceState(bool aPresent)
         pushNotification(api, q, ApiValuePtr());
       }
     }
-    #endif
+    #endif // ENABLE_JSONBRIDGEAPI
   }
 }
 
@@ -622,7 +622,7 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
           if (!bridgeable() && br) return false; // cannot turn ON bridged status when not bridgeable
           mBridged = br; return true; // but turning OFF bridged status is ok (bridge confirming un-bridging)
         }
-        #endif
+        #endif // ENABLE_JSONBRIDGEAPI
       }
     }
     else {
