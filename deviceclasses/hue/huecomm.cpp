@@ -100,11 +100,9 @@ bool HueApiOperation::initiate()
     case DELETE : methodStr = "DELETE"; break;
     default : methodStr = "GET"; mData.reset(); break;
   }
-  if (mMethod==PUT) {
-    SOLOG(mHueComm, LOG_INFO, "Sending API action (PUT) command: %s: %s", mUrl.c_str(), JsonObject::text(mData));
-  }
+  SOLOG(mHueComm, mMethod==PUT ? LOG_INFO : LOG_DEBUG, "op %p: Initiating API reuqest (%s): %s: %s", this, methodStr, mUrl.c_str(), JsonObject::text(mData));
   if (!mHueComm.mBridgeAPIComm.jsonRequest(mUrl.c_str(), boost::bind(&HueApiOperation::processAnswer, this, _1, _2), methodStr, mData)) {
-    SOLOG(mHueComm, LOG_ERR, "http client busy: cannot initiate API action (%s) command; %s: %s", methodStr, mUrl.c_str(), JsonObject::text(mData));
+    SOLOG(mHueComm, LOG_ERR, "op %p: http client busy: cannot initiate API action (%s) command; %s: %s", this, methodStr, mUrl.c_str(), JsonObject::text(mData));
     return false; // could not initiate, should retry later
   }
   // executed
@@ -117,7 +115,7 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
 {
   mError = aError;
   if (Error::isOK(mError)) {
-    SOLOG(mHueComm, LOG_INFO, "Receiving API response: %s", JsonObject::text(aJsonResponse));
+    SOLOG(mHueComm, LOG_INFO, "op %p: Receiving API response: %s", this, JsonObject::text(aJsonResponse));
     // pre-process response in case of non-GET
     if (mMethod!=GET) {
       // Expected:
@@ -161,7 +159,7 @@ void HueApiOperation::processAnswer(JsonObjectPtr aJsonResponse, ErrorPtr aError
     }
   }
   else {
-    SOLOG(mHueComm, LOG_WARNING, "API error: %s", mError->text());
+    SOLOG(mHueComm, LOG_WARNING, "op %p: API error: %s", this, mError->text());
   }
   // done
   mCompleted = true;
@@ -778,6 +776,7 @@ void HueComm::apiAction(HueApiOperation::HttpMethods aMethod, const char* aUrlSu
   // A: You can send commands to the lights too fast. If you stay roughly around 10 commands per
   //    second to the /lights resource as maximum you should be fine.
   op->setInitiationDelay(100*MilliSecond, true); // do not start next command earlier than 100mS after the previous one
+  OLOG(LOG_DEBUG, "queueing op %p (lastcheck %lld secs ago): API action (methodcode %u) command: %s: %s", op.get(), (MainLoop::now()-mLastCheck)/Second, aMethod, url.c_str(), JsonObject::text(aData));
   queueOperation(op);
   // process operations
   processOperations();
