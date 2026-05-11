@@ -46,7 +46,6 @@ namespace p44 {
   {
     typedef SQLite3TableGroup inherited;
   protected:
-    /// Get DB Schema creation/upgrade SQL statements
     virtual string schemaUpgradeSQL(int aFromVersion, int &aToVersion);
   };
 
@@ -59,77 +58,102 @@ namespace p44 {
 
     WledPersistence mDb;
 
-    /// @name persistent parameters
-    /// @{
-
+    /// persistent parameters
     bool mAutoDiscovery;              ///< enable/disable DNS-SD auto-discovery
 
-    /// @}
-
-    /// @name internal state
-    /// @{
-
+    /// internal state
     typedef map<string, WledDevicePtr> WledDeviceMap;
-    WledDeviceMap mWledDevices;       ///< known devices, keyed by MAC address
+    WledDeviceMap mWledDevices;       ///< known dS virtual devices, keyed by dSUID-base string
 
-    MLTicket mRefreshTicket;          ///< for periodic state refresh
+    MLTicket mRefreshTicket;
 
-    /// @}
+    /// preset optimizer state
+    /// Map from physical device MAC to the set of WLED preset IDs (1-250) in use by the optimizer.
+    map<string, set<int>> mUsedPresetIds;
+    MLTicket mDelayedPresetUpdateTicket;  ///< for delayed post-transition preset save
 
   public:
 
     WledVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
     virtual ~WledVdc();
 
-    /// set the log level offset on this logging object (and possibly contained sub-objects)
     virtual void setLogLevelOffset(int aLogLevelOffset) P44_OVERRIDE;
 
-    /// initialize the device container
     virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
-
-    /// vdc class identifier
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
-
-    /// scan for (collect) devices and add them to the vdc
     virtual void scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags) P44_OVERRIDE;
-
-    /// rescan modes supported
     virtual int getRescanModes() const P44_OVERRIDE { return rescanmode_incremental+rescanmode_normal+rescanmode_exhaustive; }
-
-    /// remove a device
-    void removeDevice(DevicePtr aDevice, bool aForget) P44_OVERRIDE;
-
-    /// handle vdc level method calls
+    virtual void removeDevice(DevicePtr aDevice, bool aForget) P44_OVERRIDE;
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
-
-    /// Get icon data or name
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
-
-    /// Get extra info to be displayed for vdc
     virtual string getExtraInfo() P44_OVERRIDE;
-
-    /// Get hardware GUID
     virtual string hardwareGUID() P44_OVERRIDE;
-
-    /// @return human readable, language independent suffix to explain vdc functionality.
     virtual string vdcModelSuffix() const P44_OVERRIDE { return "wled"; }
-
-    /// @return human readable model version specific to that vDC
     virtual string vdcModelVersion() const P44_OVERRIDE { return "0.0.0"; };
+    virtual void handleGlobalEvent(VdchostEvent aEvent) P44_OVERRIDE;
+
+    // MARK: - Scene optimizer (native WLED presets)
+
+    /// Allow optimizer for any ntfy_callscene regardless of device count
+    virtual bool shouldUseOptimizerFor(NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
+
+    /// On startup: re-register preset IDs that were already in use
+    virtual ErrorPtr announceNativeAction(const string aNativeActionId) P44_OVERRIDE;
+
+    /// Recall a WLED preset
+    virtual void callNativeAction(StatusCB aStatusCB, const string aNativeActionId, NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
+
+    /// Create a new WLED preset by saving the current device state
+    virtual void createNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
+
+    /// Update a WLED preset after a scene change (delayed to let transition finish)
+    virtual void updateNativeAction(StatusCB aStatusCB, OptimizerEntryPtr aOptimizerEntry, NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
+
+    /// Cancel any pending delayed preset update
+    virtual void cancelNativeActionUpdate() P44_OVERRIDE;
+
+    /// Delete a WLED preset
+    virtual void freeNativeAction(StatusCB aStatusCB, const string aNativeActionId) P44_OVERRIDE;
 
   private:
 
-    /// Connect to a WLED device by hostname/IP, query its info, create or update the
-    /// WledDevice object and persist the MAC+hostname mapping.
-    /// @param aHostname  IP address or hostname of the WLED device
-    /// @param aCompletedCB  called when done (may be NULL)
+    // MARK: - Device management
+
+    /// Connect to a WLED device, query its segments, and create one WledDevice per segment.
     void connectToDevice(const string &aHostname, StatusCB aCompletedCB);
 
-    /// perform auto-discovery of WLED devices via DNS-SD
-    void performDiscovery(StatusCB aCompletedCB);
+    /// Internal: called once we have both /json/info and /json/state for a device.
+    void createDevicesForPhysicalDevice(WledCommPtr aComm, const string &aHostname,
+                                        JsonObjectPtr aInfo, JsonObjectPtr aState,
+                                        StatusCB aCompletedCB);
 
-    /// DNS-SD browse result callback — returns true to continue browsing
+    void performDiscovery(StatusCB aCompletedCB);
     bool handleDiscoveryHandler(ErrorPtr aError, DnsSdServiceInfoPtr aServiceInfo, StatusCB aCompletedCB);
+
+    // MARK: - Preset helpers
+
+    /// Format: "wled:<mac>:p:<N>"
+    static string wledNativeActionId(const string &aMac, int aPresetId);
+
+    /// Parse the above; returns false if format does not match
+    static bool parseWledNativeActionId(const string &aId, string &aMac, int &aPresetId);
+
+    /// Find first unused preset ID for the given device MAC; returns -1 when all 250 are used
+    int allocatePresetId(const string &aMac);
+
+    /// Release a preset ID back to the free pool
+    void freePresetId(const string &aMac, int aPresetId);
+
+    /// Find a WledDevice by its physical device MAC address (returns any segment)
+    WledDevicePtr findDeviceByMac(const string &aMac);
+
+    /// Save current device state as WLED preset aPresetId and call aStatusCB when done
+    void savePreset(WledDevicePtr aDev, int aPresetId, int aSceneId, StatusCB aStatusCB);
+
+    /// Perform the delayed preset update (called after transition finishes)
+    void performPresetUpdate(uint64_t aNewHash, string aNativeActionId,
+                             WledDevicePtr aDev, int aPresetId,
+                             OptimizerEntryPtr aOptimizerEntry);
   };
 
 } // namespace p44

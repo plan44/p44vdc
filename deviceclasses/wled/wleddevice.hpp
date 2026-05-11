@@ -40,7 +40,14 @@ namespace p44 {
 
   typedef boost::intrusive_ptr<WledDevice> WledDevicePtr;
 
-  /// WLED color light device
+  /// WLED color light device.
+  ///
+  /// A single WledDevice represents either:
+  ///   - an entire WLED physical device (mSegmentId == -1), or
+  ///   - one segment of a multi-segment WLED device (mSegmentId >= 0).
+  ///
+  /// When representing a segment, mComm is shared with the other segment devices
+  /// belonging to the same physical WLED unit.
   class WledDevice : public Device
   {
     typedef Device inherited;
@@ -48,10 +55,20 @@ namespace p44 {
 
   public:
 
+    /// Constructor for a whole-device (single-segment) WledDevice.
+    /// Creates a new WledComm internally.
     /// @param aVdcP  parent VDC
     /// @param aHostname  hostname or IP address of the WLED device
     /// @param aDeviceInfo  /json/info response from the device
     WledDevice(WledVdc *aVdcP, const string &aHostname, JsonObjectPtr aDeviceInfo);
+
+    /// Constructor for a per-segment WledDevice that shares a WledComm.
+    /// @param aVdcP  parent VDC
+    /// @param aComm  shared communication layer for the physical device
+    /// @param aSegmentId  WLED segment index (0..N-1)
+    /// @param aDeviceInfo  /json/info response from the physical device
+    WledDevice(WledVdc *aVdcP, WledCommPtr aComm, int aSegmentId, JsonObjectPtr aDeviceInfo);
+
     virtual ~WledDevice();
 
     /// set the log level offset on this logging object
@@ -78,16 +95,26 @@ namespace p44 {
     /// sync channel values from hardware (called before scene save)
     virtual void syncChannelValues(SimpleCB aDoneCB) P44_OVERRIDE;
 
+    /// let device indicate if it can be part of an optimized (native) notification set
+    virtual bool prepareForOptimizedSet(NotificationDeliveryStatePtr aDeliveryState) P44_OVERRIDE;
+
     /// handle vdc-level method calls
     virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
+    /// presence check: reachable iff /json/info responds without error
     virtual void checkPresence(PresenceCB aPresenceResultHandler) P44_OVERRIDE;
-    void presenceStateReceived(PresenceCB aPresenceResultHandler, JsonObjectPtr aDeviceInfo, ErrorPtr aError);
+
+    /// disconnect guard: only allow removal when device is not reachable
+    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
+
+    /// propagate name changes to the WLED device firmware
+    virtual void setName(const string &aName) P44_OVERRIDE;
 
   protected:
 
     WledVdc &mVdc;                    ///< reference to parent VDC
-    WledComm mComm;                   ///< per-device communication layer
+    WledCommPtr mComm;                ///< communication layer (may be shared with sibling segments)
+    int mSegmentId;                   ///< segment index, or -1 for whole-device (single segment)
 
     /// device information
     string mDeviceName;               ///< user friendly device name
@@ -111,14 +138,17 @@ namespace p44 {
     bool mSettingState;               ///< flag to prevent feedback loops
 
     // internal state
-    Tristate mCurrentlyOn; ///< current "on" status
-    uint8_t mLastSentBri; ///< last sent "bri", 0=undefined
+    Tristate mCurrentlyOn;            ///< current "on" status
+    uint8_t mLastSentBri;             ///< last sent "bri", 0=undefined
 
     #if ENABLE_JSON_WEBSOCKET
     bool mWebsocketUpdatePending;     ///< flag to prevent duplicate state processing
     #endif
 
   private:
+
+    /// shared constructor body (called from both public constructors)
+    void construct(JsonObjectPtr aDeviceInfo);
 
     /// initialize behaviors based on device capabilities
     void initializeBehaviors(JsonObjectPtr aDeviceInfo);
@@ -138,6 +168,12 @@ namespace p44 {
     /// handler for syncChannelValues() state response
     void channelValuesReceived(SimpleCB aDoneCB, JsonObjectPtr aState, ErrorPtr aError);
 
+    /// handler for checkPresence() network query
+    void presenceStateReceived(PresenceCB aPresenceResultHandler, JsonObjectPtr aDeviceInfo, ErrorPtr aError);
+
+    /// handler for disconnect() presence check
+    void disconnectableHandler(bool aForgetParams, DisconnectCB aDisconnectResultHandler, bool aPresent);
+
     /// convert WLED RGB color to HSV
     static void rgbToHsv(uint8_t aRed, uint8_t aGreen, uint8_t aBlue,
                          double &aHue, double &aSaturation, double &aValue);
@@ -148,9 +184,6 @@ namespace p44 {
 
     /// extract RGB from WLED state
     void extractRgbFromState(JsonObjectPtr aState, uint8_t &aRed, uint8_t &aGreen, uint8_t &aBlue);
-
-    /// build WLED state update from channel values
-    JsonObjectPtr buildStateUpdate();
 
     #if ENABLE_JSON_WEBSOCKET
 
