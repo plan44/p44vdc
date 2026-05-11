@@ -579,13 +579,11 @@ void ChannelBehaviour::channelValueApplied(bool aAnyWay)
     #if P44SCRIPT_FULL_SUPPORT
     sendValueEvent();
     #endif
-    if (!aAnyWay) {
-      // only log when actually of importance (to prevent messages for devices that apply mostly immediately)
-      OLOG(LOG_INFO,
-        "applied new value %0.2f to hardware%s",
-        mCachedChannelValue, inTransition() ? " (still in transition)" : " (complete)"
-      );
-    }
+    // info log only when actually of importance (to prevent messages for devices that apply mostly immediately)
+    OLOG(aAnyWay ? LOG_DEBUG : LOG_INFO,
+      "applied new value %0.2f to hardware%s",
+      mCachedChannelValue, inTransition() ? " (still in transition)" : " (complete)"
+    );
   }
 }
 

@@ -436,6 +436,7 @@ void ShadowBehaviour::applyBlindChannels(MovementChangeCB aMovementCB, SimpleCB 
       // do not interrupt running positioning just because of angle change,
       // the angle will be (re)applied after positioning anyway
       // - just confirm applied
+      mAngle->channelValueApplied();
       if (aApplyDoneCB) aApplyDoneCB();
       // - let running state machine do the rest
       return;
@@ -625,7 +626,7 @@ void ShadowBehaviour::applyPosition(SimpleCB aApplyDoneCB)
 {
   // decide what to do next
   if (mPosition->needsApplying()) {
-    FOCUSLOG("- starting position apply: %.1f -> %.1f", mReferencePosition, mPosition->getChannelValue());
+    FOCUSOLOG("- starting position apply: %.1f -> %.1f", mReferencePosition, mPosition->getChannelValue());
     // set new position
     mTargetPosition = mPosition->getChannelValue();
     // as position changes angle, make sure we have a valid target angle (even in case it is not marked needsApplying() right now)
@@ -657,7 +658,7 @@ void ShadowBehaviour::applyPosition(SimpleCB aApplyDoneCB)
     // calculate moving time
     if (dist>0) {
       // we'll move up
-      FOCUSLOG("- currently saved open time: %.1f, angle open time: %.2f", mOpenTime, mAngleOpenTime);
+      FOCUSOLOG("- currently saved open time: %.1f, angle open time: %.2f", mOpenTime, mAngleOpenTime);
       mMovingUp = true;
       stopIn = mOpenTime*Second/100.0*dist;
       probablyEndsIn = mOpenTime*Second/100.0*probableDist;
@@ -667,7 +668,7 @@ void ShadowBehaviour::applyPosition(SimpleCB aApplyDoneCB)
     }
     else if (dist<0) {
       // we'll move down
-      FOCUSLOG("- currently saved close time: %.1f, angle close time: %.2f", mCloseTime, mAngleCloseTime);
+      FOCUSOLOG("- currently saved close time: %.1f, angle close time: %.2f", mCloseTime, mAngleCloseTime);
       mMovingUp = false;
       stopIn = mCloseTime*Second/100.0*-dist;
       probablyEndsIn = mCloseTime*Second/100.0*-probableDist;
@@ -716,7 +717,7 @@ void ShadowBehaviour::applyAngle(SimpleCB aApplyDoneCB)
     allDone(aApplyDoneCB);
   }
   else {
-    FOCUSLOG("- starting angle apply: %.1f -> %.1f", mReferenceAngle, mTargetAngle);
+    FOCUSOLOG("- starting angle apply: %.1f -> %.1f", mReferenceAngle, mTargetAngle);
     double dist = mTargetAngle-mReferenceAngle; // distance to move up
     MLMicroSeconds stopIn = 0;
     // calculate new stop time
@@ -757,7 +758,7 @@ void ShadowBehaviour::startMoving(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
     return;
   }
   // actually start moving
-  FOCUSLOG("- start moving into direction = %d", dir);
+  FOCUSOLOG("- start moving into direction = %d", dir);
   // - start the movement
   mMovementCB(boost::bind(&ShadowBehaviour::moveStarted, this, aStopIn, aApplyDoneCB), dir);
 }
@@ -769,7 +770,7 @@ void ShadowBehaviour::moveStarted(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
   moveTimerStart();
   // schedule stop if not moving into end positions (and end contacts are available)
   if (mHasEndContacts && mRunIntoEnd) {
-    FOCUSLOG("- move started, let movement run into end contacts");
+    FOCUSOLOG("- move started, let movement run into end contacts");
   }
   else {
     // calculate stop time and set timer
@@ -786,7 +787,7 @@ void ShadowBehaviour::moveStarted(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
         aStopIn = mMaxShortMoveTime;
         remaining-=aStopIn;
       }
-      FOCUSLOG("- must restrict to %.3f Seconds now (%.3f later) to prevent starting continuous blind movement", (double)aStopIn/Second, (double)remaining/Second);
+      FOCUSOLOG("- must restrict to %.3f Seconds now (%.3f later) to prevent starting continuous blind movement", (double)aStopIn/Second, (double)remaining/Second);
     }
     else {
       remaining = 0;
@@ -794,7 +795,9 @@ void ShadowBehaviour::moveStarted(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
     if (aStopIn>MIN_INTERRUPTABLE_MOVE_TIME) {
       // this is a long move, allow interrupting it
       // - which means that we confirm applied now
-      FOCUSLOG("- is long move, should be interruptable -> confirming applied now");
+      FOCUSOLOG("- is long move, should be interruptable -> confirming applied now");
+      mPosition->channelValueApplied();
+      mAngle->channelValueApplied();
       if (aApplyDoneCB) aApplyDoneCB();
       // - and prevent calling back again later
       aApplyDoneCB = NoOP;
@@ -804,7 +807,7 @@ void ShadowBehaviour::moveStarted(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
         mProgressTicket.executeOnce(boost::bind(&ShadowBehaviour::progressReport, this, _2), r);
       }
     }
-    FOCUSLOG("- move started, scheduling stop in %.3f Seconds", (double)aStopIn/Second);
+    FOCUSOLOG("- move started, scheduling stop in %.3f Seconds", (double)aStopIn/Second);
     mMovingTicket.executeOnce(boost::bind(&ShadowBehaviour::endMove, this, remaining, aApplyDoneCB), aStopIn);
   }
 }
@@ -831,7 +834,7 @@ void ShadowBehaviour::endMove(MLMicroSeconds aRemainingMoveTime, SimpleCB aApply
   else {
     // move is segmented, needs pause now and restart later
     // - stop (=start pause)
-    FOCUSLOG("- end of move segment, pause now");
+    FOCUSOLOG("- end of move segment, pause now");
     mMovementCB(boost::bind(&ShadowBehaviour::movePaused, this, aRemainingMoveTime, aApplyDoneCB), 0);
   }
 }
@@ -840,7 +843,7 @@ void ShadowBehaviour::endMove(MLMicroSeconds aRemainingMoveTime, SimpleCB aApply
 void ShadowBehaviour::movePaused(MLMicroSeconds aRemainingMoveTime, SimpleCB aApplyDoneCB)
 {
   // paused, restart afterwards
-  FOCUSLOG("- move paused, waiting to start next segment");
+  FOCUSOLOG("- move paused, waiting to start next segment");
   // must update reference values between segments as well, otherwise estimate will include pause
   moveTimerStop();
   // schedule next segment
