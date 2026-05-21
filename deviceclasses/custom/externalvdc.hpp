@@ -108,20 +108,23 @@ namespace p44 {
     /// @return id identifying the context object
     virtual string contextId() const P44_OVERRIDE;
 
+    /// actively shut down the connection
+    void shutdown();
 
-  private:
-
-    void removeDevice(ExternalDevicePtr aExtDev);
-    void closeConnection();
-    void handleDeviceConnectionStatus(ErrorPtr aError);
-    void handleDeviceApiJsonMessage(ErrorPtr aError, JsonObjectPtr aMessage);
-    ErrorPtr handleDeviceApiJsonSubMessage(JsonObjectPtr aMessage);
-    void handleDeviceApiSimpleMessage(ErrorPtr aError, string aMessage);
-
+    /// internal utilities
     ExternalDevicePtr findDeviceByTag(string aTag, bool aNoError);
     void sendDeviceApiJsonMessage(JsonObjectPtr aMessage, const char *aTag = NULL);
     void sendDeviceApiSimpleMessage(string aMessage, const char *aTag = NULL);
     void sendDeviceApiStatusMessage(ErrorPtr aError, const char *aTag = NULL);
+
+  private:
+
+    void closeConnection();
+    void removeDevice(ExternalDevicePtr aExtDev);
+    void handleDeviceConnectionStatus(ErrorPtr aError);
+    void handleDeviceApiJsonMessage(ErrorPtr aError, JsonObjectPtr aMessage);
+    ErrorPtr handleDeviceApiJsonSubMessage(JsonObjectPtr aMessage);
+    void handleDeviceApiSimpleMessage(ErrorPtr aError, string aMessage);
 
   };
 
@@ -161,9 +164,11 @@ namespace p44 {
     /// @note usually, this would be a LED or buzzer in the vdc device (bridge, gateway etc.)
     virtual void identifyToUser(MLMicroSeconds aDuration) P44_OVERRIDE;
 
-  private:
+  protected:
 
-    SocketCommPtr deviceApiConnectionHandler(SocketCommPtr aServerSocketCommP);
+    virtual void connectionClosed(ExternalDeviceConnector& aConnector) { /* NOP in base class */ };
+
+    virtual SocketCommPtr deviceApiConnectionHandler(SocketCommPtr aServerSocketCommP);
 
   };
 
