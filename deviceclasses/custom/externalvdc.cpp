@@ -128,15 +128,23 @@ ExternalDeviceConnector::~ExternalDeviceConnector()
 }
 
 
+void ExternalDeviceConnector::shutdown()
+{
+  OLOG(LOG_NOTICE, "shutdown: close connection and disconnect all devices");
+  closeConnection();
+  // devices have vanished for now, but will keep parameters in case it reconnects later
+  while (mExternalDevices.size()>0) {
+    mExternalDevices.begin()->second->hasVanished(false); // keep config
+  }
+}
+
+
+
 void ExternalDeviceConnector::handleDeviceConnectionStatus(ErrorPtr aError)
 {
   if (Error::notOK(aError)) {
-    closeConnection();
-    OLOG(LOG_NOTICE, "external device connection closed (%s) -> disconnecting all devices", aError->text());
-    // devices have vanished for now, but will keep parameters in case it reconnects later
-    while (mExternalDevices.size()>0) {
-      mExternalDevices.begin()->second->hasVanished(false); // keep config
-    }
+    OLOG(LOG_NOTICE, "external device connection error: %s", aError->text());
+    shutdown();
   }
 }
 
@@ -158,6 +166,7 @@ void ExternalDeviceConnector::closeConnection()
   mDeviceConnection->setConnectionStatusHandler(NoOP);
   // close connection
   mDeviceConnection->closeConnection();
+  mExternalVdc.connectionClosed(*this);
   // release the connection
   // Note: this should cause the connection to get deleted, which in turn also releases the relatedObject,
   //   so the device is only kept by the container (or not at all if it has not yet registered)
