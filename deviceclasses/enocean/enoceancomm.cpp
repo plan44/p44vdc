@@ -1152,6 +1152,7 @@ uint8_t EnOceanSecurity::rlcSize()
   uint8_t rlcBytes = 0;
   if (rlcAlgo==1) rlcBytes = 2; // 16 bit RLC
   else if (rlcAlgo==2) rlcBytes = 3; // 24 bit RLC
+  else if (rlcAlgo==3) rlcBytes = 4; // 32 bit RLC
   return rlcBytes;
 }
 
