@@ -123,6 +123,7 @@ namespace p44 {
     bool mSceneCommands; ///< if set, scene commands are forwarded to the external device
     bool mSceneCalls; ///< if set, dS scene calls are forwarded to the external device
     bool mForwardIdentify; ///< if set, "IDENTIFY" messages will be sent, and device will show the "identification" modelfeature in the vDC API
+    bool mInternal; ///< if set, the device is not published to DS
     ColorLightMode mTargetColorMode; ///< color light mode
 
     #if ENABLE_CUSTOM_EXOTIC
@@ -157,6 +158,10 @@ namespace p44 {
 
     /// identify a device up to the point that it knows its dSUID and internal structure. Possibly swap device object for a more specialized subclass.
     virtual bool identifyDevice(IdentifyDeviceCB aIdentifyCB) P44_OVERRIDE;
+
+    /// check if device is public dS device (which should be registered with vdSM)
+    /// @return true if device is registerable with vdSM
+    virtual bool isPublicDS() P44_OVERRIDE;
 
     CustomVdc &getCustomVdc();
 

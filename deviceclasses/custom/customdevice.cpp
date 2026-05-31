@@ -142,6 +142,7 @@ CustomDevice::CustomDevice(Vdc *aVdcP, bool aSimpleText) :
   mSceneCalls(false), // no scene calls forwarded by default
   mForwardIdentify(false), // no identification forward by default
   mControlValues(false), // no control values by default
+  mInternal(false), // not internal by default
   mConfigured(false),
   mIconBaseName("cust"), // default icon name
   mModelNameString("custom device"),
@@ -165,6 +166,14 @@ bool CustomDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 {
   // Nothing to do to identify for now
   return true; // simple identification, callback will not be called
+}
+
+
+bool CustomDevice::isPublicDS()
+{
+  return
+    !mInternal && // not internal-only...
+    inherited::isPublicDS(); // ...and base class has dS enabled
 }
 
 
@@ -1025,6 +1034,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   if (aInitParams->get("scenecommands", o)) mSceneCommands = o->boolValue();
   if (aInitParams->get("scenecalls", o)) mSceneCalls = o->boolValue();
   if (aInitParams->get("identification", o)) mForwardIdentify = o->boolValue();
+  if (aInitParams->get("internal", o)) mInternal = o->boolValue();
   // get unique ID
   string uniqueid;
   if (!aInitParams->get("uniqueid", o)) {
