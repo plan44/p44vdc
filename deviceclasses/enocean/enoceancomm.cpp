@@ -1146,11 +1146,33 @@ void EnOceanSecurity::deriveSubkeysFromPrivateKey()
 }
 
 
+
+// SLF - mSecurityLevelFormat
+// |  7  |  6  |  5  |  4  |  3  |   2  |  1  |  0  |
+// |     RLC_TYPE    | CMAC_TYPE |  ENCRYPTION_TYPE |
+// |  RLC_ALGO | TX  |           |                  |
+//
+// - RLC_TYPE (EnOcean Security Specification v3.02
+//   0b100: 24-bit RLC used, RLC not transmitted in data telegrams (implicit RLC)
+//   0b101: 24-bit RLC used, 24-bit RLC transmitted in data telegrams
+//   0b110: 32-bit RLC used, 24-bit RLC transmitted in data telegrams, required by legacy receivers -> NOT SUPPORTED HERE!
+//   0b111: 32-bit RLC used, 32-bit RLC transmitted in data telegrams
+// - RLC_ALGO (EnOcean Security Specification v2.0)
+//   0b00: no RLC
+//   0b01: 16 bit RLC (deprecated in v3.02)
+//   0b10: 24 bit RLC
+//   0b11: N/A (32 bit was not yet defined in v3.02)
+// - TX (EnOcean Security Specification v2.0)
+//   0b0: not transmitted (implicit RLC) - note: this conflicts with v3.02 RLC_TYPE=0b110 (which we DO NOT SUPPORT HERE)
+//   0b1: transmitted (explicit RLC)
+
+
+
 uint8_t EnOceanSecurity::rlcSize()
 {
   uint8_t rlcAlgo = (mSecurityLevelFormat>>6) & 0x03;
   uint8_t rlcBytes = 0;
-  if (rlcAlgo==1) rlcBytes = 2; // 16 bit RLC
+  if (rlcAlgo==1) rlcBytes = 2; // 16 bit RLC (deprecated)
   else if (rlcAlgo==2) rlcBytes = 3; // 24 bit RLC
   else if (rlcAlgo==3) rlcBytes = 4; // 32 bit RLC
   return rlcBytes;
@@ -1277,6 +1299,12 @@ Tristate EnOceanSecurity::processTeachInMsg(Esp3PacketPtr aTeachInMsg, AES128Blo
     }
     else if (mSecurityLevelFormat!=mTeachInP->teachInData[idx]) {
       OLOG(LOG_WARNING, "%08X: RLC update attempt with non-matching security level -> ignored", aTeachInMsg->radioSender());
+      return no; // not a valid security info update
+    }
+    if ((mSecurityLevelFormat>>5)==0x6) {
+      // This legagcy format (never seen in the wild by us) would use 32 bit RLC but only transmit 24bits,
+      // which creates various ambiguities at increment / RLC window handling, so we just do not support it
+      OLOG(LOG_ERR, "%08X: legacy 32/24 RLC_TYPE=0b110 not supported", aTeachInMsg->radioSender());
       return no; // not a valid security info update
     }
     idx++; b--;
