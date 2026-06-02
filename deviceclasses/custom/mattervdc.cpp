@@ -120,6 +120,10 @@ ErrorPtr MatterVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
     JsonObjectPtr pmsg = JsonObject::newObj();
     pmsg->add("message", pmsg->newString("pair"));
     pmsg->add("payload", pmsg->newString(payload)); // QR code or manual setup code
+    ApiValuePtr a = aParams->get("dataset");
+    if (a) {
+      pmsg->add("dataset", pmsg->newString(a->stringValue()));
+    }
     mMatterConnector->sendDeviceApiJsonMessage(pmsg);
     // TODO: expect and process "paired" message
     respErr = Error::ok();
