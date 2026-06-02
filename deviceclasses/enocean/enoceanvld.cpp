@@ -173,10 +173,15 @@ const p44::EnoceanInputDescriptor enoceanVLDdescriptors[] = {
   { 0, 0x14, 0x40, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -40,   62.4, DB(8,7), DB(7,6),    100,      40*60, &rngErrSensorHandler,   tempText },
   { 0, 0x14, 0x40, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(7,5), DB(6,6),    100,      40*60, &rngErrSensorHandler,   humText },
   { 0, 0x14, 0x40, 0, class_blue_climate, group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,         0, 131071, DB(6,5), DB(4,5),    100,      40*60, &errSensorHandler,      illumText },
-  // D2-14-41 Multi-Function Temperature, Rel. Humidity, Illumination, Contact (and acceleration, but we don't use that yet)
+  // D2-14-41 Multi-Function Temperature, Rel. Humidity, Illumination, XYZ Acceleration, Contact
   { 0, 0x14, 0x41, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -40,   62.4, DB(8,7), DB(7,6),    100,      40*60, &rngErrSensorHandler,   tempText },
   { 0, 0x14, 0x41, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(7,5), DB(6,6),    100,      40*60, &rngErrSensorHandler,   humText },
   { 0, 0x14, 0x41, 0, class_blue_climate, group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,         0, 131071, DB(6,5), DB(4,5),    100,      40*60, &errSensorHandler,      illumText },
+  // - acceleration: raw 0..1000 -> -2.5..2.5g (max=2.615 gives 0.005g/LSB); 1021/1022/1023 = under/over-range/error via rngErrSensorHandler
+  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_none,        usage_undefined,    0,      3, DB(4,4), DB(4,3),    100,      40*60, &stdSensorHandler,      "Acceleration Status" },
+  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_none,        usage_undefined, -2.5,  2.615, DB(4,2), DB(3,1),    100,      40*60, &rngErrSensorHandler,   "Acceleration X" },
+  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_none,        usage_undefined, -2.5,  2.615, DB(3,0), DB(1,7),    100,      40*60, &rngErrSensorHandler,   "Acceleration Y" },
+  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_none,        usage_undefined, -2.5,  2.615, DB(1,6), DB(0,5),    100,      40*60, &rngErrSensorHandler,   "Acceleration Z" },
   { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_none,        usage_undefined,    0,      1, DB(0,4), DB(0,4),      0,      40*60, &stdInputHandler,       contactText },
   // D2-14-59 Multi-Function Temperature, Rel. Humidity, CO2 (also possibly PM1,2.5,10, HCHO, TVOC, but we don't support those for now) - e.g. ALADIN EnO Turo
   { 0, 0x14, 0x59, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,  102.3, DB(9,7), DB(8,6),    100,      40*60, &errSensorHandler,      tempText },
