@@ -145,67 +145,73 @@ static void faultErrSensorHandler(const struct EnoceanInputDescriptor &aInputDes
 using namespace EnoceanInputs;
 
 const p44::EnoceanInputDescriptor enoceanVLDdescriptors[] = {
-  // variant,func,type, SD,primarygroup,  channelGroup,                  behaviourType,         behaviourParam,         usage,              min,  max, MSB,     LSB,   updateIv,aliveSignIv, handler,              typeText
+  // variant,func,type, SD,primarygroup,  channelGroup,                  behaviourType,         behaviourParam,         usage,                  min,       max, MSB,     LSB,   updateIv,aliveSignIv, handler,              typeText
 
   // D2-03-0A Single button with battery indicator
-  { 0, 0x03, 0x0A, 0, class_black_joker,  group_yellow_light,            behaviour_button,      buttonElement_center,   usage_room,         0,      1, DB(0,7), DB(0,0),      0,          0, &D2030AButtonHandler,   "button" },
-  { 0, 0x03, 0x0A, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_none,        usage_room,         0,    255, DB(1,7), DB(1,0),      0,          0, &batPercSensorHandler,  supplyText },
+  { 0, 0x03, 0x0A, 0, class_black_joker,  group_yellow_light,            behaviour_button,      buttonElement_center,   usage_room,               0,         1, DB(0,7), DB(0,0),      0,          0, &D2030AButtonHandler,   "button" },
+  { 0, 0x03, 0x0A, 0, class_black_joker,  group_yellow_light,            behaviour_sensor,      sensorType_none,        usage_room,               0,       255, DB(1,7), DB(1,0),      0,          0, &batPercSensorHandler,  supplyText },
   // D2-07-00 Simple Lock Status
-  { 0, 0x07, 0x00, 0, class_black_joker,  group_red_security,            behaviour_binaryinput, binInpType_none,        usage_undefined,    0,      1, DB(0,7), DB(0,7),      0,          0, &stdInputHandler,       "bolt" },
-  { 0, 0x07, 0x00, 0, class_black_joker,  group_red_security,            behaviour_binaryinput, binInpType_none,        usage_undefined,    0,      1, DB(0,6), DB(0,6),      0,          0, &stdInputHandler,       "catch" },
+  { 0, 0x07, 0x00, 0, class_black_joker,  group_red_security,            behaviour_binaryinput, binInpType_none,        usage_undefined,          0,         1, DB(0,7), DB(0,7),      0,          0, &stdInputHandler,       "bolt" },
+  { 0, 0x07, 0x00, 0, class_black_joker,  group_red_security,            behaviour_binaryinput, binInpType_none,        usage_undefined,          0,         1, DB(0,6), DB(0,6),      0,          0, &stdInputHandler,       "catch" },
   // D2-0A Multichannel Temperature Sensors, (Pressac)
-  // - D2-0A-00: 0-80ºC
-  { 0, 0x0A, 0x00, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     85, DB(2,7), DB(2,0),     30,      40*60, &faultErrSensorHandler, tempText },
-  { 0, 0x0A, 0x00, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,         0,      1, DB(3,7), DB(3,7),     30,      40*60, &lowBatInputHandler,    lowBatText },
-  { 0, 0x0A, 0x00, 1, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     85, DB(1,7), DB(1,0),     30,      40*60, &faultErrSensorHandler, tempText },
-  { 0, 0x0A, 0x00, 2, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     85, DB(0,7), DB(0,0),     30,      40*60, &faultErrSensorHandler, tempText },
-  // - D2-0A-01: -20-100ºC
-  { 0, 0x0A, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -20,  107.5, DB(2,7), DB(2,0),     30,      40*60, &faultErrSensorHandler, tempText },
-  { 0, 0x0A, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,       0,        1, DB(3,7), DB(3,7),     30,      40*60, &lowBatInputHandler,    lowBatText },
-  { 0, 0x0A, 0x01, 1, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -20,  107.5, DB(1,7), DB(1,0),     30,      40*60, &faultErrSensorHandler, tempText },
-  { 0, 0x0A, 0x01, 2, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -20,  107.5, DB(0,7), DB(0,0),     30,      40*60, &faultErrSensorHandler, tempText },
+  // - D2-0A-00: 0..80ºC
+  { 0, 0x0A, 0x00, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,               0,        85, DB(2,7), DB(2,0),     30,      40*60, &faultErrSensorHandler, tempText },
+  { 0, 0x0A, 0x00, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,               0,         1, DB(3,7), DB(3,7),     30,      40*60, &lowBatInputHandler,    lowBatText },
+  { 0, 0x0A, 0x00, 1, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,               0,        85, DB(1,7), DB(1,0),     30,      40*60, &faultErrSensorHandler, tempText },
+  { 0, 0x0A, 0x00, 2, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,               0,        85, DB(0,7), DB(0,0),     30,      40*60, &faultErrSensorHandler, tempText },
+  // - D2-0A-01: -20..100ºC
+  { 0, 0x0A, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,             -20,     107.5, DB(2,7), DB(2,0),     30,      40*60, &faultErrSensorHandler, tempText },
+  { 0, 0x0A, 0x01, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,               0,         1, DB(3,7), DB(3,7),     30,      40*60, &lowBatInputHandler,    lowBatText },
+  { 0, 0x0A, 0x01, 1, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,             -20,     107.5, DB(1,7), DB(1,0),     30,      40*60, &faultErrSensorHandler, tempText },
+  { 0, 0x0A, 0x01, 2, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,             -20,     107.5, DB(0,7), DB(0,0),     30,      40*60, &faultErrSensorHandler, tempText },
   // D2-14-30 Multi-Function Smoke, Air quality, Temperature, Humidity sensor
-  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,     51, DB(3,0), DB(2,1),    100,      40*60, &stdSensorHandler,      tempText },
-  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(2,0), DB(1,1),    100,      40*60, &stdSensorHandler,      humText },
-  { 0, 0x14, 0x30, 0, class_blue_climate, group_red_security,            behaviour_binaryinput, binInpType_smoke,       usage_room,         0,      1, DB(5,7), DB(5,7),    100,      40*60, &stdInputHandler,       "Smoke Alarm" },
-  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,         0,      1, DB(4,2), DB(4,2),    100,      40*60, &lowBatInputHandler,    lowBatText }, // MSB of 2-bit battery status -> low+Critical report low bat
-  // D2-14-40 Multi-Function Temperature, Rel. Humidity, Illumination (and acceleration, but we don't use that yet)
-  { 0, 0x14, 0x40, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -40,   62.4, DB(8,7), DB(7,6),    100,      40*60, &rngErrSensorHandler,   tempText },
-  { 0, 0x14, 0x40, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(7,5), DB(6,6),    100,      40*60, &rngErrSensorHandler,   humText },
-  { 0, 0x14, 0x40, 0, class_blue_climate, group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,         0, 131071, DB(6,5), DB(4,5),    100,      40*60, &errSensorHandler,      illumText },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,               0,        51, DB(3,0), DB(2,1),    100,      40*60, &stdSensorHandler,      tempText },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,               0,     127.5, DB(2,0), DB(1,1),    100,      40*60, &stdSensorHandler,      humText },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_red_security,            behaviour_binaryinput, binInpType_smoke,       usage_room,               0,         1, DB(5,7), DB(5,7),    100,      40*60, &stdInputHandler,       "Smoke Alarm" },
+  { 0, 0x14, 0x30, 0, class_blue_climate, group_roomtemperature_control, behaviour_binaryinput, binInpType_lowBattery,  usage_room,               0,         1, DB(4,2), DB(4,2),    100,      40*60, &lowBatInputHandler,    lowBatText }, // MSB of 2-bit battery status -> low+Critical report low bat
+  // D2-14-40 Multi-Function Temperature, Rel. Humidity, Illumination, XYZ Acceleration
+  { 0, 0x14, 0x40, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,             -40,      62.4, DB(8,7), DB(7,6),    100,      40*60, &rngErrSensorHandler,   tempText },
+  { 0, 0x14, 0x40, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,               0,     127.5, DB(7,5), DB(6,6),    100,      40*60, &rngErrSensorHandler,   humText },
+  { 0, 0x14, 0x40, 0, class_blue_climate, group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,               0,    131071, DB(6,5), DB(4,5),    100,      40*60, &errSensorHandler,      illumText },
+  // - acceleration: raw 0..1024 -> -2.5..2.62g @ g=9.80665 -> −24.516625..25.693423 m/s^2, 1021/1022/1023 = under/over-range/error via rngErrSensorHandler
+  { 0, 0x14, 0x40, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_none,        usage_undefined,          0,         3, DB(4,4), DB(4,3),    100,      40*60, &stdSensorHandler,      "Acceleration Status" },
+  { 0, 0x14, 0x40, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_acceleration,usage_undefined,    -24.517,    25.693, DB(4,2), DB(3,1),    100,      40*60, &rngErrSensorHandler,   "Acceleration X" },
+  { 0, 0x14, 0x40, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_acceleration,usage_undefined,    -24.517,    25.693, DB(3,0), DB(1,7),    100,      40*60, &rngErrSensorHandler,   "Acceleration Y" },
+  { 0, 0x14, 0x40, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_acceleration,usage_undefined,    -24.517,    25.693, DB(1,6), DB(0,5),    100,      40*60, &rngErrSensorHandler,   "Acceleration Z" },
   // D2-14-41 Multi-Function Temperature, Rel. Humidity, Illumination, XYZ Acceleration, Contact
-  { 0, 0x14, 0x41, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,       -40,   62.4, DB(8,7), DB(7,6),    100,      40*60, &rngErrSensorHandler,   tempText },
-  { 0, 0x14, 0x41, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(7,5), DB(6,6),    100,      40*60, &rngErrSensorHandler,   humText },
-  { 0, 0x14, 0x41, 0, class_blue_climate, group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,         0, 131071, DB(6,5), DB(4,5),    100,      40*60, &errSensorHandler,      illumText },
-  // - acceleration: raw 0..1000 -> -2.5..2.5g (max=2.615 gives 0.005g/LSB); 1021/1022/1023 = under/over-range/error via rngErrSensorHandler
-  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_none,        usage_undefined,    0,      3, DB(4,4), DB(4,3),    100,      40*60, &stdSensorHandler,      "Acceleration Status" },
-  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_none,        usage_undefined, -2.5,  2.615, DB(4,2), DB(3,1),    100,      40*60, &rngErrSensorHandler,   "Acceleration X" },
-  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_none,        usage_undefined, -2.5,  2.615, DB(3,0), DB(1,7),    100,      40*60, &rngErrSensorHandler,   "Acceleration Y" },
-  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_none,        usage_undefined, -2.5,  2.615, DB(1,6), DB(0,5),    100,      40*60, &rngErrSensorHandler,   "Acceleration Z" },
-  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_none,        usage_undefined,    0,      1, DB(0,4), DB(0,4),      0,      40*60, &stdInputHandler,       contactText },
+  { 0, 0x14, 0x41, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,             -40,      62.4, DB(8,7), DB(7,6),    100,      40*60, &rngErrSensorHandler,   tempText },
+  { 0, 0x14, 0x41, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,               0,     127.5, DB(7,5), DB(6,6),    100,      40*60, &rngErrSensorHandler,   humText },
+  { 0, 0x14, 0x41, 0, class_blue_climate, group_yellow_light,            behaviour_sensor,      sensorType_illumination,usage_room,               0,    131071, DB(6,5), DB(4,5),    100,      40*60, &errSensorHandler,      illumText },
+  // - acceleration: raw 0..1024 -> -2.5..2.62g @ g=9.80665 -> −24.516625..25.693423 m/s^2, 1021/1022/1023 = under/over-range/error via rngErrSensorHandler
+  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_none,        usage_undefined,          0,         3, DB(4,4), DB(4,3),    100,      40*60, &stdSensorHandler,      "Acceleration Status" },
+  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_acceleration,usage_undefined,    -24.517,    25.693, DB(4,2), DB(3,1),    100,      40*60, &rngErrSensorHandler,   "Acceleration X" },
+  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_acceleration,usage_undefined,    -24.517,    25.693, DB(3,0), DB(1,7),    100,      40*60, &rngErrSensorHandler,   "Acceleration Y" },
+  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_acceleration,usage_undefined,    -24.517,    25.693, DB(1,6), DB(0,5),    100,      40*60, &rngErrSensorHandler,   "Acceleration Z" },
+  // - contact
+  { 0, 0x14, 0x41, 0, class_black_joker,  group_black_variable,          behaviour_binaryinput, binInpType_none,        usage_undefined,          0,         1, DB(0,4), DB(0,4),      0,      40*60, &stdInputHandler,       contactText },
   // D2-14-59 Multi-Function Temperature, Rel. Humidity, CO2 (also possibly PM1,2.5,10, HCHO, TVOC, but we don't support those for now) - e.g. ALADIN EnO Turo
-  { 0, 0x14, 0x59, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,         0,  102.3, DB(9,7), DB(8,6),    100,      40*60, &errSensorHandler,      tempText },
-  { 0, 0x14, 0x59, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,         0,  127.5, DB(10,7),DB(10,0),   100,      40*60, &errSensorHandler,      humText },
-  { 0, 0x14, 0x59, 0, class_blue_climate, group_ventilation_control,     behaviour_sensor,      sensorType_gas_CO2,     usage_room,         0,  16383, DB(1,7), DB(0,2),    100,      40*60, &errSensorHandler,      co2Text },
+  { 0, 0x14, 0x59, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_temperature, usage_room,               0,     102.3, DB(9,7), DB(8,6),    100,      40*60, &errSensorHandler,      tempText },
+  { 0, 0x14, 0x59, 0, class_blue_climate, group_roomtemperature_control, behaviour_sensor,      sensorType_humidity,    usage_room,               0,     127.5, DB(10,7),DB(10,0),   100,      40*60, &errSensorHandler,      humText },
+  { 0, 0x14, 0x59, 0, class_blue_climate, group_ventilation_control,     behaviour_sensor,      sensorType_gas_CO2,     usage_room,               0,     16383, DB(1,7), DB(0,2),    100,      40*60, &errSensorHandler,      co2Text },
   // D2-32 AC current clamps (Pressac)
   // D2-32-00: single phase current clamp
-  { 0, 0x32, 0x00, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler,   "Current" },
+  { 0, 0x32, 0x00, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,          0,     409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler,   "Current" },
   // D2-32-01: two phase current clamp
   // - separate devices
-  { 0, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(2,7), DB(1,4),     30,          0, &currentClampHandler,   "Current1" },
-  { 0, 0x32, 0x01, 1, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,3), DB(0,0),     30,          0, &currentClampHandler,   "Current2" },
+  { 0, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,          0,     409.6, DB(2,7), DB(1,4),     30,          0, &currentClampHandler,   "Current1" },
+  { 0, 0x32, 0x01, 1, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,          0,     409.6, DB(1,3), DB(0,0),     30,          0, &currentClampHandler,   "Current2" },
   // - both in one device
-  { 1, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(2,7), DB(1,4),     30,          0, &currentClampHandler,   "Current1" },
-  { 1, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,3), DB(0,0),     30,          0, &currentClampHandler,   "Current2" },
+  { 1, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,          0,     409.6, DB(2,7), DB(1,4),     30,          0, &currentClampHandler,   "Current1" },
+  { 1, 0x32, 0x01, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,          0,     409.6, DB(1,3), DB(0,0),     30,          0, &currentClampHandler,   "Current2" },
   // D2-32-02: three phase current clamp
   // - separate devices
-  { 0, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(4,7), DB(3,4),     30,          0, &currentClampHandler,   "Current1" },
-  { 0, 0x32, 0x02, 1, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(3,3), DB(2,0),     30,          0, &currentClampHandler,   "Current2" },
-  { 0, 0x32, 0x02, 2, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler,   "Current3" },
+  { 0, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,          0,     409.6, DB(4,7), DB(3,4),     30,          0, &currentClampHandler,   "Current1" },
+  { 0, 0x32, 0x02, 1, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,          0,     409.6, DB(3,3), DB(2,0),     30,          0, &currentClampHandler,   "Current2" },
+  { 0, 0x32, 0x02, 2, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,          0,     409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler,   "Current3" },
   // - all three in one device
-  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(4,7), DB(3,4),     30,          0, &currentClampHandler,   "Current1" },
-  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(3,3), DB(2,0),     30,          0, &currentClampHandler,   "Current2" },
-  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,    0,  409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler,   "Current3" },
+  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,          0,     409.6, DB(4,7), DB(3,4),     30,          0, &currentClampHandler,   "Current1" },
+  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,          0,     409.6, DB(3,3), DB(2,0),     30,          0, &currentClampHandler,   "Current2" },
+  { 1, 0x32, 0x02, 0, class_black_joker,  group_black_variable,          behaviour_sensor,      sensorType_current,     usage_undefined,          0,     409.6, DB(1,7), DB(0,4),     30,          0, &currentClampHandler,   "Current3" },
 
   // terminator
   { 0, 0,    0,    0, class_black_joker,  group_black_variable,          behaviour_undefined, 0, usage_undefined, 0, 0, 0, 0, 0, 0, NULL /* NULL for extractor function terminates list */, NULL },

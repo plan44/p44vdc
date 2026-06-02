@@ -111,46 +111,48 @@ const ValueUnit sensorTypeUnits[numVdcSensorTypes] = {
   VALUE_UNIT(valueUnit_second, unitScaling_1), ///< time in seconds
   VALUE_UNIT(valueUnit_percent, unitScaling_1), ///< absolute percentage 0..100% (for user dimmers)
   VALUE_UNIT(valueUnit_percent, unitScaling_1), ///< change speed in % of full range per second (for user dimmers)
-  VALUE_UNIT(valueUnit_hertz, unitScaling_1), ///< Frequency in Hz
+  VALUE_UNIT(valueUnit_hertz, unitScaling_1), ///< frequency in Hz
+  VALUE_UNIT(valueUnit_meterpersecond2, unitScaling_1), ///< acceleration in m/S^2
 };
 
 
 const char *sensorTypeIds[numVdcSensorTypes] = {
-  "undefined", ///< none
-  "temperature", ///< temperature in degrees celsius
-  "humidity", ///< relative humidity in %
-  "brightness", ///< illumination in lux
-  "voltage", ///< supply voltage level in Volts
-  "co_concentration", ///< CO (carbon monoxide) concentration in ppm
-  "radon_activity", ///< Radon activity in Bq/m3
-  "gas_type", ///< gas type sensor
-  "particles_st_10um", ///< particles <10µm in μg/m3
-  "particles_st_2500nm", ///< particles <2.5µm in μg/m3
-  "particles_st_1um", ///< particles <1µm in μg/m3
-  "set_point", ///< room operating panel set point, 0..1
-  "fan_speed", ///< fan speed, 0..1 (0=off, <0=auto)
-  "wind_speed", ///< wind speed in m/s
-  "power", ///< Power in W
-  "current", ///< Electric current in A
-  "energy", ///< Energy in kWh
-  "apparent_power", ///< Apparent electric power in VA
-  "air_pressure", ///< Air pressure in hPa
-  "wind_direction", ///< Wind direction in degrees
-  "sound_pressure", ///< Sound pressure level in dB
-  "precipitation", ///< Precipitation in mm/m2
-  "co2_concentration", ///< CO2 (carbon dioxide) concentration in ppm
-  "gust_speed", ///< gust speed in m/S
-  "gust_direction", ///< gust direction in degrees
-  "generated_power", ///< Generated power in W
-  "generated_energy", ///< Generated energy in kWh
-  "water_quantity", ///< Water quantity in liters
-  "water_flow", ///< Water flow rate in liters/minute
-  "length", ///< Length in meters
-  "mass", ///< mass in grams
-  "time", ///< duration in seconds
-  "percent", ///< absolute percent value
-  "percent_speed", ///< relative speed in % of full range per second
-  "frequency", ///< frequency in Hz
+  "undefined", // none
+  "temperature", // temperature in degrees celsius
+  "humidity", // relative humidity in %
+  "brightness", // illumination in lux
+  "voltage", // supply voltage level in Volts
+  "co_concentration", // CO (carbon monoxide) concentration in ppm
+  "radon_activity", // Radon activity in Bq/m3
+  "gas_type", // gas type sensor
+  "particles_st_10um", // particles <10µm in μg/m3
+  "particles_st_2500nm", // particles <2.5µm in μg/m3
+  "particles_st_1um", // particles <1µm in μg/m3
+  "set_point", // room operating panel set point, 0..1
+  "fan_speed", // fan speed, 0..1 (0=off, <0=auto)
+  "wind_speed", // wind speed in m/s
+  "power", // Power in W
+  "current", // Electric current in A
+  "energy", // Energy in kWh
+  "apparent_power", // Apparent electric power in VA
+  "air_pressure", // Air pressure in hPa
+  "wind_direction", // Wind direction in degrees
+  "sound_pressure", // Sound pressure level in dB
+  "precipitation", // Precipitation in mm/m2
+  "co2_concentration", // CO2 (carbon dioxide) concentration in ppm
+  "gust_speed", // gust speed in m/S
+  "gust_direction", // gust direction in degrees
+  "generated_power", // Generated power in W
+  "generated_energy", // Generated energy in kWh
+  "water_quantity", // Water quantity in liters
+  "water_flow", // Water flow rate in liters/minute
+  "length", // Length in meters
+  "mass", // mass in grams
+  "time", // duration in seconds
+  "percent", // absolute percent value
+  "percent_speed", // relative speed in % of full range per second
+  "frequency", // frequency in Hz
+  "acceleration", // acceleration in m/S^2
 };
 
 
