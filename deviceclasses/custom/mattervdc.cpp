@@ -128,6 +128,20 @@ ErrorPtr MatterVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
     // TODO: expect and process "paired" message
     respErr = Error::ok();
   }
+  else if (aMethod=="dloglevel") {
+    // matter specific pairing
+    if (!mMatterConnector) return TextError::err("no matter controller deamon connected, cannot set log level");
+    JsonObjectPtr pmsg = JsonObject::newObj();
+    pmsg->add("message", pmsg->newString("loglevel"));
+    ApiValuePtr a;
+    a = aParams->get("app"); if (a) pmsg->add("app", pmsg->newInt32(a->int32Value()));
+    a = aParams->get("chip"); if (a) pmsg->add("chip", pmsg->newInt32(a->int32Value()));
+    a = aParams->get("deltas"); if (a) pmsg->add("deltas", pmsg->newInt32(a->boolValue()));
+    a = aParams->get("symbols"); if (a) pmsg->add("symbols", pmsg->newInt32(a->boolValue()));
+    a = aParams->get("colors"); if (a) pmsg->add("colors", pmsg->newInt32(a->boolValue()));
+    mMatterConnector->sendDeviceApiJsonMessage(pmsg);
+    respErr = Error::ok();
+  }
   else {
     respErr = inherited::handleMethod(aRequest, aMethod, aParams);
   }
