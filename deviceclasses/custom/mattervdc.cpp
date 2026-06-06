@@ -131,14 +131,26 @@ ErrorPtr MatterVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
   else if (aMethod=="dloglevel") {
     // matter specific pairing
     if (!mMatterConnector) return TextError::err("no matter controller deamon connected, cannot set log level");
-    JsonObjectPtr pmsg = JsonObject::newObj();
-    pmsg->add("message", pmsg->newString("loglevel"));
+    JsonObjectPtr pmsg = JsonObject::newString("loglevel")->wrapAs("message");
     ApiValuePtr a;
     a = aParams->get("app"); if (a) pmsg->add("app", pmsg->newInt32(a->int32Value()));
     a = aParams->get("chip"); if (a) pmsg->add("chip", pmsg->newInt32(a->int32Value()));
-    a = aParams->get("deltas"); if (a) pmsg->add("deltas", pmsg->newInt32(a->boolValue()));
-    a = aParams->get("symbols"); if (a) pmsg->add("symbols", pmsg->newInt32(a->boolValue()));
-    a = aParams->get("colors"); if (a) pmsg->add("colors", pmsg->newInt32(a->boolValue()));
+    a = aParams->get("deltas"); if (a) pmsg->add("deltas", pmsg->newBool(a->boolValue()));
+    a = aParams->get("symbols"); if (a) pmsg->add("symbols", pmsg->newBool(a->boolValue()));
+    a = aParams->get("colors"); if (a) pmsg->add("colors", pmsg->newBool(a->boolValue()));
+    mMatterConnector->sendDeviceApiJsonMessage(pmsg);
+    respErr = Error::ok();
+  }
+  else if (aMethod=="dquit") {
+    ApiValuePtr a;
+    int exitcode = EXIT_SUCCESS;
+    if ((a = aParams->get("exitcode"))) {
+      // custom exit code
+      exitcode = a->int32Value();
+    }
+    OLOG(LOG_NOTICE, "Sending quit/terminate request to matter controller with exitcode=%d", exitcode);
+    JsonObjectPtr pmsg = JsonObject::newString("terminate")->wrapAs("message");
+    pmsg->add("exitcode", pmsg->newInt32(exitcode));
     mMatterConnector->sendDeviceApiJsonMessage(pmsg);
     respErr = Error::ok();
   }
