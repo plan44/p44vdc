@@ -54,6 +54,28 @@ namespace p44 {
 
   protected:
 
+    /// disconnect device. If presence is represented by data stored in the vDC rather than
+    /// detection of real physical presence on a bus, this call must clear the data that marks
+    /// the device as connected to this vDC (such as a learned-in EnOcean button).
+    /// For devices where the vDC can be *absolutely certain* that they are still connected
+    /// to the vDC AND cannot possibly be connected to another vDC as well, this call should
+    /// return false.
+    /// @param aForgetParams if set, not only the connection to the device is removed, but also all parameters related to it
+    ///   such that in case the same device is re-connected later, it will not use previous configuration settings, but defaults.
+    /// @param aDisconnectResultHandler will be called to report true if device could be disconnected,
+    ///   false in case it is certain that the device is still connected to this and only this vDC
+    /// @note at the time aDisconnectResultHandler is called, the only owner left for the device object might be the
+    ///   aDevice argument to the DisconnectCB handler.
+    virtual void disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler) P44_OVERRIDE;
+
+    /// check if device can be disconnected by software (i.e. Web-UI)
+    /// @return true if device might be disconnectable by the user via software (i.e. web UI)
+    /// @note devices returning true here might still refuse disconnection on a case by case basis when
+    ///   operational state does not allow disconnection.
+    /// @note devices returning false here might still be disconnectable using disconnect() triggered
+    ///   by vDC API "remove" method.
+    virtual bool isSoftwareDisconnectable() P44_OVERRIDE { return true; };
+
   };
 
 
@@ -91,9 +113,10 @@ namespace p44 {
   protected:
 
     virtual SocketCommPtr deviceApiConnectionHandler(SocketCommPtr aServerSocketCommP) P44_OVERRIDE;
-
     virtual void connectionClosed(ExternalDeviceConnector& aConnector) P44_OVERRIDE;
 
+    // factory method that can be overridden by subclasses
+    virtual ExternalDevice* newExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceConnector, string aTag, bool aSimpleText) P44_OVERRIDE;
 
   };
 

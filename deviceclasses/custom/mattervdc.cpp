@@ -50,6 +50,20 @@ MatterVdc &MatterDevice::getMatterVdc()
 }
 
 
+void MatterDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResultHandler)
+{
+  // Note: we get also disconnected when the external device API connection closes/interrupts
+  //   which is the case at every matter controller daemon restart
+  if (aForgetParams) {
+    // this is an explicit disconnect, unpair this device
+    JsonObjectPtr msg = JsonObject::newString("unpair")->wrapAs("message");
+    sendDeviceApiJsonMessage(msg);
+  }
+  inherited::disconnect(aForgetParams, aDisconnectResultHandler);
+}
+
+
+
 
 // MARK: - matter device container
 
@@ -59,6 +73,12 @@ MatterVdc::MatterVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool 
 {
   // set default icon base name
   mIconBaseName = "vdc_matter";
+}
+
+
+ExternalDevice* MatterVdc::newExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceConnector, string aTag, bool aSimpleText)
+{
+  return new MatterDevice(aVdcP, aDeviceConnector, aTag);
 }
 
 
@@ -117,28 +137,28 @@ ErrorPtr MatterVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
     string payload;
     respErr = checkStringParam(aParams, "payload", payload);
     if (Error::notOK(respErr)) return respErr;
-    JsonObjectPtr pmsg = JsonObject::newObj();
-    pmsg->add("message", pmsg->newString("pair"));
-    pmsg->add("payload", pmsg->newString(payload)); // QR code or manual setup code
+    JsonObjectPtr msg = JsonObject::newObj();
+    msg->add("message", msg->newString("pair"));
+    msg->add("payload", msg->newString(payload)); // QR code or manual setup code
     ApiValuePtr a = aParams->get("dataset");
     if (a) {
-      pmsg->add("dataset", pmsg->newString(a->stringValue()));
+      msg->add("dataset", msg->newString(a->stringValue()));
     }
-    mMatterConnector->sendDeviceApiJsonMessage(pmsg);
+    mMatterConnector->sendDeviceApiJsonMessage(msg);
     // TODO: expect and process "paired" message
     respErr = Error::ok();
   }
   else if (aMethod=="dloglevel") {
     // matter specific pairing
     if (!mMatterConnector) return TextError::err("no matter controller deamon connected, cannot set log level");
-    JsonObjectPtr pmsg = JsonObject::newString("loglevel")->wrapAs("message");
+    JsonObjectPtr msg = JsonObject::newString("loglevel")->wrapAs("message");
     ApiValuePtr a;
-    a = aParams->get("app"); if (a) pmsg->add("app", pmsg->newInt32(a->int32Value()));
-    a = aParams->get("chip"); if (a) pmsg->add("chip", pmsg->newInt32(a->int32Value()));
-    a = aParams->get("deltas"); if (a) pmsg->add("deltas", pmsg->newBool(a->boolValue()));
-    a = aParams->get("symbols"); if (a) pmsg->add("symbols", pmsg->newBool(a->boolValue()));
-    a = aParams->get("colors"); if (a) pmsg->add("colors", pmsg->newBool(a->boolValue()));
-    mMatterConnector->sendDeviceApiJsonMessage(pmsg);
+    a = aParams->get("app"); if (a) msg->add("app", msg->newInt32(a->int32Value()));
+    a = aParams->get("chip"); if (a) msg->add("chip", msg->newInt32(a->int32Value()));
+    a = aParams->get("deltas"); if (a) msg->add("deltas", msg->newBool(a->boolValue()));
+    a = aParams->get("symbols"); if (a) msg->add("symbols", msg->newBool(a->boolValue()));
+    a = aParams->get("colors"); if (a) msg->add("colors", msg->newBool(a->boolValue()));
+    mMatterConnector->sendDeviceApiJsonMessage(msg);
     respErr = Error::ok();
   }
   else if (aMethod=="dquit") {
@@ -149,9 +169,9 @@ ErrorPtr MatterVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
       exitcode = a->int32Value();
     }
     OLOG(LOG_NOTICE, "Sending quit/terminate request to matter controller with exitcode=%d", exitcode);
-    JsonObjectPtr pmsg = JsonObject::newString("terminate")->wrapAs("message");
-    pmsg->add("exitcode", pmsg->newInt32(exitcode));
-    mMatterConnector->sendDeviceApiJsonMessage(pmsg);
+    JsonObjectPtr msg = JsonObject::newString("terminate")->wrapAs("message");
+    msg->add("exitcode", msg->newInt32(exitcode));
+    mMatterConnector->sendDeviceApiJsonMessage(msg);
     respErr = Error::ok();
   }
   else {

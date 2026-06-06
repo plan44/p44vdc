@@ -167,8 +167,10 @@ namespace p44 {
   protected:
 
     virtual void connectionClosed(ExternalDeviceConnector& aConnector) { /* NOP in base class */ };
-
     virtual SocketCommPtr deviceApiConnectionHandler(SocketCommPtr aServerSocketCommP);
+
+    // factory method that can be overridden by subclasses
+    virtual ExternalDevice* newExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceConnector, string aTag, bool aSimpleText);
 
   };
 

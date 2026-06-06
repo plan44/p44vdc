@@ -328,7 +328,7 @@ ErrorPtr ExternalDeviceConnector::handleDeviceApiJsonSubMessage(JsonObjectPtr aM
       }
       if (Error::isOK(err)) {
         // ok to create new device
-        extDev = ExternalDevicePtr(new ExternalDevice(&mExternalVdc, this, tag, mSimpletext));
+        extDev = ExternalDevicePtr(mExternalVdc.newExternalDevice(&mExternalVdc, this, tag, mSimpletext));
         // - let it initalize
         err = extDev->configureDevice(aMessage);
       }
@@ -443,6 +443,12 @@ ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, b
   mExternalDeviceApiServer = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
   mExternalDeviceApiServer->setConnectionParams(NULL, aSocketPathOrPort.c_str(), SOCK_STREAM, PF_UNSPEC);
   mExternalDeviceApiServer->setAllowNonlocalConnections(aNonLocal);
+}
+
+
+ExternalDevice* ExternalVdc::newExternalDevice(Vdc *aVdcP, ExternalDeviceConnectorPtr aDeviceConnector, string aTag, bool aSimpleText)
+{
+  return new ExternalDevice(aVdcP, aDeviceConnector, aTag, aSimpleText);
 }
 
 
