@@ -83,6 +83,14 @@ private:
     testNextVdc();
   }
 
+  IndicatorOutputPtr redOrExistingLED()
+  {
+    if (dynamic_pointer_cast<MissingPin>(mRedLED)) {
+      return mGreenLED; // must exist
+    }
+    return mRedLED;
+  }
+
 
   void testNextVdc()
   {
@@ -90,7 +98,7 @@ private:
       // ok, test next
       // - start green/yellow blinking = test in progress
       mGreenLED->steadyOn();
-      mRedLED->blinkFor(Infinite, 600*MilliSecond, 50);
+      redOrExistingLED()->blinkFor(Infinite, 600*MilliSecond, 50);
       // - check for init errors
       ErrorPtr vdcErr = mNextVdc->second->getVdcErr();
       if (Error::isOK(vdcErr)) {
@@ -124,7 +132,7 @@ private:
         // morse out tag number of vDC failing self test until button is pressed
         mGreenLED->steadyOff();
         int numBlinks = mNextVdc->second->getTag();
-        mRedLED->blinkFor(300*MilliSecond*numBlinks, 300*MilliSecond, 50);
+        redOrExistingLED()->blinkFor(300*MilliSecond*numBlinks, 300*MilliSecond, 50);
         // call myself again later
         mErrorReportTicket.executeOnce(boost::bind(&SelfTestRunner::vdcTested, this, aError), 300*MilliSecond*numBlinks+2*Second);
         // also install button responder
@@ -172,7 +180,7 @@ private:
     else  {
       LOG(LOG_ERR, "Self test has FAILED: %s", mGlobalError->text());
       mGreenLED->steadyOff();
-      mRedLED->blinkFor(Infinite, 250, 60); // faster red blinking = not good
+      redOrExistingLED()->blinkFor(Infinite, 250, 60); // faster red blinking = not good
     }
     // callback, report last error seen
     mCompletedCB(mGlobalError);
