@@ -180,6 +180,7 @@ namespace p44 {
     string mDescriptionTemplate; ///< how to describe the vdc host (e.g. in service announcements)
     string mVdcModelNameTemplate; ///< how to generate vdc model names (that's what shows up in HW-Info in dS)
 
+    bool mStaticVdcsInitialized; ///< set when static vdcs are all initialized.
     bool mCollecting;
     MLTicket mAnnouncementTicket;
     MLTicket mPeriodicTaskTicket;
@@ -704,6 +705,8 @@ namespace p44 {
     void savePrivate();
 
     // initializing and collecting
+    void dynamicVdcAdded(VdcPtr aNewDynamicVdc, DsUid aTempDSUID, ErrorPtr aError);
+    void dynamicVdcCollected(VdcPtr aNewDynamicVdc, ErrorPtr aError);
     void initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::iterator aNextVdc);
     void vdcInitialized(StatusCB aCompletedCB, bool aFactoryReset, VdcMap::iterator aNextVdc, ErrorPtr aError);
     void collectFromNextVdc(StatusCB aCompletedCB, RescanMode aRescanFlags, VdcMap::iterator aNextVdc);

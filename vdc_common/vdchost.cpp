@@ -106,6 +106,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   mAllowCloud(false),
   DsAddressable(this),
   mCollecting(false),
+  mStaticVdcsInitialized(false),
   mLastActivity(Never),
   mLastPeriodicRun(Never),
   mLearningMode(false),
@@ -254,7 +255,7 @@ const char* vdcHostEventNames[numVdcHostEvents] = {
   "devices_collected",
   "devices_initialized",
 };
-#endif
+#endif // !REDUCED_FOOTPRINT
 
 
 void VdcHost::postEvent(VdchostEvent aEvent)
@@ -344,8 +345,38 @@ void VdcHost::setIdMode(DsUid& aExternalDsUid, const string aIfNameForMAC, int a
 void VdcHost::addVdc(VdcPtr aVdcPtr)
 {
   mVdcs[aVdcPtr->getDsUid()] = aVdcPtr;
+  if (mStaticVdcsInitialized) {
+    // initial init run over non-dynamic vdcs is already over, this must be a dynamically added vdc
+    aVdcPtr->initialize(boost::bind(&VdcHost::dynamicVdcAdded, this, aVdcPtr, aVdcPtr->getDsUid(), _1), false);
+  }
 }
 
+
+void VdcHost::dynamicVdcAdded(VdcPtr aNewDynamicVdc, DsUid aTempDSUID, ErrorPtr aError)
+{
+  if (Error::notOK(aError)) {
+    POLOG(aNewDynamicVdc, LOG_ERR, "dynamically added: failed to initialize: %s", aError->text());
+    aNewDynamicVdc->setVdcError(aError);
+  }
+  else {
+    if (aTempDSUID!=aNewDynamicVdc->getDsUid()) {
+      POLOG(aNewDynamicVdc, LOG_NOTICE, "dynamically added: has changed dSUID during initialisation (from %s)", aTempDSUID.getString().c_str());
+      VdcMap::iterator pos = mVdcs.find(aTempDSUID);
+      if (pos!=mVdcs.end()) {
+        mVdcs.erase(pos);
+        // map with new dSUID
+        mVdcs[aNewDynamicVdc->getDsUid()] = aNewDynamicVdc;
+      }
+    }
+    aNewDynamicVdc->collectDevices(boost::bind(&VdcHost::dynamicVdcCollected, this, aNewDynamicVdc, _1), rescanmode_normal);
+  }
+}
+
+
+void VdcHost::dynamicVdcCollected(VdcPtr aNewDynamicVdc, ErrorPtr aError)
+{
+  POLOG(aNewDynamicVdc, LOG_NOTICE, "dynamically added: done collecting: %s", Error::text(aError));
+}
 
 
 void VdcHost::setIconDir(const char *aIconDir)
@@ -540,6 +571,7 @@ ErrorPtr VdcHost::prepareForVdcs(bool aFactoryReset)
 void VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
   // Log start message
+  mStaticVdcsInitialized = false;
   LOG(LOG_NOTICE,
     "\n\n\n*** starting initialisation of vcd host '%s' (Instance #%d)"
     "\n*** Product name: '%s', Product Version: '%s', App Version: '%s', Device Hardware ID: '%s'"
@@ -589,6 +621,7 @@ void VdcHost::initializeNextVdc(StatusCB aCompletedCB, bool aFactoryReset, VdcMa
     mVdcs[pos->second->getDsUid()] = pos->second;
   }
   // successfully done
+  mStaticVdcsInitialized = true;
   postEvent(vdchost_vdcs_initialized);
   aCompletedCB(ErrorPtr());
 }

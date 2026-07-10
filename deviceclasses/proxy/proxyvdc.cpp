@@ -149,12 +149,21 @@ bool ProxyVdc::p44BridgeApiDiscoveryHandler(ErrorPtr aError, DnsSdServiceInfoPtr
           rowId = sharedDb(*aVdcHostP).db().last_insert_rowid();
         }
       }
-      LOG(LOG_NOTICE, "Found %sCONFIRMED proxy '%s' at %s(%s):%d", isConfirmed ? "" : "UN", aServiceInfo->name.c_str(), aServiceInfo->hostname.c_str(), aServiceInfo->hostaddress.c_str(), aServiceInfo->port);
       ProxyVdcPtr proxyVdc = ProxyVdcPtr(new ProxyVdc(mNextInstanceNumber, aVdcHostP, aTag));
+      LOG(LOG_NOTICE,
+        "Found %sCONFIRMED proxy '%s' at %s(%s):%d (instance: %d)",
+        isConfirmed ? "" : "UN",
+        aServiceInfo->name.c_str(), aServiceInfo->hostname.c_str(), aServiceInfo->hostaddress.c_str(), aServiceInfo->port,
+        mNextInstanceNumber
+      );
       proxyVdc->setAPIParams(aServiceInfo->hostaddress, string_format("%u", aServiceInfo->port));
       proxyVdc->mConfirmed = isConfirmed;
+      if (!isConfirmed) {
+        proxyVdc->setVdcError(Error::err<VdcError>(VdcError::NotConfirmed, "Needs confirming"));
+      }
       proxyVdc->mRowId = rowId;
       proxyVdc->addVdcToVdcHost();
+      mNextInstanceNumber++;
     }
   }
   else {
@@ -219,6 +228,8 @@ void ProxyVdc::acknowledgeInitialisation(ErrorPtr aStatus)
   // load parameters
   // Note: in case this happens after initialisation, we must load again because we have the dSUID only now
   load();
+  if (!getVdcFlag(vdcflag_flagsinitialized)) setVdcFlag(vdcflag_hidewhenempty, true); // hide by default
+  updatePresenceState(mConfirmed);
   if (mInitialisationCompleteCB) {
     // initialisation has failed
     StatusCB cb = mInitialisationCompleteCB;
@@ -235,7 +246,6 @@ ErrorPtr ProxyVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod
     // confirm (or revoke) operation of this ProxyVdc instance
     bool newConfirmed = true;
     ApiValuePtr a = aParams->get("revoke"); if (a) newConfirmed = !(a->boolValue());
-    respErr = Error::ok();
     if (mConfirmed!=newConfirmed) {
       mConfirmed = newConfirmed;
       if (mRowId>0) {
@@ -249,14 +259,17 @@ ErrorPtr ProxyVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod
         }
       }
       // act on change
+      updatePresenceState(mConfirmed);
       if (mConfirmed) {
         // freshly confirmed: re-scan
+        setVdcError(ErrorPtr()); // clear "not confirmed" error
         collectDevices(boost::bind(&ProxyVdc::confirmedAndCollected, this, aRequest, _1), rescanmode_normal);
         return ErrorPtr();
       }
       else {
         // revoke: remove devices including settings
         removeDevices(true);
+        respErr = Error::ok();
       }
     }
   }
@@ -332,7 +345,7 @@ void ProxyVdc::bridgeApiIDQueryHandler(ErrorPtr aError, JsonObjectPtr aJsonMsg)
         // try to connect to the bridge API
         if (!mConfirmed) {
           OLOG(LOG_WARNING, "Proxy target P44 device %s (#%s) not yet confirmed -> not using its devices yet", getName().c_str(), mProxiedDeviceSerial.c_str());
-          setVdcError(Error::err<VdcError>(VdcError::NotConfirmed, "Not yet confirmed"));
+          setVdcError(Error::err<VdcError>(VdcError::NotConfirmed, "Needs confirming"));
         }
         else {
           // we're not in initialisation any more, scan for devices now
@@ -485,8 +498,8 @@ bool ProxyVdc::isConfigured()
 void ProxyVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
   if (!mConfirmed) {
-    OLOG(LOG_WARNING, "Proxy target P44 device not yet confirmed -> scanning devices disabled");
-    aCompletedCB(Error::err<VdcError>(VdcError::NotConfirmed, "Not yet confirmed"));
+    OLOG(LOG_WARNING, "Proxy target P44 device not confirmed -> scanning devices disabled");
+    aCompletedCB(Error::err<VdcError>(VdcError::NotConfirmed, "Needs confirming"));
     return;
   }
   if (!(aRescanFlags & rescanmode_incremental)) {
