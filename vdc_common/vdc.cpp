@@ -1342,6 +1342,7 @@ enum {
   maxOptimizerScenes_key,
   maxOptimizerGroups_key,
   hideWhenEmpty_key,
+  confirmed_key,
   effectSpeedOptimized_key,
   defaultBridgingFlags_key,
   numVdcProperties
@@ -1429,6 +1430,7 @@ PropertyDescriptorPtr Vdc::getDescriptorByIndex(int aPropIndex, int aDomain, Pro
       { "x-p44-maxOptimizerScenes", apivalue_uint64, maxOptimizerScenes_key, OKEY(vdc_key) },
       { "x-p44-maxOptimizerGroups", apivalue_uint64, maxOptimizerGroups_key, OKEY(vdc_key) },
       { "x-p44-hideWhenEmpty", apivalue_bool, hideWhenEmpty_key, OKEY(vdc_key) },
+      { "x-p44-confirmed", apivalue_bool, confirmed_key, OKEY(vdc_key) },
       { "x-p44-effectSpeedOptimized", apivalue_bool, effectSpeedOptimized_key, OKEY(vdc_key) }
       #if ENABLE_JSONBRIDGEAPI
       , { "x-p44-defaultBridgingFlags", apivalue_uint64, defaultBridgingFlags_key, OKEY(vdc_key) }
@@ -1488,6 +1490,9 @@ bool Vdc::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Property
           return true;
         case hideWhenEmpty_key:
           aPropValue->setBoolValue(getVdcFlag(vdcflag_hidewhenempty));
+          return true;
+        case confirmed_key:
+          aPropValue->setBoolValue(isConfirmed());
           return true;
         case effectSpeedOptimized_key:
           aPropValue->setBoolValue(getVdcFlag(vdcflag_effectSpeedOptimized));

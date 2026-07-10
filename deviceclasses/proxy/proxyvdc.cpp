@@ -1,6 +1,6 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
-//  Copyright (c) 2024 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2024-2026 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -40,31 +40,130 @@ using namespace p44;
 
 #define P44_DEFAULT_BRIDGE_PORT 4444
 
+// MARK: - DB
+
+// Version history
+//  1 : first version
+#define PROXY_SCHEMA_MIN_VERSION 1 // minimally supported version, anything older will be deleted
+#define PROXY_SCHEMA_VERSION 1 // current version
+
+string ProxyPersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
+{
+  string sql;
+  if (aFromVersion==0) {
+    // create table group from scratch
+    // - use standard globs table for schema version
+    sql = inherited::schemaUpgradeSQL(aFromVersion, aToVersion);
+    // - create my tables
+    sql.append(
+      "DROP TABLE IF EXISTS $PREFIX_proxytargets;"
+      "CREATE TABLE $PREFIX_proxytargets ("
+      " name TEXT,"
+      " hostname TEXT,"
+      " confirmed INTEGER"
+      ");"
+    );
+    // reached final version in one step
+    aToVersion = PROXY_SCHEMA_VERSION;
+  }
+  return sql;
+}
+
+/// Note: unlike many other vdc types, for proxies we have **multiple instances** of
+///   ProxyVdc, one for each target. So the DB is **not** at the vdc level, but global
+int ProxyVdc::mNextInstanceNumber = 0;
+ProxyPersistence* ProxyVdc::mDbP = nullptr;
+
+ProxyPersistence& ProxyVdc::sharedDb(VdcHost& aVdcHost)
+{
+  if (!mDbP) {
+    mDbP = new ProxyPersistence;
+    ErrorPtr err;
+    err = mDbP->initialize(aVdcHost.getPersistence(), "proxy_vdcs_common", PROXY_SCHEMA_VERSION, PROXY_SCHEMA_MIN_VERSION, nullptr);
+    if (Error::notOK(err)) {
+      LOG(LOG_ERR, "Cannot access proxy DB: %s", Error::text(err));
+    }
+  }
+  return *mDbP;
+}
+
+
+
 void ProxyVdc::instantiateProxies(const string aProxiesSpecification, VdcHost *aVdcHostP, int aTag)
 {
   string proxyspec;
   const char* p = aProxiesSpecification.c_str();
-  int instancenumber = 1;
+  mNextInstanceNumber = 1;
   while(nextPart(p, proxyspec, ',')) {
     // found a proxy spec
     if (proxyspec=="dnssd") {
-      // TODO: implement DNS-SD scanning
-      LOG(LOG_ERR, "DNS-SD proxy discovery not yet implemented")
+      #if PROXY_DNSSD_DISCOVERY
+      LOG(LOG_INFO, "Starting DNS-SD proxy discovery");
+      DnsSdManager::sharedDnsSdManager().browse("_p44-br._tcp", boost::bind(&ProxyVdc::p44BridgeApiDiscoveryHandler, _1, _2, aVdcHostP, aTag));
+      #else
+      LOG(LOG_ERR, "DNS-SD proxy discovery not available in this build")
+      #endif
     }
     else {
       // must be a host[:port] specification
       string host;
       uint16_t port = P44_DEFAULT_BRIDGE_PORT;
       splitHost(proxyspec.c_str(), &host, &port);
-      ProxyVdcPtr proxyVdc = ProxyVdcPtr(new ProxyVdc(instancenumber, aVdcHostP, aTag));
+      ProxyVdcPtr proxyVdc = ProxyVdcPtr(new ProxyVdc(mNextInstanceNumber, aVdcHostP, aTag));
       proxyVdc->setAPIParams(host, string_format("%u", port));
+      proxyVdc->mConfirmed = true; // command line proxies are implicitly confirmed
       proxyVdc->addVdcToVdcHost();
       // count instance
-      instancenumber++;
+      mNextInstanceNumber++;
     }
   }
 }
 
+
+#if PROXY_DNSSD_DISCOVERY
+
+bool ProxyVdc::p44BridgeApiDiscoveryHandler(ErrorPtr aError, DnsSdServiceInfoPtr aServiceInfo, VdcHost *aVdcHostP, int aTag)
+{
+  if (Error::isOK(aError)) {
+    if (!aServiceInfo->disappeared) {
+      // is this a confirmed device?
+      SQLiteTGQuery qry(sharedDb(*aVdcHostP));
+      ErrorPtr err;
+      err = qry.prefixedPrepare("SELECT ROWID, name, confirmed FROM $PREFIX_proxytargets WHERE hostname = '%q'", aServiceInfo->hostname.c_str());
+      bool isConfirmed = false;
+      long long int rowId = 0;
+      if (Error::isOK(err)) {
+        sqlite3pp::query::iterator i = qry.begin();
+        if (i!=qry.end()) {
+          // known hostname
+          rowId = i->getWithDefault(0, 0);
+          string name = nonNullCStr(i->get<const char *>(1));
+          isConfirmed = i->getCastedWithDefault<bool, int>(2, false);
+        }
+        else {
+          sharedDb(*aVdcHostP).prefixedExecute(
+            "INSERT INTO $PREFIX_proxytargets (name, hostname, confirmed) VALUES ('%q', '%q', 0);",
+            aServiceInfo->name.c_str(),
+            aServiceInfo->hostname.c_str()
+          );
+          rowId = sharedDb(*aVdcHostP).db().last_insert_rowid();
+        }
+      }
+      LOG(LOG_NOTICE, "Found %sCONFIRMED proxy '%s' at %s(%s):%d", isConfirmed ? "" : "UN", aServiceInfo->name.c_str(), aServiceInfo->hostname.c_str(), aServiceInfo->hostaddress.c_str(), aServiceInfo->port);
+      ProxyVdcPtr proxyVdc = ProxyVdcPtr(new ProxyVdc(mNextInstanceNumber, aVdcHostP, aTag));
+      proxyVdc->setAPIParams(aServiceInfo->hostaddress, string_format("%u", aServiceInfo->port));
+      proxyVdc->mConfirmed = isConfirmed;
+      proxyVdc->mRowId = rowId;
+      proxyVdc->addVdcToVdcHost();
+    }
+  }
+  else {
+    LOG(LOG_INFO, "DNS-SD proxy discovery ends with: %s", Error::text(aError));
+  }
+  return true; // continue looking for devices
+}
+
+#endif // PROXY_DNSSD_DISCOVERY
 
 
 // MARK: - initialisation
@@ -73,7 +172,9 @@ void ProxyVdc::instantiateProxies(const string aProxiesSpecification, VdcHost *a
 ProxyVdc::ProxyVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
   mProxiedDSUID(false),
-  mProxiedDeviceReached(false)
+  mProxiedDeviceReached(false),
+  mConfirmed(false),
+  mRowId(0)
 {
   mBridgeApi.isMemberVariable();
 }
@@ -125,6 +226,53 @@ void ProxyVdc::acknowledgeInitialisation(ErrorPtr aStatus)
     cb(aStatus);
   }
 }
+
+
+ErrorPtr ProxyVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams)
+{
+  ErrorPtr respErr;
+  if (aMethod=="confirm") {
+    // confirm (or revoke) operation of this ProxyVdc instance
+    bool newConfirmed = true;
+    ApiValuePtr a = aParams->get("revoke"); if (a) newConfirmed = !(a->boolValue());
+    respErr = Error::ok();
+    if (mConfirmed!=newConfirmed) {
+      mConfirmed = newConfirmed;
+      if (mRowId>0) {
+        respErr = sharedDb(getVdcHost()).prefixedExecute(
+          "UPDATE $PREFIX_proxytargets SET confirmed=%d WHERE ROWID=%lld",
+          mConfirmed,
+          mRowId
+        );
+        if (Error::notOK(respErr)) {
+          OLOG(LOG_ERR, "Error updating proxy confirmed status %s", respErr->text());
+        }
+      }
+      // act on change
+      if (mConfirmed) {
+        // freshly confirmed: re-scan
+        collectDevices(boost::bind(&ProxyVdc::confirmedAndCollected, this, aRequest, _1), rescanmode_normal);
+        return ErrorPtr();
+      }
+      else {
+        // revoke: remove devices including settings
+        removeDevices(true);
+      }
+    }
+  }
+  else {
+    respErr = inherited::handleMethod(aRequest, aMethod, aParams);
+  }
+  return respErr;
+}
+
+
+
+void ProxyVdc::confirmedAndCollected(VdcApiRequestPtr aRequest, ErrorPtr aError)
+{
+  aRequest->sendStatus(Error::ok());
+}
+
 
 
 
@@ -181,9 +329,16 @@ void ProxyVdc::bridgeApiIDQueryHandler(ErrorPtr aError, JsonObjectPtr aJsonMsg)
       // we had not reached the proxy before, but are not initializing
       mProxiedDeviceReached = true;
       if (!mInitialisationCompleteCB) {
-        // we're not in initialisation any more, scan for devices now
-        setVdcError(ErrorPtr()); // clear previous error, if any
-        collectDevices(NoOP, rescanmode_incremental);
+        // try to connect to the bridge API
+        if (!mConfirmed) {
+          OLOG(LOG_WARNING, "Proxy target P44 device %s (#%s) not yet confirmed -> not using its devices yet", getName().c_str(), mProxiedDeviceSerial.c_str());
+          setVdcError(Error::err<VdcError>(VdcError::NotConfirmed, "Not yet confirmed"));
+        }
+        else {
+          // we're not in initialisation any more, scan for devices now
+          setVdcError(ErrorPtr()); // clear previous error, if any
+          collectDevices(NoOP, rescanmode_incremental);
+        }
       }
     }
   }
@@ -329,6 +484,11 @@ bool ProxyVdc::isConfigured()
 /// @param aCompletedCB will be called when device scan for this vDC has been completed
 void ProxyVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
 {
+  if (!mConfirmed) {
+    OLOG(LOG_WARNING, "Proxy target P44 device not yet confirmed -> scanning devices disabled");
+    aCompletedCB(Error::err<VdcError>(VdcError::NotConfirmed, "Not yet confirmed"));
+    return;
+  }
   if (!(aRescanFlags & rescanmode_incremental)) {
     // full collect, remove all devices
     removeDevices(aRescanFlags & rescanmode_clearsettings);

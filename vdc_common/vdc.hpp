@@ -47,6 +47,7 @@ namespace p44 {
       StaleAction, ///< optimizer has detected stale action
       NoMoreActions, ///< cannot add another native action because there would be too many
       NoHWTested, ///< no hardware tested
+      NotConfirmed, ///< not confirmed as a valid VDC, will not scan devices
       numErrorCodes
     } ErrorCodes;
     
@@ -66,6 +67,7 @@ namespace p44 {
       "StaleAction",
       "NoMoreActions",
       "NoHWTested",
+      "NotConfirmed",
     };
     #endif // ENABLE_NAMED_ERRORS
   };
@@ -270,6 +272,9 @@ namespace p44 {
 
     /// destructor
     virtual ~Vdc();
+
+    /// check if confirmed for operation (scannable)
+    virtual bool isConfirmed() { return true; /* by default, vdcs are confirmed */ }
 
     /// add this vDC to vDC host.
     void addVdcToVdcHost();

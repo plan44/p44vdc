@@ -1,6 +1,6 @@
 //  SPDX-License-Identifier: GPL-3.0-or-later
 //
-//  Copyright (c) 2024 plan44.ch / Lukas Zeller, Zurich, Switzerland
+//  Copyright (c) 2024-2026 plan44.ch / Lukas Zeller, Zurich, Switzerland
 //
 //  Author: Lukas Zeller <luz@plan44.ch>
 //
@@ -27,6 +27,15 @@
 
 #if ENABLE_PROXYDEVICES
 
+#if !defined(PROXY_DNSSD_DISCOVERY) && !DISABLE_DISCOVERY
+  #define PROXY_DNSSD_DISCOVERY 1
+#endif
+
+
+#if PROXY_DNSSD_DISCOVERY
+  #include "dnssd.hpp"
+#endif
+
 #include "vdc.hpp"
 #include "proxydevice.hpp"
 
@@ -38,6 +47,16 @@ namespace p44 {
 
   class ProxyVdc;
   class ProxyDevice;
+
+  /// persistence for proxy device container
+  class ProxyPersistence : public SQLite3TableGroup
+  {
+    typedef SQLite3TableGroup inherited;
+  protected:
+    /// Get DB Schema creation/upgrade SQL statements
+    virtual string schemaUpgradeSQL(int aFromVersion, int &aToVersion);
+  };
+
 
   typedef boost::intrusive_ptr<ProxyVdc> ProxyVdcPtr;
   class ProxyVdc final : public Vdc
@@ -52,6 +71,11 @@ namespace p44 {
     StatusCB mInitialisationCompleteCB;
     MLTicket mInitialisationTimeout;
     bool mProxiedDeviceReached;
+    bool mConfirmed; ///< confirmed proxy origin
+    uint64_t mRowId; ///< rowid in global proxy table
+
+    static int mNextInstanceNumber;
+    static ProxyPersistence* mDbP;
 
   public:
 
@@ -63,6 +87,12 @@ namespace p44 {
     ProxyVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag);
 
     virtual ~ProxyVdc();
+
+    /// check if confirmed for operation (scannable)
+    virtual bool isConfirmed() P44_OVERRIDE { return mConfirmed; }
+
+    /// access to the shared persistence instance for all ProxyVdcs
+    static ProxyPersistence& sharedDb(VdcHost& aVdcHost);
 
     /// @name P44BridgeApi
     /// @{
@@ -91,6 +121,9 @@ namespace p44 {
     virtual void deriveDsUid() P44_OVERRIDE;
 
     virtual const char *vdcClassIdentifier() const P44_OVERRIDE;
+
+    /// vdc level methods
+    virtual ErrorPtr handleMethod(VdcApiRequestPtr aRequest, const string &aMethod, ApiValuePtr aParams) P44_OVERRIDE;
 
     /// @return hardware GUID in URN format to identify the hardware INSTANCE as uniquely as possible
     virtual string hardwareGUID() const P44_OVERRIDE;
@@ -126,6 +159,10 @@ namespace p44 {
 
   private:
 
+    #if PROXY_DNSSD_DISCOVERY
+    static bool p44BridgeApiDiscoveryHandler(ErrorPtr aError, DnsSdServiceInfoPtr aServiceInfo, VdcHost *aVdcHostP, int aTag);
+    #endif
+
     void initialisationTimeout();
     void acknowledgeInitialisation(ErrorPtr aStatus);
     void bridgeApiConnectedHandler(ErrorPtr aStatus);
@@ -137,6 +174,9 @@ namespace p44 {
     ProxyDevicePtr addProxyDevice(JsonObjectPtr aDeviceJSON);
 
     bool handleBridgeLevelNotification(const string aNotification, JsonObjectPtr aParams);
+
+    void confirmedAndCollected(VdcApiRequestPtr aRequest, ErrorPtr aError);
+
 
   };
 
