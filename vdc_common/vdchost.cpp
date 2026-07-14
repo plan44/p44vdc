@@ -1119,7 +1119,7 @@ bool VdcHost::checkForLocalSensorHandling(SensorBehaviour &aSensorBehaviour, dou
   }
   return false; // nothing happened due to sensor change
 }
-#endif
+#endif // ENABLE_LOCALCONTROLLER
 
 
 
