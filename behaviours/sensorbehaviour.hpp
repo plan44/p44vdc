@@ -380,6 +380,8 @@ namespace p44 {
     void reEvaluateSensorValue(double aValue, double aMinChange);
     #if ENABLE_RRDB
     void prepareLogging();
+    int doRRDUpdate(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue);
+    void extracted(double aProcessedValue, double aPushedValue, double aRawValue, MLMicroSeconds aTimeStamp);
     void logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue);
     #endif // ENABLE_RRDB
 

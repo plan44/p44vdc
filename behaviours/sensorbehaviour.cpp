@@ -359,32 +359,32 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
     if (aValue<mMin) aValue = mMin;
   }
   MLMicroSeconds now = MainLoop::now();
-  bool changedValue = false;
+  bool considerNew = false;
   if (mLastUpdate==Never) {
-    changedValue = true; // after invalid value, any new value is a change
+    considerNew = true; // after invalid value, any new value is a new value
     mLastNewValue = aValue; // but init comparison value
   }
-  // always update age, even if value itself may not have changed
-  mLastUpdate = now;
+  // we got a value, (re-)arm timed invalidator
   armInvalidator();
   // update context
   if (mContextId!=aContextId) {
     mContextId = aContextId;
-    changedValue = true;
+    considerNew = true;
   };
   if (mContextMsg!=nonNullCStr(aContextMsg)) {
     mContextMsg = nonNullCStr(aContextMsg);
-    changedValue = true;
+    considerNew = true;
   };
   // determine minchange
   if (aMinChange<0) aMinChange = mResolution/2;
   // update value
-  if (fabs(aValue - mLastNewValue) > aMinChange) changedValue = true;
-  OLOG(changedValue ? LOG_NOTICE : LOG_INFO, "reports %s value = %0.3f %s", changedValue ? "NEW" : "same", aValue, getSensorUnitText().c_str());
+  if (fabs(aValue - mLastNewValue) > aMinChange) considerNew = true;
+  OLOG(considerNew ? LOG_NOTICE : LOG_INFO, "reports %s value = %0.3f %s", considerNew ? "NEW" : "~same", aValue, getSensorUnitText().c_str());
   if (mContextId>=0 || !mContextMsg.empty()) {
     OLOG(LOG_INFO, "- contextId=%d, contextMsg='%s'", mContextId, mContextMsg.c_str());
   }
   // prossibly process for filtering (no matter if value changed or not)
+  double processedValue = aValue;
   if (mFilter || (mProfileP && mProfileP->evalType!=eval_none)) {
     // need filtering
     if (!mFilter) {
@@ -395,30 +395,35 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
     mFilter->addValue(aValue, now);
     double v = mFilter->evaluate();
     // filter output might change while input value does not
-    if (fabs(v - mLastNewValue) > mResolution/2) changedValue = true; // filter output has changed
-    OLOG(changedValue ? LOG_NOTICE : LOG_INFO, "calculates %s filtered value = %0.3f %s", changedValue ? "NEW" : "same", v, getSensorUnitText().c_str());
-    mCurrentValue = v;
+    if (fabs(v - mLastNewValue) > mResolution/2) considerNew = true; // filter output has changed
+    OLOG(considerNew ? LOG_NOTICE : LOG_INFO, "calculates %s filtered value = %0.3f %s", considerNew ? "NEW" : "~same", v, getSensorUnitText().c_str());
+    processedValue = v;
     // as long as filter output is not stable, we must re-evaluate it
-    if (changedValue && mProfileP && mProfileP->collWin>0) {
+    if (considerNew && mProfileP && mProfileP->collWin>0) {
       // re-run same value within collection window time frame (ticket will be cancelled if real sensor value arrives sooner)
       mReEvaluationTicket.executeOnce(boost::bind(&SensorBehaviour::reEvaluateSensorValue, this, aValue, aMinChange), mProfileP->collWin);
     }
   }
-  else {
-    // just assign new current value
-    mCurrentValue = aValue;
+  #if ENABLE_RRDB
+  // BEFORE pushing, check if we need a pre-change RRD sample
+  if (considerNew && processedValue!=mLastNewValue && mLastUpdate<now-30*Second) {
+    // this is a significant change, and the last RRD update is long ago
+    // -> re-record the previous value before to make sharp edges with long pauses in between record correctly
+    logSensorValue(now, mLastNewValue, mLastNewValue, mLastPushedValue); // mLastPushedValue is actually last pushed value
   }
-  // update last deemed "changed" value
-  if (changedValue) mLastNewValue = mCurrentValue;
+  #endif // ENABLE_RRDB
+  // apply update, all cases count as an update happened (mLastUpdate)
+  mLastUpdate = now;
+  mCurrentValue = processedValue;
   // possibly let localcontroller process it
   #if ENABLE_LOCALCONTROLLER
-  // also let vdchost know for local dimmer dial handling etc., but only changes!
+  // also let vdchost know for local dimmer dial handling etc., but only those considered new values, no small jitter etc.!
   // TODO: maybe more elegant solution for this
-  if (!isBridgeExclusive() && changedValue) {
+  if (!isBridgeExclusive() && considerNew) {
     mDevice.getVdcHost().checkForLocalSensorHandling(*this, mCurrentValue, mLastNewValue);
   }
   #endif // ENABLE_LOCALCONTROLLER
-  // possibly push
+  // possibly push (may update mLastPushedValue)
   if (aPush) {
     pushSensor(false);
   }
@@ -427,8 +432,10 @@ void SensorBehaviour::updateSensorValue(double aValue, double aMinChange, bool a
   #endif
   // possibly log value
   #if ENABLE_RRDB
-  logSensorValue(now, aValue, mCurrentValue, mLastPushedValue);
+  logSensorValue(now, aValue, processedValue, mLastPushedValue); // mLastPushedValue is already current pushed value, here
   #endif
+  // update last deemed "changed" value
+  if (considerNew) mLastNewValue = mCurrentValue;
 }
 
 
@@ -816,33 +823,38 @@ void SensorBehaviour::prepareLogging()
 }
 
 
+int SensorBehaviour::doRRDUpdate(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue)
+{
+  mLastRRDBupdate = aTimeStamp;
+  ArgsVector args;
+  args.push_back("rrdupdate");
+  args.push_back(mRRDBfile);
+  string ud = mRRDBupdate;
+  // substitute values for placeholders
+  size_t i;
+  i = ud.find("%T");
+  if (i!=string::npos) ud.replace(i, 2, string_format("%lld", aTimeStamp/Second).c_str());
+  // - raw (considered unknown when sensor is invalid)
+  i = ud.find("%R");
+  if (i!=string::npos) ud.replace(i, 2, rrdval(aRawValue, mLastUpdate!=Never).c_str());
+  // - filtered (considered unknown when sensor is invalid)
+  i = ud.find("%F");
+  if (i!=string::npos) ud.replace(i, 2, rrdval(aProcessedValue, mLastUpdate!=Never).c_str());
+  // - pushed (considered unknown when never pushed, or last state pushed must have been NULL because of invalidation)
+  i = ud.find("%P");
+  if (i!=string::npos) ud.replace(i, 2, rrdval(aPushedValue, mLastPush!=Never && mLastUpdate!=Never).c_str());
+  args.push_back(ud);
+  OLOG(LOG_DEBUG, "rrd: recording: %s", ud.c_str());
+  return rrd_call(rrd_update, args);
+}
+
+
 void SensorBehaviour::logSensorValue(MLMicroSeconds aTimeStamp, double aRawValue, double aProcessedValue, double aPushedValue)
 {
-  // make sure logging is prepared
   prepareLogging();
   // now actually log into file
   if (mLoggingReady && mLastRRDBupdate<aTimeStamp-10*Second) {
-    mLastRRDBupdate = aTimeStamp;
-    ArgsVector args;
-    args.push_back("rrdupdate");
-    args.push_back(mRRDBfile);
-    string ud = mRRDBupdate;
-    // substitute values for placeholders
-    size_t i;
-    i = ud.find("%T");
-    if (i!=string::npos) ud.replace(i, 2, string_format("%lld", aTimeStamp/Second).c_str());
-    // - raw (considered unknown when sensor is invalid)
-    i = ud.find("%R");
-    if (i!=string::npos) ud.replace(i, 2, rrdval(aRawValue, mLastUpdate!=Never).c_str());
-    // - filtered (considered unknown when sensor is invalid)
-    i = ud.find("%F");
-    if (i!=string::npos) ud.replace(i, 2, rrdval(aProcessedValue, mLastUpdate!=Never).c_str());
-    // - pushed (considered unknown when never pushed, or last state pushed must have been NULL because of invalidation)
-    i = ud.find("%P");
-    if (i!=string::npos) ud.replace(i, 2, rrdval(aPushedValue, mLastPush!=Never && mLastUpdate!=Never).c_str());
-    args.push_back(ud);
-    OLOG(LOG_DEBUG, "rrd: recording: %s", ud.c_str());
-    int ret = rrd_call(rrd_update, args);
+    int ret = doRRDUpdate(aTimeStamp, aRawValue, aProcessedValue, aPushedValue);
     if (ret!=0) {
       OLOG(LOG_WARNING, "rrd: could not update rrd data for file '%s': %s", mRRDBfile.c_str(), rrd_get_error());
       mLoggingReady = false; // back to not initialized, might work again after recreating file
