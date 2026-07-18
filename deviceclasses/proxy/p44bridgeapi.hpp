@@ -66,7 +66,7 @@ public:
 
   /// convenience method to set properties
   /// @param aDSUID the dsuid
-  /// @param aProperties the property value to set, or if aPropName is empty, the object containing all properties to set.
+  /// @param aProperties an object containing all properties to set
   void setProperties(const string aDSUID, JsonObjectPtr aProperties);
 
   /// convenience method to set single property

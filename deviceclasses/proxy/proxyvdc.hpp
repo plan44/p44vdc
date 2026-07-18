@@ -63,6 +63,7 @@ namespace p44 {
   {
     typedef Vdc inherited;
     friend class ProxyDevice;
+    friend class VdcHost;
 
     P44BridgeApi mBridgeApi;
     bool mProxiedDSUID;

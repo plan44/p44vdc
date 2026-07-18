@@ -510,13 +510,29 @@ namespace p44 {
     bool checkForLocalClickHandling(ButtonBehaviour &aButtonBehaviour);
 
     #if ENABLE_LOCALCONTROLLER
+
     /// have sensor changes checked for local handling
     /// @param aSensorBehaviour the sensor behaviour that has pushed a change
     /// @param aCurrentValue the current sensor value
     /// @param aPreviousValue the previous sensor value (sometimes relevant for user dial sync)
     /// @return true if acted on the change locally
     bool checkForLocalSensorHandling(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue);
-    #endif
+
+    #if ENABLE_PROXYDEVICES
+    
+    /// Call a method on all vdchosts we have a proxy for
+    /// @note we cannot get results, this is mainly for setting properties such as zone names
+    /// @param aMethod the method name
+    /// @param aParams method parameters
+    void callMethodOnProxied(const string aMethod, JsonObjectPtr aParams);
+
+    /// Send a notification to all vdchosts we have a proxy for
+    /// @param aNotification the notification name
+    /// @param aParams method parameters
+    void notifyProxied(const string aNotification, JsonObjectPtr aParams);
+
+    #endif // ENABLE_PROXYDEVICES
+    #endif // ENABLE_LOCALCONTROLLER
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
@@ -754,18 +770,22 @@ namespace p44 {
     void createValueSourcesList(ApiValuePtr aApiObjectValue);
     #endif // ENABLE_P44SCRIPT
 
-
     #if !REDUCED_FOOTPRINT
     /// get a list of scene number/name associations
     /// @param aApiObjectValue must be an object typed API value, will receive a list of scenes with dS-id, name etc.
     void createScenesList(ApiValuePtr aApiObjectValue);
     #endif
+
+    #if ENABLE_LOCALCONTROLLER && ENABLE_PROXYDEVICES
+    void proxyMethodCalled(P44LoggingObj* aLogResultToP, ErrorPtr aError, JsonObjectPtr aJsonObject);
+    #endif
+
     #if P44SCRIPT_FULL_SUPPORT
     void runGlobalScripts();
     ScriptObjPtr mainScriptRun(ScriptCommand aScriptCommand);
     void globalScriptEnds(ScriptObjPtr aResult, const char *aOriginLabel, string aSetupScriptFn);
     void scriptExecHandler(VdcApiRequestPtr aRequest, ScriptObjPtr aResult);
-    #endif
+    #endif // P44SCRIPT_FULL_SUPPORT
   };
 
 

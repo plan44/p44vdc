@@ -352,7 +352,15 @@ bool ZoneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
     }
     else {
       switch (aPropertyDescriptor->fieldKey()) {
-        case zoneName_key: setPVar(mZoneName, aPropValue->stringValue()); return true;
+        case zoneName_key: {
+          setPVar(mZoneName, aPropValue->stringValue());
+          // proxied devices must get zone name updated, too
+          // { "method":"setProperty", "dSUID":"root", "properties": { "x-p44-localController": { "zones": { "22000": { "name": _new_value_ } } } } }
+          JsonObjectPtr p = JsonObject::newString("root")->wrapAs("dSUID");
+          p->add("properties", JsonObject::newString(aPropValue->stringValue())->wrapAs("name")->wrapAs(string_format("%d", mZoneID))->wrapAs("zones")->wrapAs("x-p44-localController"));
+          VdcHost::sharedVdcHost()->callMethodOnProxied("setProperty", p);
+          return true;
+        }
       }
     }
   }

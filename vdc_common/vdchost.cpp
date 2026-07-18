@@ -41,6 +41,10 @@
 #if ENABLE_LOCALCONTROLLER
 #include "localcontroller.hpp"
 #endif
+#if ENABLE_PROXYDEVICES
+#include "proxyvdc.hpp"
+#endif
+
 
 #if ENABLE_P44SCRIPT
 #include "httpcomm.hpp"
@@ -56,7 +60,7 @@
 #if !DISABLE_DISCOVERY
 #include "dnssd.hpp"
 #endif
-#endif
+#endif // ENABLE_P44SCRIPT
 
 
 using namespace p44;
@@ -911,6 +915,41 @@ void VdcHost::reportLearnEvent(bool aLearnIn, ErrorPtr aError)
   }
 }
 
+
+// MARK: - proxy forwarding
+
+#if ENABLE_LOCALCONTROLLER && ENABLE_PROXYDEVICES
+
+void VdcHost::callMethodOnProxied(const string aMethod, JsonObjectPtr aParams)
+{
+  for(VdcMap::iterator pos = mVdcs.begin(); pos!=mVdcs.end(); ++pos) {
+    ProxyVdcPtr proxyVdc = dynamic_pointer_cast<ProxyVdc>(pos->second);
+    if (proxyVdc) {
+      POLOG(proxyVdc, LOG_INFO, "call method on proxied: %s params: %s", aMethod.c_str(), JsonObject::text(aParams));
+      proxyVdc->mBridgeApi.call(aMethod, aParams, boost::bind(&VdcHost::proxyMethodCalled, this, proxyVdc.get(), _1, _2));
+    }
+  }
+}
+
+
+void VdcHost::proxyMethodCalled(P44LoggingObj* aLogResultToP, ErrorPtr aError, JsonObjectPtr aJsonObject)
+{
+  POLOG(aLogResultToP, Error::isOK(aError) ? LOG_INFO : LOG_ERR, "method call returns err=%s, response=%s", Error::text(aError), JsonObject::text(aJsonObject));
+}
+
+
+void VdcHost::notifyProxied(const string aNotification, JsonObjectPtr aParams)
+{
+  for(VdcMap::iterator pos = mVdcs.begin(); pos!=mVdcs.end(); ++pos) {
+    ProxyVdcPtr proxyVdc = dynamic_pointer_cast<ProxyVdc>(pos->second);
+    if (proxyVdc) {
+      POLOG(proxyVdc, LOG_INFO, "notify proxied: %s params: %s", aNotification.c_str(), JsonObject::text(aParams));
+      proxyVdc->mBridgeApi.notify(aNotification, aParams);
+    }
+  }
+}
+
+#endif // ENABLE_LOCALCONTROLLER && ENABLE_PROXYDEVICES
 
 
 // MARK: - activity monitoring
@@ -2044,9 +2083,9 @@ ValueSource *VdcHost::getValueSourceById(string aValueSourceID)
 {
   ValueSource *valueSource = NULL;
   // value source ID is
-  //  dSUID_Sx for sensors (x=sensor index)
-  //  dSUID_Ix for inputs (x=input index)
-  //  dSUID_Bx for buttons (x=button index)
+  //  dSUID_Sx for sensors (x=sensor index or id)
+  //  dSUID_Ix for inputs (x=input index or id)
+  //  dSUID_Bx for buttons (x=button index or id)
   //  dSUID_Ciii for channels (ii=channel id)
   // - extract dSUID
   size_t i = aValueSourceID.find("_");
