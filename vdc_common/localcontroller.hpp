@@ -183,8 +183,10 @@ namespace p44 {
     /// get zone by ID
     /// @param aZoneId zone to look up
     /// @param aCreateNewIfNotExisting if true, a zone is created on the fly when none exists for the given ID
+    /// @param aNameForNewZone if not null and aCreateNewIfNotExisting is true, this will be used to name a new zone
     /// @return zone or NULL if aZoneId is not known (and none created)
-    ZoneDescriptorPtr getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotExisting = false);
+    /// @note zones created as new by this call are not marked dirty, so will not get persisted locally automatically
+    ZoneDescriptorPtr getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotExisting = false, const char* aNameForNewZone = nullptr);
 
     /// get zone by name
     /// @param aZoneName a user-assigned zone name to look for

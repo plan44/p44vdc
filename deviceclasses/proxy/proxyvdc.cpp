@@ -34,6 +34,10 @@
 
 #include "jsonvdcapi.hpp"
 
+#if ENABLE_LOCALCONTROLLER
+#include "localcontroller.hpp"
+#endif
+
 using namespace p44;
 
 // MARK: - Factory
@@ -304,8 +308,11 @@ void ProxyVdc::bridgeApiConnectedHandler(ErrorPtr aStatus)
     // query for basic vdc identification
     JsonObjectPtr params = JsonObject::objFromText(
       "{ \"method\":\"getProperty\", \"dSUID\":\"root\", \"query\":{ "
-      "\"dSUID\":null, \"model\":null, \"name\":null, \"x-p44-deviceHardwareId\":null, "
-      "\"configURL\":null, "
+        "\"dSUID\":null, \"model\":null, \"name\":null, \"x-p44-deviceHardwareId\":null, "
+        "\"configURL\":null"
+        #if ENABLE_LOCALCONTROLLER
+        ", \"x-p44-localController\": { \"zones\": { \"\": null } }"
+        #endif
       "}}"
     );
     api().call("getProperty", params, boost::bind(&ProxyVdc::bridgeApiIDQueryHandler, this, _1, _2));
@@ -337,6 +344,26 @@ void ProxyVdc::bridgeApiIDQueryHandler(ErrorPtr aError, JsonObjectPtr aJsonMsg)
     if (result->get("configURL", o)) {
       mProxiedDeviceConfigUrl = o->stringValue();
     }
+    #if ENABLE_LOCALCONTROLLER
+    // import (volatile) zone names from proxied controller
+    LocalControllerPtr lc = VdcHost::sharedVdcHost()->getLocalController();
+    if (lc && result->get("x-p44-localController", o)) {
+      JsonObjectPtr zones;
+      if (o->get("zones", zones)) {
+        zones->resetKeyIteration();
+        string zoneIDStr;
+        JsonObjectPtr zone;
+        while (zones->nextKeyValue(zoneIDStr, zone)) {
+          DsZoneID zoneID = (DsZoneID)atoi(zoneIDStr.c_str());
+          JsonObjectPtr o2;
+          if (zone->get("name", o2)) {
+            // for zones except global, import them with the remote's zone name, unless already existing
+            if (zoneID!=0) lc->mLocalZones.getZoneById(zoneID, true, o2->c_strValue());
+          }
+        }
+      }
+    }
+    #endif // ENABLE_LOCALCONTROLLER
     // reached once, got basic vdc info
     if (!mProxiedDeviceReached) {
       // we had not reached the proxy before, but are not initializing
@@ -481,16 +508,18 @@ bool ProxyVdc::isConfigured()
 
 
 #define NEEDED_DEVICE_PROPERTIES \
-  "{\"dSUID\":null, \"name\":null, \"zoneID\": null, \"x-p44-zonename\": null, " \
-  "\"outputDescription\":null, \"outputSettings\": null, \"modelFeatures\":null, " \
-  "\"scenes\": { \"0\":null, \"5\":null }, " \
-  "\"vendorName\":null, \"model\":null, \"configURL\":null, " \
-  "\"channelStates\":null, \"channelDescriptions\":null, " \
-  "\"sensorDescriptions\":null, \"sensorStates\":null, " \
-  "\"binaryInputDescriptions\":null, \"binaryInputStates\":null, " \
-  "\"buttonInputDescriptions\":null, \"buttonInputStates\":null, " \
-  "\"active\":null, " \
-  "\"x-p44-bridgeable\":null, \"x-p44-bridged\":null, \"x-p44-bridgeAs\":null }"
+  "{" \
+    "\"dSUID\":null, \"name\":null, \"zoneID\": null, \"x-p44-zonename\": null, " \
+    "\"outputDescription\":null, \"outputSettings\": null, \"modelFeatures\":null, " \
+    "\"scenes\": { \"0\":null, \"5\":null }, " \
+    "\"vendorName\":null, \"model\":null, \"configURL\":null, " \
+    "\"channelStates\":null, \"channelDescriptions\":null, " \
+    "\"sensorDescriptions\":null, \"sensorStates\":null, " \
+    "\"binaryInputDescriptions\":null, \"binaryInputStates\":null, " \
+    "\"buttonInputDescriptions\":null, \"buttonInputStates\":null, " \
+    "\"active\":null, " \
+    "\"x-p44-bridgeable\":null, \"x-p44-bridged\":null, \"x-p44-bridgeAs\":null " \
+  "}"
 
 
 /// collect devices from this vDC
@@ -515,9 +544,10 @@ void ProxyVdc::scanForDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
   // query devices
   JsonObjectPtr params = JsonObject::objFromText(
     "{ \"method\":\"getProperty\", \"dSUID\":\"root\", \"query\":{ "
-    "\"x-p44-vdcs\": { \"*\":{ \"x-p44-devices\": { \"*\": "
-    NEEDED_DEVICE_PROPERTIES
-    "} }} }}"
+      "\"x-p44-vdcs\": { \"*\":{ \"x-p44-devices\": { \"*\": "
+        NEEDED_DEVICE_PROPERTIES
+      "} }}"
+    "}}"
   );
   api().call("getProperty", params, boost::bind(&ProxyVdc::bridgeApiCollectQueryHandler, this, aCompletedCB, _1, _2));
 }

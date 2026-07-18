@@ -371,7 +371,7 @@ bool ZoneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
 // MARK: - ZoneList
 
 
-ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotExisting)
+ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotExisting, const char* aNameForNewZone)
 {
   ZoneDescriptorPtr zone;
   for (ZonesVector::iterator pos = mZones.begin(); pos!=mZones.end(); ++pos) {
@@ -384,7 +384,8 @@ ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotEx
     // create new zone descriptor on the fly
     zone = ZoneDescriptorPtr(new ZoneDescriptor);
     zone->mZoneID = aZoneId;
-    zone->mZoneName = aZoneId==0 ? "[global]" : string_format("Zone #%d", aZoneId);
+    if (aNameForNewZone) zone->mZoneName = aNameForNewZone;
+    else zone->mZoneName = aZoneId==0 ? "[global]" : string_format("Zone #%d", aZoneId);
     zone->markClean(); // not modified yet, no need to save
     mZones.push_back(zone);
   }
