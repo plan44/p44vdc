@@ -145,7 +145,7 @@ namespace p44 {
     typedef NumericValue inherited;
     MLMicroSeconds mLastUpdate;
     int mOpLevel;
-    EventSource* mEventSource;
+    ValueSource* mValueSource;
   public:
     ValueSourceObj(ValueSource* aValueSourceP);
     virtual string getAnnotation() const P44_OVERRIDE;

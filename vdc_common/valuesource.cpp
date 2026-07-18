@@ -128,9 +128,9 @@ bool ValueSourceMapper::parseMappingDefs(const string &aValueDefs, string *aMigr
 ValueSourceObj::ValueSourceObj(ValueSource* aValueSourceP) :
   inherited(aValueSourceP->getSourceValue()),
   mLastUpdate(aValueSourceP->getSourceLastUpdate()),
-  mOpLevel(aValueSourceP->getSourceOpLevel())
+  mOpLevel(aValueSourceP->getSourceOpLevel()),
+  mValueSource(aValueSourceP)
 {
-  mEventSource = dynamic_cast<EventSource*>(aValueSourceP);
 }
 
 
@@ -148,13 +148,13 @@ TypeInfo ValueSourceObj::getTypeInfo() const
 
 bool ValueSourceObj::isEventSource() const
 {
-  return mEventSource; // yes if it exists
+  return mValueSource; // yes if it exists
 }
 
 
 void ValueSourceObj::registerForFilteredEvents(EventSink* aEventSink, intptr_t aRegId)
 {
-  if (mEventSource) mEventSource->registerForEvents(aEventSink, aRegId); // no filtering
+  if (mValueSource) mValueSource->registerForEvents(aEventSink, aRegId); // no filtering
 }
 
 
@@ -172,6 +172,9 @@ const ScriptObjPtr ValueSourceObj::memberByName(const string aName, TypeInfo aMe
     if (mOpLevel>=0) val = new IntegerValue(mOpLevel);
     else val = new AnnotatedNullValue("unknown");
   }
+  else if (uequals(aName, "sourceID")) {
+    if (mValueSource) val = new StringValue(mValueSource->getSourceId());
+  }
   return val;
 }
 
@@ -181,6 +184,7 @@ void ValueSourceMapper::appendMemberNames(FieldNameList& aList, TypeInfo aIntere
   aList.push_back("age");
   aList.push_back("valid");
   aList.push_back("oplevel");
+  aList.push_back("sourceID");
 }
 
 
