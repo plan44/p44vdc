@@ -983,6 +983,9 @@ enum {
   updateInterval_key,
   aliveSignInterval_key,
   maxPushInterval_key,
+  #if P44SCRIPT_FULL_SUPPORT
+  sourceID_key,
+  #endif
   #if ENABLE_RRDB
   rrdbFile_key,
   #endif
@@ -1004,6 +1007,9 @@ const PropertyDescriptorPtr SensorBehaviour::getDescDescriptorByIndex(int aPropI
     { "updateInterval", apivalue_double, updateInterval_key+descriptions_key_offset, OKEY(sensor_key) },
     { "aliveSignInterval", apivalue_double, aliveSignInterval_key+descriptions_key_offset, OKEY(sensor_key) },
     { "maxPushInterval", apivalue_double, maxPushInterval_key+descriptions_key_offset, OKEY(sensor_key) },
+    #if P44SCRIPT_FULL_SUPPORT
+    { "x-p44-sourceID", apivalue_string, sourceID_key+descriptions_key_offset, OKEY(sensor_key) },
+    #endif
     #if ENABLE_RRDB
     { "x-p44-rrdFile", apivalue_string, rrdbFile_key+descriptions_key_offset, OKEY(sensor_key) },
     #endif
@@ -1125,12 +1131,17 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case maxPushInterval_key+descriptions_key_offset:
           aPropValue->setDoubleValue((double)mMaxPushInterval/Second);
           return true;
+        #if P44SCRIPT_FULL_SUPPORT
+        case sourceID_key+descriptions_key_offset:
+          aPropValue->setStringValue(getSourceId());
+          return true;
+        #endif // P44SCRIPT_FULL_SUPPORT
         #if ENABLE_RRDB
         case rrdbFile_key+descriptions_key_offset:
           if (mRRDBfile.empty()) return false; // only visible if there actually IS a file
           aPropValue->setStringValue(mRRDBfile);
           return true;
-        #endif
+        #endif // ENABLE_RRDB
         // Settings properties
         case group_key+settings_key_offset:
           aPropValue->setUint16Value(mSensorGroup);
@@ -1145,7 +1156,7 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case sync_key+settings_key_offset:
           aPropValue->setUint16Value(mDialSyncMode);
           return true;
-        #endif
+        #endif // !REDUCED_FOOTPRINT
         case minPushInterval_key+settings_key_offset:
           aPropValue->setDoubleValue((double)mMinPushInterval/Second);
           return true;
@@ -1157,7 +1168,7 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           if (!mDevice.isBridged()) return false; // hide when not bridged
           aPropValue->setBoolValue(mBridgeExclusive);
           return true;
-        #endif
+        #endif // ENABLE_JSONBRIDGEAPI
         case moderated_key+settings_key_offset:
           aPropValue->setBoolValue(mProfileP!=nullptr);
           return true;

@@ -424,7 +424,7 @@ static const char *stateNames[] = {
   "S13_3pauseWait",
   "S14_awaitrelease_timedout"
 };
-#endif
+#endif // FOCUSLOGGING
 
 
 
@@ -1152,6 +1152,9 @@ enum {
   buttonActionId_key,
   stateMachineMode_key,
   longFunctionDelay_key,
+  #if ENABLE_LOCALCONTROLLER && P44SCRIPT_FULL_SUPPORT
+  sourceID_key,
+  #endif
   #if ENABLE_JSONBRIDGEAPI
   bridgeExclusive_key,
   #endif
@@ -1173,6 +1176,9 @@ const PropertyDescriptorPtr ButtonBehaviour::getSettingsDescriptorByIndex(int aP
     { "x-p44-buttonActionId", apivalue_uint64, buttonActionId_key+settings_key_offset, OKEY(button_key) },
     { "x-p44-stateMachineMode", apivalue_uint64, stateMachineMode_key+settings_key_offset, OKEY(button_key) },
     { "x-p44-longFunctionDelay", apivalue_uint64, longFunctionDelay_key+settings_key_offset, OKEY(button_key) },
+    #if ENABLE_LOCALCONTROLLER && P44SCRIPT_FULL_SUPPORT
+    { "x-p44-sourceID", apivalue_string, sourceID_key+descriptions_key_offset, OKEY(button_key) },
+    #endif
     #if ENABLE_JSONBRIDGEAPI
     { "x-p44-bridgeExclusive", apivalue_bool, bridgeExclusive_key+settings_key_offset, OKEY(button_key) },
     #endif
@@ -1230,6 +1236,11 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case combinables_key+descriptions_key_offset:
           aPropValue->setUint64Value(mCombinables); // 0 and 1 both mean non-combinable, but 1 means that buttonmode is still not fixed
           return true;
+        #if ENABLE_LOCALCONTROLLER && P44SCRIPT_FULL_SUPPORT
+        case sourceID_key+descriptions_key_offset:
+          aPropValue->setStringValue(getSourceId());
+          return true;
+        #endif // ENABLE_LOCALCONTROLLER && P44SCRIPT_FULL_SUPPORT
         // Settings properties
         case group_key+settings_key_offset:
           aPropValue->setUint16Value(mButtonGroup);
@@ -1266,7 +1277,7 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           if (!mDevice.isBridged()) return false; // hide when not bridged
           aPropValue->setBoolValue(mBridgeExclusive);
           return true;
-        #endif
+        #endif // ENABLE_JSONBRIDGEAPI
         // States properties
         case value_key+states_key_offset:
           if (mLastAction==Never)
@@ -1365,7 +1376,7 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           // volatile, does not make settings dirty
           mBridgeExclusive = aPropValue->boolValue();
           return true;
-        #endif
+        #endif // ENABLE_JSONBRIDGEAPI
       }
     }
   }

@@ -399,6 +399,9 @@ enum {
   updateInterval_key,
   aliveSignInterval_key,
   maxPushInterval_key,
+  #if P44SCRIPT_FULL_SUPPORT
+  sourceID_key,
+  #endif
   numDescProperties
 };
 
@@ -413,6 +416,9 @@ const PropertyDescriptorPtr BinaryInputBehaviour::getDescDescriptorByIndex(int a
     { "updateInterval", apivalue_double, updateInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
     { "aliveSignInterval", apivalue_double, aliveSignInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
     { "maxPushInterval", apivalue_double, maxPushInterval_key+descriptions_key_offset, OKEY(binaryInput_key) },
+    #if P44SCRIPT_FULL_SUPPORT
+    { "x-p44-sourceID", apivalue_string, sourceID_key+descriptions_key_offset, OKEY(binaryInput_key) },
+    #endif
   };
   return PropertyDescriptorPtr(new StaticPropertyDescriptor(&properties[aPropIndex], aParentDescriptor));
 }
@@ -495,6 +501,11 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
         case maxPushInterval_key+descriptions_key_offset:
           aPropValue->setDoubleValue((double)mMaxPushInterval/Second);
           return true;
+        #if P44SCRIPT_FULL_SUPPORT
+        case sourceID_key+descriptions_key_offset:
+          aPropValue->setStringValue(getSourceId());
+          return true;
+        #endif // P44SCRIPT_FULL_SUPPORT
         // Settings properties
         case group_key+settings_key_offset:
           aPropValue->setUint16Value(mBinInputGroup);
@@ -513,7 +524,7 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
           if (!mDevice.isBridged()) return false; // hide when not bridged
           aPropValue->setBoolValue(mBridgeExclusive);
           return true;
-        #endif
+        #endif // ENABLE_JSONBRIDGEAPI
         // States properties
         case value_key+states_key_offset:
           // value
@@ -566,7 +577,7 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
           // volatile, does not make settings dirty
           mBridgeExclusive = aPropValue->boolValue();
           return true;
-        #endif
+        #endif // ENABLE_JSONBRIDGEAPI
       }
     }
   }

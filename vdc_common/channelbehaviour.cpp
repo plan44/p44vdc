@@ -695,6 +695,9 @@ enum {
   min_key,
   max_key,
   resolution_key,
+  #if P44SCRIPT_FULL_SUPPORT
+  sourceID_key,
+  #endif
   #if !REDUCED_FOOTPRINT
   enumvalues_key,
   #endif
@@ -725,7 +728,7 @@ int ChannelBehaviour::numProps(int aDomain, PropertyDescriptorPtr aParentDescrip
     // number of enum values
     return mEnumList ? mEnumList->numProps() : 0;
   }
-  #endif
+  #endif // !REDUCED_FOOTPRINT
   switch (aParentDescriptor->mParentDescriptor->fieldKey()) {
     case descriptions_key_offset: return numChannelDescProperties;
     case settings_key_offset: return numChannelSettingsProperties;
@@ -746,6 +749,9 @@ PropertyDescriptorPtr ChannelBehaviour::getDescriptorByIndex(int aPropIndex, int
     { "min", apivalue_double, min_key+descriptions_key_offset, OKEY(channel_Key) },
     { "max", apivalue_double, max_key+descriptions_key_offset, OKEY(channel_Key) },
     { "resolution", apivalue_double, resolution_key+descriptions_key_offset, OKEY(channel_Key) },
+    #if P44SCRIPT_FULL_SUPPORT
+    { "x-p44-sourceID", apivalue_string, sourceID_key+descriptions_key_offset, OKEY(channel_Key) },
+    #endif
     #if !REDUCED_FOOTPRINT
     { "values", apivalue_object+propflag_container, enumvalues_key, OKEY(channel_enumvalues_key) }
     #endif
@@ -788,7 +794,7 @@ PropertyContainerPtr ChannelBehaviour::getContainer(const PropertyDescriptorPtr 
   // unknown here
   return inheritedProps::getContainer(aPropertyDescriptor, aDomain);
 }
-#endif
+#endif // !REDUCED_FOOTPRINT
 
 
 // access to all fields
@@ -799,7 +805,7 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
     return mEnumList ? mEnumList->accessField(aMode, aPropValue, aPropertyDescriptor) : false;
   }
   else
-  #endif
+  #endif // !REDUCED_FOOTPRINT
   if (aPropertyDescriptor->hasObjectKey(channel_Key)) {
     if (aMode==access_read) {
       // read properties
@@ -833,6 +839,11 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         case resolution_key+descriptions_key_offset:
           aPropValue->setDoubleValue(getResolution());
           return true;
+        #if P44SCRIPT_FULL_SUPPORT
+        case sourceID_key+descriptions_key_offset:
+          aPropValue->setStringValue(getSourceId());
+          return true;
+        #endif // P44SCRIPT_FULL_SUPPORT
         // Settings properties
         // - none for now
         // States properties
