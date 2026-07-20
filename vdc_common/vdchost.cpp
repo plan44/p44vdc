@@ -139,7 +139,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   mMainScript.setSharedMainContext(mVdcHostScriptContext);
   mMainScript.setScriptHostUid("mainscript");
   mMainScript.setScriptCommandHandler(boost::bind(&VdcHost::mainScriptRun, this, _1));
-  mMainScript.setScriptResultHandler(boost::bind(&VdcHost::globalScriptEnds, this, _1, mMainScript.getOriginLabel(), ""));
+  mMainScript.setScriptResultHandler(boost::bind(&VdcHost::globalScriptEnds, this, _1, ScriptHostPtr(&mMainScript), false, ""));
   // Add some extras
   #if ENABLE_HTTP_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::httpGlobals());
@@ -1755,7 +1755,7 @@ ErrorPtr VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMethod
       return lcErr;
     }
   }
-  #endif
+  #endif // ENABLE_LOCALCONTROLLER
   #if P44SCRIPT_FULL_SUPPORT && !P44SCRIPT_REGISTERED_SOURCE
   // Note: functionality for controlling script executions (not only) of mainscript
   //   is now in P44ScriptHost, but is not backwards compatible
@@ -1941,7 +1941,7 @@ PropertyContainerPtr VdcHost::getContainer(const PropertyDescriptorPtr aProperty
   else if (aPropertyDescriptor->hasObjectKey(localController_obj)) {
     return mLocalController; // can be NULL if local controller is not enabled
   }
-  #endif
+  #endif // ENABLE_LOCALCONTROLLER
   else if (aPropertyDescriptor->hasObjectKey(vdc_obj)) {
     // - just iterate into map, we'll never have more than a few logical vdcs!
     int i = 0;
@@ -1975,7 +1975,7 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
           aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
           createScenesList(aPropValue);
           return true;
-        #endif
+        #endif // !REDUCED_FOOTPRINT
         case persistentChannels_key:
           aPropValue->setBoolValue(mPersistentChannels);
           return true;
@@ -1995,7 +1995,7 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case mainscriptId_key:
           aPropValue->setStringValue(mMainScript.getSourceUid());
           return true;
-        #endif
+        #endif // P44SCRIPT_FULL_SUPPORT
         case nextVersion_key:
           aPropValue->setStringValue(nextModelVersion());
           return true;
@@ -2020,7 +2020,7 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case mainscript_key:
           if (mMainScript.setAndStoreSource(aPropValue->stringValue())) markDirty();
           return true;
-        #endif
+        #endif // P44SCRIPT_FULL_SUPPORT
       }
     }
   }
@@ -2573,45 +2573,65 @@ void VdcHost::runGlobalScripts()
     err = string_fromfile(scriptFn, script);
   }
   if (!scriptFn.empty()) {
+    const char* scriptName = setupscript ? "setupscript" : "initscript";
     if (Error::notOK(err)) {
-      OLOG(LOG_ERR, "cannot open initscript: %s", err->text());
+      OLOG(LOG_ERR, "cannot open %s: %s", scriptName, err->text());
     }
     else {
-      ScriptHost initScript(sourcecode|regular, setupscript ? "setupscript" : "initscript", "%O", this);
-      initScript.setSource(script, scriptbody|ephemeralSource);
-      initScript.setSharedMainContext(mVdcHostScriptContext);
-      initScript.registerUnstoredScript("initscript");
-      OLOG(LOG_NOTICE, "Starting %s specified on commandline '%s'", initScript.getOriginLabel(), scriptFn.c_str());
-      initScript.run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript.getOriginLabel(), setupscript ? scriptFn : ""), ScriptObjPtr(), Infinite);
+      ScriptHostPtr initScript = new ScriptHost(sourcecode|regular, scriptName, "%O", this, false);
+      initScript->setSource(script, scriptbody|(setupscript ? 0 : ephemeralSource)); // setupscript is not considered ephemeral (may have includes)
+      initScript->setSharedMainContext(mVdcHostScriptContext);
+      initScript->registerUnstoredScript(scriptName);
+      OLOG(LOG_NOTICE, "Starting '%s' specified on commandline '%s'", initScript->getOriginLabel(), scriptFn.c_str());
+      initScript->run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript, true, setupscript ? scriptFn : ""), ScriptObjPtr(), Infinite);
+      return; // mainscript is run only when init/setup returns
     }
   }
+  runMainScript();
+}
+
+
+void VdcHost::runMainScript()
+{
   // stored global script
   if (!mMainScript.getSource().empty()) {
-    OLOG(LOG_NOTICE, "Starting global main script");
+    OLOG(LOG_NOTICE, "Starting global 'mainscript'");
     mMainScript.run(regular|concurrently|keepvars, NoOP, ScriptObjPtr(), Infinite);
   }
 }
 
-void VdcHost::globalScriptEnds(ScriptObjPtr aResult, const char *aOriginLabel, string aSetupScriptFn)
+
+
+void VdcHost::globalScriptEnds(ScriptObjPtr aResult, ScriptHostPtr aScriptHost, bool aInitOrSetup, string aSetupScriptFn)
 {
-  OLOG(aResult && aResult->isErr() ? LOG_WARNING : LOG_NOTICE, "Global %s script finished running, result=%s", aOriginLabel, ScriptObj::describe(aResult).c_str());
-  if (!aSetupScriptFn.empty()) {
-    // this was a setup script running
-    if (aResult && !aResult->isErr() && aResult->boolValue()) {
-      // successful execution of setupscript, return value is trueish
-      string ret = aResult->stringValue().c_str();
-      OLOG(LOG_WARNING, "setupscript successfully executed returning='%s', now deleting file '%s'", ret.c_str(), aSetupScriptFn.c_str());
-      unlink(aSetupScriptFn.c_str());
-      if (ret=="reboot" || ret=="restart") {
-        // also reboot/restart
-        OLOG(LOG_WARNING, "setupscript requests %s", ret.c_str());
-        save();
-        Application::sharedApplication()->terminateApp(ret=="reboot" ? P44_EXIT_REBOOT : EXIT_SUCCESS);
+  OLOG(aResult && aResult->isErr() ? LOG_WARNING : LOG_NOTICE, "Global '%s' finished running, result=%s", aScriptHost->getOriginLabel(), ScriptObj::describe(aResult).c_str());
+  // release init/setup script
+  if (aInitOrSetup) {
+    // these are temproary, release them
+    aScriptHost->uncompile(true, false);
+    if (!aSetupScriptFn.empty()) {
+      // this was a setup script running
+      if (aResult && !aResult->isErr() && aResult->boolValue()) {
+        // successful execution of setupscript, return value is trueish
+        string ret = aResult->stringValue().c_str();
+        OLOG(LOG_WARNING, "setupscript successfully executed returning='%s', now deleting file '%s'", ret.c_str(), aSetupScriptFn.c_str());
+        unlink(aSetupScriptFn.c_str());
+        if (ret=="reboot" || ret=="restart") {
+          // also reboot/restart
+          OLOG(LOG_WARNING, "setupscript requests %s", ret.c_str());
+          save();
+          Application::sharedApplication()->terminateApp(ret=="reboot" ? P44_EXIT_REBOOT : EXIT_SUCCESS);
+          return; // done, do not start main script
+        }
+      }
+      else {
+        OLOG(LOG_ERR, "setupscript failed to execute successfully, returns: %s", ScriptObj::describe(aResult).c_str());
       }
     }
-    else {
-      OLOG(LOG_ERR, "setupscript failed to execute successfully, returns: %s", ScriptObj::describe(aResult).c_str());
-    }
+  }
+  if (aInitOrSetup) {
+    // now after init or setup script, run mainscript (not in parallel!)
+    runMainScript();
   }
 }
 
