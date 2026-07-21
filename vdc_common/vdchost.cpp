@@ -810,8 +810,10 @@ bool VdcHost::addDevice(DevicePtr aDevice)
   // load the device's persistent params (if there are any)
   aDevice->load();
   // if not collecting, initialize device right away.
-  // Otherwise, initialisation will be done when collecting is complete
+  // Otherwise, initialisation will be done when collecting of all devices is complete
   if (!mCollecting) {
+    // - adding a single device is like a collection run with only one device, signal this
+    postEvent(vdchost_devices_collected);
     aDevice->initializeDevice(boost::bind(&VdcHost::separateDeviceInitialized, this, aDevice, _1), false);
   }
   return true;
@@ -828,6 +830,8 @@ void VdcHost::duplicateIgnored(DevicePtr aDevice)
 void VdcHost::separateDeviceInitialized(DevicePtr aDevice, ErrorPtr aError)
 {
   deviceInitialized(aDevice, aError);
+  // - initializing a single device after adding is like a initialisation run with only one device, signal this
+  postEvent(vdchost_devices_initialized);
   // trigger announcing when initialized (no problem when called while already announcing)
   startAnnouncing();
 }
