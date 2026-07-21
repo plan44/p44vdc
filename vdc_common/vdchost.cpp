@@ -134,7 +134,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   // vdchost is the global context for this app, so register its members in the standard scripting
   // domain making them accessible in all scripts
   StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::p44VdcHostMembers());
-  mVdcHostScriptContext = StandardScriptingDomain::sharedDomain().newContext();
+  mVdcHostScriptContext = StandardScriptingDomain::sharedDomain().newContext(); // default user level
   // init main script source
   mMainScript.setSharedMainContext(mVdcHostScriptContext);
   mMainScript.setScriptHostUid("mainscript");
@@ -2552,7 +2552,7 @@ void VdcHost::runGlobalScripts()
   // command line provided script
   string scriptFn;
   string script;
-  bool setupscript = false;
+  bool isSetupscript = false;
   ErrorPtr err;
   if (CmdLineApp::sharedCmdLineApp()->getStringOption("setupscript", scriptFn)) {
     scriptFn = Application::sharedApplication()->resourcePath(scriptFn);
@@ -2560,7 +2560,7 @@ void VdcHost::runGlobalScripts()
     err = string_fromfile(scriptFn, script);
     if (Error::isOK(err)) {
       // exists, run it (and delete afterwards), no initscript or mainscript can run now
-      setupscript = true;
+      isSetupscript = true;
     }
     else {
       // setupscript not available, we can run mainscript
@@ -2568,22 +2568,23 @@ void VdcHost::runGlobalScripts()
       scriptFn.clear();
     }
   }
-  if (!setupscript && CmdLineApp::sharedCmdLineApp()->getStringOption("initscript", scriptFn)) {
+  if (!isSetupscript && CmdLineApp::sharedCmdLineApp()->getStringOption("initscript", scriptFn)) {
     scriptFn = Application::sharedApplication()->resourcePath(scriptFn);
     err = string_fromfile(scriptFn, script);
   }
   if (!scriptFn.empty()) {
-    const char* scriptName = setupscript ? "setupscript" : "initscript";
+    const char* scriptName = isSetupscript ? "setupscript" : "initscript";
     if (Error::notOK(err)) {
       OLOG(LOG_ERR, "cannot open %s: %s", scriptName, err->text());
     }
     else {
-      ScriptHostPtr initScript = new ScriptHost(sourcecode|regular, scriptName, "%O", this, false);
-      initScript->setSource(script, scriptbody|(setupscript ? 0 : ephemeralSource)); // setupscript is not considered ephemeral (may have includes)
-      initScript->setSharedMainContext(mVdcHostScriptContext);
-      initScript->registerUnstoredScript(scriptName);
-      OLOG(LOG_NOTICE, "Starting '%s' specified on commandline '%s'", initScript->getOriginLabel(), scriptFn.c_str());
-      initScript->run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, initScript, true, setupscript ? scriptFn : ""), ScriptObjPtr(), Infinite);
+      ScriptHostPtr globScript = new ScriptHost(sourcecode|regular, scriptName, "%O", this, false);
+      globScript->setSource(script, scriptbody|(isSetupscript ? 0 : ephemeralSource)); // setupscript is not considered ephemeral (may have includes)
+      if (isSetupscript) mVdcHostScriptContext->setUserLevel(3); // setupscript has super high permissions, might even do factory reset
+      globScript->setSharedMainContext(mVdcHostScriptContext);
+      globScript->registerUnstoredScript(scriptName);
+      OLOG(LOG_NOTICE, "Starting '%s' specified on commandline '%s'", globScript->getOriginLabel(), scriptFn.c_str());
+      globScript->run(regular|concurrently|keepvars, boost::bind(&VdcHost::globalScriptEnds, this, _1, globScript, true, isSetupscript ? scriptFn : ""), ScriptObjPtr(), Infinite);
       return; // mainscript is run only when init/setup returns
     }
   }
@@ -2594,6 +2595,7 @@ void VdcHost::runGlobalScripts()
 void VdcHost::runMainScript()
 {
   // stored global script
+  mVdcHostScriptContext->setUserLevel(); // reset to default
   if (!mMainScript.getSource().empty()) {
     OLOG(LOG_NOTICE, "Starting global 'mainscript'");
     mMainScript.run(regular|concurrently|keepvars, NoOP, ScriptObjPtr(), Infinite);
