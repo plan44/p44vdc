@@ -124,7 +124,7 @@ EvaluatorDevice::EvaluatorDevice(EvaluatorVdc *aVdcP, const string &aEvaluatorID
     evaluatorSettings()->mAction.setSharedMainContext(evaluatorSettings()->mEvaluatorContext);
     evaluatorSettings()->mAction.setScriptCommandHandler(boost::bind(&EvaluatorDevice::actionRun, this, _1, _2));
   }
-  #endif
+  #endif // P44SCRIPT_FULL_SUPPORT
   deriveDsUid();
 }
 
@@ -241,6 +241,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
     cond = checkResult->newObject();
     res = evaluatorSettings()->mOnCondition.run(initial|synchronously, NoOP, ScriptObjPtr(), 2*Second);
     cond->add("expression", checkResult->newString(evaluatorSettings()->mOnCondition.getSource()));
+    if (!res) res = new ScriptObj; // at least: null
     if (!res->isErr()) {
       cond->add("result", cond->newScriptValue(res));
       cond->add("text", cond->newString(res->defined() ? res->stringValue() : res->getAnnotation()));
@@ -266,6 +267,7 @@ ErrorPtr EvaluatorDevice::handleMethod(VdcApiRequestPtr aRequest, const string &
       }
       else {
         res = evaluatorSettings()->mOffCondition.run(initial|synchronously, NoOP, ScriptObjPtr(), 2*Second);
+        if (!res) res = new ScriptObj; // at least: null
         if (!res->isErr()) {
           cond->add("result", cond->newScriptValue(res));
           cond->add("text", cond->newString(res->defined() ? res->stringValue() : res->getAnnotation()));
