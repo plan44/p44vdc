@@ -85,7 +85,7 @@ private:
 
   IndicatorOutputPtr redOrExistingLED()
   {
-    if (dynamic_pointer_cast<MissingPin>(mRedLED)) {
+    if (mRedLED->pinMissing()) {
       return mGreenLED; // must exist
     }
     return mRedLED;
@@ -255,19 +255,19 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   if (mConfigApi) {
     mConfigApi->mJsonApiServer->startServer(boost::bind(&P44VdcHost::configApiConnectionHandler, this, _1), 3);
   }
-  #endif
+  #endif // ENABLE_JSONCFGAPI
   #if ENABLE_UBUS
   // start ubus API, if we have it
   if (mUbusApiServer) {
     mUbusApiServer->startServer();
   }
-  #endif
+  #endif // ENABLE_UBUS
   #if ENABLE_P44FEATURES && ENABLE_P44SCRIPT
   // register script access
   if (FeatureApi::existingSharedApi()) {
     StandardScriptingDomain::sharedDomain().registerMemberLookup(new FeatureApiLookup);
   }
-  #endif
+  #endif // ENABLE_P44FEATURES && ENABLE_P44SCRIPT
   // Note: bridge API will be started when all devices are initialized for the first time
   // now init rest of vdc host
   inherited::initialize(aCompletedCB, aFactoryReset);

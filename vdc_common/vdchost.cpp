@@ -290,7 +290,7 @@ void VdcHost::postEvent(VdchostEvent aEvent)
   if (aEvent>=vdchost_redistributed_events) {
     sendEvent(new StringValue(vdcHostEventNames[aEvent]));
   }
-  #endif
+  #endif // P44SCRIPT_FULL_SUPPORT
 }
 
 
