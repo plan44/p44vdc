@@ -102,7 +102,7 @@ void Vdc::selfTest(StatusCB aCompletedCB)
   // by default, signal "no hardware tested"
   aCompletedCB(Error::err<VdcError>(VdcError::NoHWTested, "No hardware tested"));
 }
-#endif
+#endif // SELFTESTING_ENABLED
 
 
 const char *Vdc::getPersistentDataDir()

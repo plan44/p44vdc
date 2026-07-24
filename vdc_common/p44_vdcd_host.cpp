@@ -98,7 +98,7 @@ private:
       // ok, test next
       // - start green/yellow blinking = test in progress
       mGreenLED->steadyOn();
-      redOrExistingLED()->blinkFor(Infinite, 600*MilliSecond, 50);
+      redOrExistingLED()->blinkFor(Infinite, 700*MilliSecond, 30); // assymetric to distinguish from normal busy blink
       // - check for init errors
       ErrorPtr vdcErr = mNextVdc->second->getVdcErr();
       if (Error::isOK(vdcErr)) {
@@ -126,15 +126,15 @@ private:
     if (Error::notOK(aError)) {
       if (!aError->isError(VdcError::domain(), VdcError::NoHWTested)) {
         // test failed
-        LOG(LOG_ERR, "****** Test of '%s' FAILED with error: %s", mNextVdc->second->vdcClassIdentifier(), aError->text());
+        LOG(LOG_ERR, "****** Test of '%s' FAILED with error (confirm with button): %s", mNextVdc->second->vdcClassIdentifier(), aError->text());
         // remember
         mGlobalError = aError;
         // morse out tag number of vDC failing self test until button is pressed
         mGreenLED->steadyOff();
         int numBlinks = mNextVdc->second->getTag();
-        redOrExistingLED()->blinkFor(300*MilliSecond*numBlinks, 300*MilliSecond, 50);
+        redOrExistingLED()->blinkFor(500*MilliSecond*numBlinks, 500*MilliSecond, 50); // regular rythm that would allow counting
         // call myself again later
-        mErrorReportTicket.executeOnce(boost::bind(&SelfTestRunner::vdcTested, this, aError), 300*MilliSecond*numBlinks+2*Second);
+        mErrorReportTicket.executeOnce(boost::bind(&SelfTestRunner::vdcTested, this, aError), 500*MilliSecond*numBlinks+3*Second);
         // also install button responder
         mButton->setButtonHandler(boost::bind(&SelfTestRunner::errorAcknowledged, this), false); // report only release
         return; // done for now
@@ -175,12 +175,12 @@ private:
     if (Error::isOK(mGlobalError)) {
       LOG(LOG_ERR, "Self test OK");
       mRedLED->steadyOff();
-      mGreenLED->blinkFor(Infinite, 500, 85); // slow green blinking = good
+      mGreenLED->blinkFor(Infinite, 500, 70); // slow FAT green blinking = good
     }
     else  {
       LOG(LOG_ERR, "Self test has FAILED: %s", mGlobalError->text());
       mGreenLED->steadyOff();
-      redOrExistingLED()->blinkFor(Infinite, 250, 60); // faster red blinking = not good
+      redOrExistingLED()->blinkFor(Infinite, 250, mRedLED->pinMissing() ? 30 : 70); // faster red (or THIN) blinking = not good
     }
     // callback, report last error seen
     mCompletedCB(mGlobalError);
