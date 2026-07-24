@@ -79,7 +79,8 @@ VdcApiServer::VdcApiServer() :
 
 void VdcApiServer::start()
 {
-  inherited::startServer(boost::bind(&VdcApiServer::serverConnectionHandler, this, _1), 3);
+  ErrorPtr err = inherited::startServer(boost::bind(&VdcApiServer::serverConnectionHandler, this, _1), 3);
+  if (Error::notOK(err)) LOG(LOG_ERR, "Cannot start vDC API server: %s", Error::text(err));
 }
 
 

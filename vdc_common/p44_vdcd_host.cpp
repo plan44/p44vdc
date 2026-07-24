@@ -253,13 +253,15 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   #if ENABLE_JSONCFGAPI
   // start config API, if we have one
   if (mConfigApi) {
-    mConfigApi->mJsonApiServer->startServer(boost::bind(&P44VdcHost::configApiConnectionHandler, this, _1), 3);
+    ErrorPtr err = mConfigApi->mJsonApiServer->startServer(boost::bind(&P44VdcHost::configApiConnectionHandler, this, _1), 3);
+    if (Error::notOK(err)) OLOG(LOG_ERR, "Cannot start config API server: %s", Error::text(err));
   }
   #endif // ENABLE_JSONCFGAPI
   #if ENABLE_UBUS
   // start ubus API, if we have it
   if (mUbusApiServer) {
-    mUbusApiServer->startServer();
+    ErrorPtr err = mUbusApiServer->startServer();
+    if (Error::notOK(err)) OLOG(LOG_ERR, "Cannot start UBUS server: %s", Error::text(err));
   }
   #endif // ENABLE_UBUS
   #if ENABLE_P44FEATURES && ENABLE_P44SCRIPT
