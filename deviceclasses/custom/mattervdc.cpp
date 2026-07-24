@@ -68,8 +68,8 @@ void MatterDevice::disconnect(bool aForgetParams, DisconnectCB aDisconnectResult
 // MARK: - matter device container
 
 
-MatterVdc::MatterVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag) :
-  ExternalVdc(aInstanceNumber, aSocketPathOrPort, aNonLocal, aVdcHostP, aTag)
+MatterVdc::MatterVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, int aProtocolFamily, VdcHost *aVdcHostP, int aTag) :
+  ExternalVdc(aInstanceNumber, aSocketPathOrPort, aNonLocal, aProtocolFamily, aVdcHostP, aTag)
 {
   // set default icon base name
   mIconBaseName = "vdc_matter";

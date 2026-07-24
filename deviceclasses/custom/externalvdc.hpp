@@ -141,7 +141,7 @@ namespace p44 {
     SocketCommPtr mExternalDeviceApiServer;
 
   public:
-    ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag);
+    ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, int aProtocolFamily, VdcHost *aVdcHostP, int aTag);
 
     virtual void initialize(StatusCB aCompletedCB, bool aFactoryReset) P44_OVERRIDE;
 

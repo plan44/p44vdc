@@ -434,14 +434,14 @@ void ExternalDeviceConnector::handleDeviceApiSimpleMessage(ErrorPtr aError, stri
 
 
 
-ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, VdcHost *aVdcHostP, int aTag) :
+ExternalVdc::ExternalVdc(int aInstanceNumber, const string &aSocketPathOrPort, bool aNonLocal, int aProtocolFamily, VdcHost *aVdcHostP, int aTag) :
   CustomVdc(aInstanceNumber, aVdcHostP, aTag)
 {
   // set default icon base name
   mIconBaseName = "vdc_ext";
   // create device API server and set connection specifications
   mExternalDeviceApiServer = SocketCommPtr(new SocketComm(MainLoop::currentMainLoop()));
-  mExternalDeviceApiServer->setConnectionParams(NULL, aSocketPathOrPort.c_str(), SOCK_STREAM, PF_UNSPEC);
+  mExternalDeviceApiServer->setConnectionParams(NULL, aSocketPathOrPort.c_str(), SOCK_STREAM, aProtocolFamily);
   mExternalDeviceApiServer->setAllowNonlocalConnections(aNonLocal);
 }
 
