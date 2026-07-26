@@ -419,17 +419,25 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
     // now derive decision
     Tristate prevState = mEvaluatorState;
     bool decisionMade = false;
-    if (!decisionMade && prevState!=yes && aOnCondition) {
-      // off or unknown, and on condition has changed: check for switching on
-      OLOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->mOnCondition.getSource().c_str(), newConditionState==undefined ? "<undefined>" : (newConditionState==yes ? "true -> switching ON" : "false"));
-      if (newConditionState==yes) {
-        mEvaluatorState = yes;
+    if (!decisionMade && aOnCondition) {
+      if (mEvaluatorType!=evaluator_internalaction && evaluatorSettings()->mOffCondition.empty() && newConditionState==no && prevState!=no) {
+        // no off condition -> imply offCondition == !onCondition (except for internalaction, which handles this case separately, taking action script changes into account)
+        OLOG(LOG_INFO, "onCondition '%s' evaluates to false while there is no offCondition -> evaluator:=OFF", evaluatorSettings()->mOnCondition.getSource().c_str());
+        mEvaluatorState = no;
         decisionMade = true;
+      }
+      else if (prevState!=yes) {
+        // off or unknown, and on condition has changed: check for switching on
+        OLOG(LOG_INFO, "onCondition '%s' evaluates to %s", evaluatorSettings()->mOnCondition.getSource().c_str(), newConditionState==undefined ? "<undefined>" : (newConditionState==yes ? "true -> evaluator:=ON" : "false"));
+        if (newConditionState==yes) {
+          mEvaluatorState = yes;
+          decisionMade = true;
+        }
       }
     }
     if (!decisionMade && prevState!=no && !aOnCondition) {
       // on or unknown, and off condition has changed: check for switching off
-      OLOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->mOffCondition.getSource().c_str(), newConditionState==undefined ? "<undefined>" : (newConditionState==yes ? "true -> switching OFF" : "false"));
+      OLOG(LOG_INFO, "offCondition '%s' evaluates to %s", evaluatorSettings()->mOffCondition.getSource().c_str(), newConditionState==undefined ? "<undefined>" : (newConditionState==yes ? "true -> evaluator:=OFF" : "false"));
       if (newConditionState==yes) {
         mEvaluatorState = no;
         decisionMade = true;
@@ -442,7 +450,7 @@ void EvaluatorDevice::handleTrigger(bool aOnCondition, ScriptObjPtr aResult)
       if (otherConditionState==yes) {
         mEvaluatorState = aOnCondition ? no : yes; // the OTHER condition causes a state change!
         if (mEvaluatorState!=prevState) {
-          OLOG(LOG_INFO, "%sCondition was already true while %sCondition gets false -> switching %s", aOnCondition ? "off" : "on", aOnCondition ? "on" : "off", mEvaluatorState==yes ? "ON" : "OFF");
+          OLOG(LOG_INFO, "%sCondition was already true while %sCondition gets false -> evaluator:=%s", aOnCondition ? "off" : "on", aOnCondition ? "on" : "off", mEvaluatorState==yes ? "ON" : "OFF");
           decisionMade = true;
         }
       }
