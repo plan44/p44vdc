@@ -865,7 +865,8 @@ string Esp3Packet::description()
       if (radioHasTeachInfo()) {
         const char *mn = EnoceanComm::manufacturerName(eepManufacturer());
         string_format_append(t,
-          "\n- Is Learn-In packet: EEP RORG/FUNC/TYPE: %02X %02X %02X, Manufacturer = %s (%03X)",
+          "\n- Is Learn-%s packet: EEP RORG/FUNC/TYPE: %02X %02X %02X, Manufacturer = %s (%03X)",
+          teachInfoType()==yes ? "in only" : (teachInfoType()==no ? "out only" : "In/Out"),
           EEP_RORG(eepProfile()),
           EEP_FUNC(eepProfile()),
           EEP_TYPE(eepProfile()),
