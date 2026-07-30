@@ -27,6 +27,12 @@
 #include "simplescene.hpp"
 #include "outputbehaviour.hpp"
 
+#ifndef ENABLE_AUDIO_SUPPORT
+  #define ENABLE_AUDIO_SUPPORT (!REDUCED_FOOTPRINT)
+#endif
+
+#if ENABLE_AUDIO_SUPPORT
+
 using namespace std;
 
 namespace p44 {
@@ -244,5 +250,7 @@ namespace p44 {
   typedef boost::intrusive_ptr<AudioBehaviour> AudioBehaviourPtr;
 
 } // namespace p44
+
+#endif // ENABLE_AUDIO_SUPPORT
 
 #endif /* defined(__p44vdc__audiobehaviour__) */

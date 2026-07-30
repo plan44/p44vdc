@@ -22,6 +22,8 @@
 
 #include "videobehaviour.hpp"
 
+#if ENABLE_VIDEO_SUPPORT
+
 using namespace p44;
 
 
@@ -594,7 +596,7 @@ string VideoBehaviour::description()
   return s;
 }
 
-
+#endif // ENABLE_VIDEO_SUPPORT
 
 
 

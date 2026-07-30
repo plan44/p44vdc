@@ -27,6 +27,12 @@
 #include "simplescene.hpp"
 #include "outputbehaviour.hpp"
 
+#ifndef ENABLE_VIDEO_SUPPORT
+  #define ENABLE_VIDEO_SUPPORT (!REDUCED_FOOTPRINT)
+#endif
+
+#if ENABLE_VIDEO_SUPPORT
+
 using namespace std;
 
 namespace p44 {
@@ -258,5 +264,7 @@ namespace p44 {
   typedef boost::intrusive_ptr<VideoBehaviour> VideoBehaviourPtr;
 
 } // namespace p44
+
+#endif // ENABLE_VIDEO_SUPPORT
 
 #endif /* defined(__p44vdc__videobehaviour__) */

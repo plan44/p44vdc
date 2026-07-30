@@ -22,6 +22,8 @@
 
 #include "audiobehaviour.hpp"
 
+#if ENABLE_AUDIO_SUPPORT
+
 #include <math.h>
 
 using namespace p44;
@@ -586,8 +588,7 @@ string AudioBehaviour::description()
   return s;
 }
 
-
-
+#endif // ENABLE_AUDIO_SUPPORT
 
 
 

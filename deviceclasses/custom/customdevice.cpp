@@ -1205,6 +1205,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     fl->setHardwareName(hardwareName);
     addBehaviour(fl);
   }
+  #if ENABLE_AUDIO_SUPPORT
   else if (outputType=="audio") {
     if (defaultGroup==group_undefined) defaultGroup = group_cyan_audio;
     // - use audio settings, which include a volume+powerstate+contensource+sceneCmd scene table
@@ -1214,6 +1215,8 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     ab->setHardwareName(hardwareName);
     addBehaviour(ab);
   }
+  #endif // ENABLE_AUDIO_SUPPORT
+  #if ENABLE_VIDEO_SUPPORT
   else if (outputType=="video") {
     if (defaultGroup==group_undefined) defaultGroup = group_magenta_video;
     // - use video settings, which include a volume+powerstate+contensource+sceneCmd scene table
@@ -1223,6 +1226,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     vb->setHardwareName(hardwareName);
     addBehaviour(vb);
   }
+  #endif // ENABLE_VIDEO_SUPPORT
   #endif // ENABLE_CUSTOM_EXOTIC
   else if (outputType=="heatingvalve") {
     if (defaultGroup==group_undefined) defaultGroup = group_roomtemperature_control;
