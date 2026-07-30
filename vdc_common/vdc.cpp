@@ -1344,7 +1344,9 @@ enum {
   hideWhenEmpty_key,
   confirmed_key,
   effectSpeedOptimized_key,
+  #if ENABLE_JSONBRIDGEAPI
   defaultBridgingFlags_key,
+  #endif
   numVdcProperties
 };
 
