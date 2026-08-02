@@ -443,8 +443,8 @@ namespace p44 {
     LEDChainArrangementPtr mLedChainArrangement; ///< access to LED chains for LED simulator API
     #endif
 
-    int webUiPort; ///< port number of the web-UI (on the same host). 0 if no Web-UI present
-    string webUiPath; ///< path to be used in the webuiURLString
+    int mWebUiPort; ///< port number of the web-UI (on the same host). 0 if no Web-UI present
+    string mWebUiPath; ///< path to be used in the webuiURLString
 
     P44VdcHost(bool aWithLocalController = false, bool aWithPersistentChannels = false);
 

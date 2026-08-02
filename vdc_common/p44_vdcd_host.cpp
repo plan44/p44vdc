@@ -197,7 +197,7 @@ private:
 
 P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   inherited(aWithLocalController, aWithPersistentChannels),
-  webUiPort(0)
+  mWebUiPort(0)
   #if P44SCRIPT_REGISTERED_SOURCE
   ,mPlayground(sourcecode|regular|keepvars, "playground", "p44script playground", this)
   #endif
@@ -229,8 +229,8 @@ void P44VdcHost::selfTest(StatusCB aCompletedCB, ButtonInputPtr aButton, Indicat
 
 string P44VdcHost::webuiURLString() const
 {
-  if (webUiPort)
-    return string_format("http://%s:%d%s", ipv4ToString(getIpV4Address()).c_str(), webUiPort, webUiPath.c_str());
+  if (mWebUiPort)
+    return string_format("http://%s:%d%s", ipv4ToString(getIpV4Address()).c_str(), mWebUiPort, mWebUiPath.c_str());
   else
     return inherited::webuiURLString();
 }
