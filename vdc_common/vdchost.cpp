@@ -57,6 +57,7 @@
 #include "spi.hpp"
 #include "modbus.hpp"
 #include "midi.hpp"
+#include "dmxhandler.hpp"
 #if !DISABLE_DISCOVERY
 #include "dnssd.hpp"
 #endif
@@ -170,6 +171,9 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #endif
   #if ENABLE_MIDI_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::midiGlobals());
+  #endif
+  #if ENABLE_DMX_SCRIPT_FUNCS
+  StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::dmxhandlerGlobals());
   #endif
   #if ENABLE_MODBUS_SCRIPT_FUNCS
   StandardScriptingDomain::sharedDomain().addGlobalBuiltins(P44Script::modbusGlobals());
