@@ -243,6 +243,15 @@ void Device::setZoneID(DsZoneID aZoneId)
       }
     }
     #endif // ENABLE_JSONBRIDGEAPI
+    #if ENABLE_GENERIC_API_PUSH
+    // when we have a webui capable of receiving pushes, always push
+    VdcApiConnectionPtr api = getVdcHost().genericPushApi();
+    if (api) {
+      ApiValuePtr q = api->newApiValue();
+      q = q->wrapNull("zoneID");
+      pushNotification(api, q, ApiValuePtr());
+    }
+    #endif // ENABLE_GENERIC_API_PUSH
   }
 }
 
@@ -298,6 +307,15 @@ void Device::setName(const string &aName)
       }
     }
     #endif // ENABLE_JSONBRIDGEAPI
+    #if ENABLE_GENERIC_API_PUSH
+    // when we have a webui capable of receiving pushes, always push
+    VdcApiConnectionPtr api = getVdcHost().genericPushApi();
+    if (api) {
+      ApiValuePtr q = api->newApiValue();
+      q = q->wrapNull("name");
+      pushNotification(api, q, ApiValuePtr());
+    }
+    #endif // ENABLE_GENERIC_API_PUSH
   }
 }
 

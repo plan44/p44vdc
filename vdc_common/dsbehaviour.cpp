@@ -100,7 +100,17 @@ bool DsBehaviour::pushBehaviourState(bool aDS, bool aBridges)
       requestedPushDone = false;
     }
   }
-  #endif
+  #endif // ENABLE_JSONBRIDGEAPI
+  #if ENABLE_GENERIC_API_PUSH
+  // when we have a webui capable of receiving pushes, always push
+  VdcApiConnectionPtr api = mDevice.getVdcHost().genericPushApi();
+  if (api) {
+    ApiValuePtr q = api->newApiValue();
+    q = q->wrapNull(getApiId(api->getApiVersion()))->wrapAs(string(getTypeName()).append("States"));
+    // fire and forget for generic API push, does not functionally count as push failure
+    mDevice.pushNotification(api, q, ApiValuePtr());
+  }
+  #endif // ENABLE_GENERIC_API_PUSH
   // true if requested pushes are done or irrelevant (e.g. bridge push requested w/o bridging enabled at all)
   return requestedPushDone;
 }

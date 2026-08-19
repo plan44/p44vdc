@@ -236,6 +236,15 @@ void ButtonBehaviour::setGroup(DsGroup aGroup)
       }
     }
     #endif // ENABLE_JSONBRIDGEAPI
+    #if ENABLE_GENERIC_API_PUSH
+    // when we have a webui capable of receiving pushes, always push
+    VdcApiConnectionPtr api = mDevice.getVdcHost().genericPushApi();
+    if (api) {
+      ApiValuePtr q = api->newApiValue();
+      q = q->wrapNull("group")->wrapAs(getApiId(api->getApiVersion()))->wrapAs("buttonSettings");
+      mDevice.pushNotification(api, q, ApiValuePtr());
+    }
+    #endif // ENABLE_GENERIC_API_PUSH
   }
 }
 
@@ -254,6 +263,15 @@ void ButtonBehaviour::setChannel(DsChannelType aChannel)
       }
     }
     #endif // ENABLE_JSONBRIDGEAPI
+    #if ENABLE_GENERIC_API_PUSH
+    // when we have a webui capable of receiving pushes, always push
+    VdcApiConnectionPtr api = mDevice.getVdcHost().genericPushApi();
+    if (api) {
+      ApiValuePtr q = api->newApiValue();
+      q = q->wrapNull("channel")->wrapAs(getApiId(api->getApiVersion()))->wrapAs("buttonSettings");
+      mDevice.pushNotification(api, q, ApiValuePtr());
+    }
+    #endif // ENABLE_GENERIC_API_PUSH
   }
 }
 

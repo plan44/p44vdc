@@ -315,7 +315,7 @@ bool DsAddressable::pushNotification(VdcApiConnectionPtr aApi, ApiValuePtr aProp
 {
   if (!aApi) return false; // safety
   if (aApi->domain()!=VDC_API_DOMAIN || isAnnounced()) {
-    // device is announced: push can take place
+    // device is announced or not vdc API: push can take place
     if (aPropertyQuery) {
       if (aForwardQuery) {
         // the query should be forwarded as-is
@@ -482,6 +482,15 @@ void DsAddressable::updatePresenceState(bool aPresent)
       }
     }
     #endif // ENABLE_JSONBRIDGEAPI
+    #if ENABLE_GENERIC_API_PUSH
+    // when we have a webui capable of receiving pushes, always push
+    api = getVdcHost().genericPushApi();
+    if (api) {
+      ApiValuePtr q = api->newApiValue();
+      q = q->wrapNull("active");
+      pushNotification(api, q, ApiValuePtr());
+    }
+    #endif // ENABLE_GENERIC_API_PUSH
   }
 }
 
@@ -674,6 +683,15 @@ void DsAddressable::pushBridgeable() {
     q = q->wrapNull("x-p44-bridgeable");
     pushNotification(api, q, ApiValuePtr());
   }
+  #if ENABLE_GENERIC_API_PUSH
+  // when we have a webui capable of receiving pushes, always push
+  api = getVdcHost().genericPushApi();
+  if (api) {
+    ApiValuePtr q = api->newApiValue();
+    q = q->wrapNull("x-p44-bridgeable");
+    pushNotification(api, q, ApiValuePtr());
+  }
+  #endif // ENABLE_GENERIC_API_PUSH
 }
 #endif // ENABLE_JSONBRIDGEAPI
 

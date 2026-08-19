@@ -34,7 +34,7 @@
   #else
     #define ENABLE_JSONCFGAPI 1
   #endif
-#endif
+#endif // !ENABLE_JSONCFGAPI
 
 #if ENABLE_UBUS
   #include "ubus.hpp"
@@ -67,7 +67,7 @@ namespace p44 {
   };
 
 
-  #if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
+  #if ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
 
   /// API connection object for JSON APIs
   class P44JsonApiConnection : public VdcApiConnection
@@ -79,10 +79,6 @@ namespace p44 {
     SocketCommPtr mJsonApiServer;
 
     P44JsonApiConnection(SocketCommPtr aJsonApiServer);
-
-    /// install callback for received API requests
-    /// @param aApiRequestHandler will be called when a API request has been received
-    void setRequestHandler(VdcApiRequestCB aApiRequestHandler);
 
     /// The underlying socket connection
     /// @return socket connection
@@ -138,7 +134,7 @@ namespace p44 {
   };
   typedef boost::intrusive_ptr<P44JsonApiRequest> P44JsonApiRequestPtr;
 
-  #endif // ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI
+  #endif // ENABLE_JSONCFGAPI || ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
 
   #if ENABLE_JSONCFGAPI
 
@@ -151,7 +147,7 @@ namespace p44 {
 
     P44CfgApiConnection(SocketCommPtr aJsonApiServer) : inherited(aJsonApiServer) {};
 
-    virtual int domain() P44_OVERRIDE { return VDC_API_DOMAIN; };
+    virtual int domain() P44_OVERRIDE { return VDC_CFG_DOMAIN; };
     virtual const char* apiName() const P44_OVERRIDE { return "cfg"; };
   };
   typedef boost::intrusive_ptr<P44CfgApiConnection> P44CfgApiConnectionPtr;
@@ -223,28 +219,28 @@ namespace p44 {
   #if ENABLE_UBUS
 
   /// Dummy ubus API "connection" object
-  class UbusApiConnection : public VdcApiConnection
+  class UbusApiConnection : public P44JsonApiConnection
   {
-    typedef VdcApiConnection inherited;
+    typedef P44JsonApiConnection inherited;
 
   public:
 
+    UbusServerPtr mUbusApiServer; ///< ubus API for openwrt web interface
+    UbusObjectPtr mUbusVdcdObj; ///< the vdcd object
+
     UbusApiConnection();
 
-    virtual const char* apiName() const { return "cfg (ubus)"; };
+    virtual const char* apiName() const { return "ubus"; };
 
-    /// install callback for received API requests
-    /// @param aApiRequestHandler will be called when a API request has been received
-    void setRequestHandler(VdcApiRequestCB aApiRequestHandler);
+    virtual int domain() P44_OVERRIDE { return VDC_CFG_DOMAIN; };
 
     /// The underlying socket connection (dummy for ubus)
     /// @return socket connection
     virtual SocketCommPtr socketConnection() P44_OVERRIDE { return SocketCommPtr(); };
 
-    /// Cannot send a API request
+    /// Send API request (ubus notification to subscribed clients)
     /// @return empty or Error object in case of error
-    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) P44_OVERRIDE
-      { return TextError::err("cant send request to ubus API"); };
+    virtual ErrorPtr sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler = VdcApiResponseCB()) P44_OVERRIDE;
 
     /// request closing connection after last message has been sent
     virtual void closeAfterSend() P44_OVERRIDE {};
@@ -254,6 +250,7 @@ namespace p44 {
     virtual ApiValuePtr newApiValue() P44_OVERRIDE;
 
   };
+  typedef boost::intrusive_ptr<UbusApiConnection> UbusApiConnectionPtr;
 
 
   /// ubus api request
@@ -261,11 +258,12 @@ namespace p44 {
   {
     typedef VdcApiRequest inherited;
     UbusRequestPtr mUbusRequest;
+    UbusApiConnectionPtr mUbusApiConnection;
 
   public:
 
     /// constructor
-    UbusApiRequest(UbusRequestPtr aUbusRequest);
+    UbusApiRequest(UbusRequestPtr aUbusRequest, UbusApiConnectionPtr aUbusApiConnection);
 
     /// return the request ID as a string
     /// @return request ID as string
@@ -417,21 +415,21 @@ namespace p44 {
 
     #if ENABLE_JSONCFGAPI
     P44CfgApiConnectionPtr mConfigApi; ///< JSON API for legacy web interface
-    #endif
+    #endif // ENABLE_JSONCFGAPI
 
     #if ENABLE_UBUS
-    UbusServerPtr mUbusApiServer; ///< ubus API for openwrt web interface
-    #endif
+    UbusApiConnectionPtr mUbusApi; ///< ubus API for openwrt web interface
+    #endif // ENABLE_UBUS
 
     #if ENABLE_JSONBRIDGEAPI
     BridgeApiConnectionPtr mBridgeApi; ///< JSON API for bridge access
     BridgeInfoPtr mBridgeInfo; ///< bridge related properties, mostly passive (just for passing between bridge and webui)
-    #endif
+    #endif // ENABLE_JSONBRIDGEAPI
 
     #if P44SCRIPT_REGISTERED_SOURCE
     P44ScriptManagerPtr mScriptManager; ///< script manager
     ScriptHost mPlayground; ///< playground/REPL script in main script context
-    #endif
+    #endif // P44SCRIPT_REGISTERED_SOURCE
 
   public:
 
@@ -458,13 +456,24 @@ namespace p44 {
 
     /// get the config API
     VdcApiConnectionPtr getConfigApi() { return mConfigApi; }
-    #endif
+    #endif // ENABLE_JSONCFGAPI
 
     #if ENABLE_UBUS
+
     /// enable ubus API
     /// @note ubus server will be started only at initialize()
     void enableUbusApi();
-    #endif
+
+    #endif // ENABLE_UBUS
+
+    #if ENABLE_GENERIC_API_PUSH
+
+    /// get the generic push API
+    /// @note the generic push API is where all push notifications should be posted to.
+    ///   Usually, this is a WebUI connected via UBUS
+    virtual VdcApiConnectionPtr genericPushApi() P44_OVERRIDE;
+
+    #endif // ENABLE_GENERIC_API_PUSH
 
     #if ENABLE_JSONBRIDGEAPI
 

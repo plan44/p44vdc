@@ -203,7 +203,16 @@ void OutputBehaviour::setGroupMembership(DsGroup aGroup, bool aIsMember)
         mDevice.pushNotification(api, q, ApiValuePtr());
       }
     }
-    #endif
+    #endif // ENABLE_JSONBRIDGEAPI
+    #if ENABLE_GENERIC_API_PUSH
+    // when we have a webui capable of receiving pushes, always push
+    VdcApiConnectionPtr api = mDevice.getVdcHost().genericPushApi();
+    if (api) {
+      ApiValuePtr q = api->newApiValue();
+      q = q->wrapNull("groups")->wrapAs("outputSettings.groups");
+      mDevice.pushNotification(api, q, ApiValuePtr());
+    }
+    #endif // ENABLE_GENERIC_API_PUSH
   }
 }
 
@@ -353,6 +362,18 @@ bool OutputBehaviour::pushOutputState(bool aDS, bool aBridges)
     }
   }
   #endif // ENABLE_JSONBRIDGEAPI
+  #if ENABLE_GENERIC_API_PUSH
+  // when we have a webui capable of receiving pushes, always push
+  VdcApiConnectionPtr api = mDevice.getVdcHost().genericPushApi();
+  if (api) {
+    ApiValuePtr query = api->newApiValue();
+    query->setType(apivalue_object);
+    query->add("channelStates", query->newValue(apivalue_null));
+    query->add("outputState", query->newValue(apivalue_null));
+    // fire and forget for generic API push, does not functionally count as push failure
+    mDevice.pushNotification(api, query, ApiValuePtr());
+  }
+  #endif // ENABLE_GENERIC_API_PUSH
   // true if requested pushes are done or irrelevant (e.g. bridge push requested w/o bridging enabled at all)
   return requestedPushDone;
 }

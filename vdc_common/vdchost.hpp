@@ -265,6 +265,11 @@ namespace p44 {
     /// get the bridge API (if any)
     virtual VdcApiConnectionPtr getBridgeApi() { return VdcApiConnectionPtr(); /* none in this base class */ }
 
+    /// get the generic push API
+    /// @note the generic push API is where all push notifications should be posted to.
+    ///   Usually, this is a WebUI connected via UBUS
+    virtual VdcApiConnectionPtr genericPushApi() { return VdcApiConnectionPtr(); /* none in this base class */ }
+
     /// get an API value that would work for the session connection if we had one
     /// @return an API value of the same type as session connection will use
     ApiValuePtr newApiValue();

@@ -259,8 +259,8 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
   #endif // ENABLE_JSONCFGAPI
   #if ENABLE_UBUS
   // start ubus API, if we have it
-  if (mUbusApiServer) {
-    ErrorPtr err = mUbusApiServer->startServer();
+  if (mUbusApi) {
+    ErrorPtr err = mUbusApi->mUbusApiServer->startServer();
     if (Error::notOK(err)) OLOG(LOG_ERR, "Cannot start UBUS server: %s", Error::text(err));
   }
   #endif // ENABLE_UBUS
@@ -298,14 +298,15 @@ static const struct blobmsg_policy vdcapi_policy[] = {
 
 void P44VdcHost::enableUbusApi()
 {
-  if (!mUbusApiServer) {
+  if (!mUbusApi) {
     // can be enabled only once
-    mUbusApiServer = UbusServerPtr(new UbusServer());
-    mUbusApiServer->setLogLevelOffset(-1); // a bit more quiet by default
-    UbusObjectPtr u = new UbusObject("vdcd", boost::bind(&P44VdcHost::ubusApiRequestHandler, this, _1));
-    u->addMethod("api", vdcapi_policy);
-//    u->addMethod("cfg", cfgapi_policy);
-    mUbusApiServer->registerObject(u);
+    mUbusApi = new UbusApiConnection();
+    mUbusApi->mUbusApiServer = UbusServerPtr(new UbusServer());
+    mUbusApi->mUbusApiServer->setLogLevelOffset(-1); // a bit more quiet by default
+    mUbusApi->mUbusVdcdObj = new UbusObject("vdcd", boost::bind(&P44VdcHost::ubusApiRequestHandler, this, _1));
+    mUbusApi->mUbusVdcdObj->addMethod("api", vdcapi_policy);
+//    mUbusApi->mUbusVdcdObj->addMethod("cfg", cfgapi_policy);
+    mUbusApi->mUbusApiServer->registerObject(mUbusApi->mUbusVdcdObj);
   }
 }
 
@@ -318,9 +319,9 @@ void P44VdcHost::ubusApiRequestHandler(UbusRequestPtr aUbusRequest)
     aUbusRequest->sendResponse(JsonObjectPtr(), UBUS_STATUS_INVALID_ARGUMENT);
     return;
   }
-  POLOG(mUbusApiServer, LOG_INFO, "request received: %s", aUbusRequest->msg()->c_strValue());
+  POLOG(mUbusApi->mUbusApiServer, LOG_INFO, "request received: %s", aUbusRequest->msg()->c_strValue());
   ErrorPtr err;
-  UbusApiRequestPtr request = UbusApiRequestPtr(new UbusApiRequest(aUbusRequest));
+  UbusApiRequestPtr request = UbusApiRequestPtr(new UbusApiRequest(aUbusRequest, mUbusApi));
   if (aUbusRequest->method()=="api") {
     string cmd;
     bool isMethod = false;
@@ -369,10 +370,23 @@ void P44VdcHost::ubusApiRequestHandler(UbusRequestPtr aUbusRequest)
 }
 
 
+#if ENABLE_GENERIC_API_PUSH
+
+VdcApiConnectionPtr P44VdcHost::genericPushApi()
+{
+  if (mUbusApi && mUbusApi->mUbusVdcdObj && mUbusApi->mUbusVdcdObj->hasSubscribers()) {
+    return mUbusApi;
+  }
+  return nullptr; // no API ready to receive pushes (avoid generating them when there is no ubus subscriber)
+}
+
+#endif // ENABLE_GENERIC_API_PUSH
+
 
 // MARK: - ubus API - UbusApiConnection
 
-UbusApiConnection::UbusApiConnection()
+UbusApiConnection::UbusApiConnection() :
+  inherited(nullptr) // no underlying socket connection
 {
   setApiVersion(VDC_API_VERSION_MAX);
 }
@@ -384,17 +398,27 @@ ApiValuePtr UbusApiConnection::newApiValue()
 }
 
 
+ErrorPtr UbusApiConnection::sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler)
+{
+  // notify subscribers of the vdcd ubus object (aMethod = notification name, mostly "pushNotification"
+  mUbusVdcdObj->notify(aMethod, JsonApiValue::getAsJson(aParams));
+  // Note: we don't support methods with responses, so ignoring aResponseHandler completely here
+  return ErrorPtr();
+}
+
+
 // MARK: - ubus API - UbusApiRequest
 
-UbusApiRequest::UbusApiRequest(UbusRequestPtr aUbusRequest)
+UbusApiRequest::UbusApiRequest(UbusRequestPtr aUbusRequest, UbusApiConnectionPtr aUbusApiConnection) :
+  mUbusRequest(aUbusRequest),
+  mUbusApiConnection(aUbusApiConnection)
 {
-  mUbusRequest = aUbusRequest;
 }
 
 
 VdcApiConnectionPtr UbusApiRequest::connection()
 {
-  return VdcApiConnectionPtr(new UbusApiConnection());
+  return mUbusApiConnection;
 }
 
 
@@ -447,7 +471,7 @@ void UbusApiRequest::sendResponse(JsonObjectPtr aResult, ErrorPtr aError)
 }
 
 
-#endif
+#endif // ENABLE_UBUS
 
 
 #if ENABLE_JSONCFGAPI
@@ -623,7 +647,7 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
           aError = Error::err<P44VdcError>(400, "LED subsystem not initialized");
         }
       }
-      #endif
+      #endif // ENABLE_LEDCHAIN
       #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
       #define SCRIPTAPI_NAME "scriptapi"
       else if (uequals(apiselector.c_str(), SCRIPTAPI_NAME, strlen(SCRIPTAPI_NAME))) {
@@ -1194,7 +1218,7 @@ ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMet
         aParams->del("method");
         aParams->del("notification");
         aParams->del("dSUID");
-        o = aParams->get("bridgeUID");
+        o = aParams->get("bridgeUID"); // becomes dSUID in the sent request
         if (o) {
           aParams->add("dSUID", o);
           aParams->del("bridgeUID");
@@ -1205,6 +1229,34 @@ ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMet
     }
   }
   #endif // ENABLE_JSONBRIDGEAPI
+  #if ENABLE_UBUS
+  else if (aMethod=="x-p44-notifyUbus") {
+    // send a notification to ubus subscribers (test/debug only, webui normally IS the ubus subscriber)
+    if (!mUbusApi || !mUbusApi->mUbusVdcdObj || !mUbusApi->mUbusVdcdObj->hasSubscribers()) {
+      respErr = Error::err<P44VdcError>(404, "no ubus susbcribers");
+    }
+    else {
+      ApiValuePtr o = aParams->get("ubusnotification");
+      if (!o) {
+        respErr = Error::err<P44VdcError>(415, "missing 'ubusnotification'");
+      }
+      else {
+        string n = o->stringValue();
+        aParams->del("ubusnotification");
+        aParams->del("method");
+        aParams->del("notification");
+        aParams->del("dSUID");
+        o = aParams->get("ubusUID"); // becomes dSUID in the sent notification
+        if (o) {
+          aParams->add("dSUID", o);
+          aParams->del("ubusUID");
+        }
+        mUbusApi->mUbusVdcdObj->notify(n, JsonApiValue::getAsJson(aParams));
+        respErr = Error::ok(); // return NULL response
+      }
+    }
+  }
+  #endif // ENABLE_UBUS
   #if P44SCRIPT_REGISTERED_SOURCE
   else if (mScriptManager && mScriptManager->handleScriptManagerMethod(respErr, aRequest, aMethod, aParams)) {
     return respErr;
@@ -1226,7 +1278,7 @@ P44LoggingObj* P44VdcHost::getTopicLogObject(const string aTopic)
   if (uequals(aTopic,"bridgeapi")) return mBridgeApi.get();
   #endif
   #if ENABLE_UBUS
-  if (uequals(aTopic,"ubusapi")) return mUbusApiServer.get();
+  if (uequals(aTopic,"ubusapi")) return mUbusApi ? mUbusApi->mUbusApiServer.get() : nullptr;
   #endif
   #if P44SCRIPT_REGISTERED_SOURCE
   if (uequals(aTopic,"scriptmanager")) return mScriptManager.get();
