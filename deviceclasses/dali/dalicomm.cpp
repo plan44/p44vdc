@@ -978,6 +978,7 @@ class DaliFullBusScanner : public P44Obj
   int mCompareRepeat;
   int mReadShortAddrRepeat;
   bool mSetLMH;
+  int mUnusableDevices;
   DaliComm::ShortAddressListPtr mFoundDevicesPtr;
   DaliComm::ShortAddressListPtr mUsedShortAddrsPtr;
   DaliComm::ShortAddressListPtr mConflictedShortAddrsPtr;
@@ -998,6 +999,8 @@ private:
   {
     mDaliComm.startProcedure();
     // start a scan
+    mRestarts = 0;
+    mUnusableDevices = 0;
     startScan();
   }
 
@@ -1043,7 +1046,6 @@ private:
     mDaliComm.daliSendTwice(DALICMD_INITIALISE, mFullScanOnlyIfNeeded ? 0xFF : 0x00, NoOP, 100*MilliSecond); // 0xFF = only those w/o short address
     mDaliComm.daliSendTwice(DALICMD_RANDOMISE, 0x00, NoOP, 100*MilliSecond);
     // start search at lowest address
-    mRestarts = 0;
     // - as specs say DALICMD_RANDOMISE might need 100mS until new random addresses are ready, wait a little before actually starting
     mDelayTicket.executeOnce(boost::bind(&DaliFullBusScanner::newSearchUpFrom, this, 0), 150*MilliSecond);
   };
@@ -1187,11 +1189,20 @@ private:
 
   void handleShortAddressQuery(bool aNoOrTimeout, uint8_t aResponse, ErrorPtr aError)
   {
-    if (aError)
-      return completed(aError);
+    if (aError) {
+      if (!aError->isError(DaliCommError::domain(), DaliCommError::DALIFrame)) {
+        // non DALI bus hardware error -> abort scanning
+        SOLOG(mDaliComm, LOG_ERR, "error querying short address of device found in binary search: %s", Error::text(aError));
+        return completed(aError);
+      }
+      // Frame error here means somehow broken end device -> just skip
+      SOLOG(mDaliComm, LOG_ERR, "Error - could not query existing short address -> ignoring this device");
+      deviceFound(NoDaliAddress); // not really a usable device, but withdraw it and continue searching
+      return;
+    }
     if (aNoOrTimeout) {
       // should not happen, but just retry
-      SOLOG(mDaliComm, LOG_WARNING, "- Device at 0x%06X does not respond to DALICMD_QUERY_SHORT_ADDRESS", mSearchAddr);
+      SOLOG(mDaliComm, LOG_WARNING, "- Device at 0x%06X did not respond to DALICMD_QUERY_SHORT_ADDRESS", mSearchAddr);
       mReadShortAddrRepeat++;
       if (mReadShortAddrRepeat<=MAX_SHORTADDR_READ_REPEATS) {
         mDaliComm.daliSendAndReceive(DALICMD_QUERY_SHORT_ADDRESS, 0x00, boost::bind(&DaliFullBusScanner::handleShortAddressQuery, this, _1, _2, _3), READ_SHORT_ADDR_SEND_DELAY);
@@ -1236,6 +1247,7 @@ private:
         if (mNewAddress==NoDaliAddress) {
           // no more short addresses available
           SOLOG(mDaliComm, LOG_ERR, "Bus has too many devices, device 0x%06X cannot be assigned a new short address and will not be usable", mSearchAddr);
+          mUnusableDevices++;
           addrProg = 0xFF; // programming 0xFF means NO address
         }
         else {
@@ -1267,7 +1279,7 @@ private:
     }
     else {
       // short address verification failed
-      SOLOG(mDaliComm, LOG_ERR, "Error - could not assign new short address %d", mNewAddress);
+      SOLOG(mDaliComm, LOG_ERR, "Error - could not assign new short address %d -> ignoring this device", mNewAddress);
       deviceFound(NoDaliAddress); // not really a usable device, but withdraw it and continue searching
     }
   }
@@ -1288,6 +1300,9 @@ private:
         mUsedShortAddrsPtr->push_back(aShortAddress);
       }
     }
+    else {
+      mUnusableDevices++;
+    }
     // withdraw this device from further searches
     mDaliComm.daliSend(DALICMD_WITHDRAW, 0x00);
     // continue searching devices
@@ -1301,6 +1316,9 @@ private:
     mDaliComm.daliSend(DALICMD_TERMINATE, 0x00);
     mDaliComm.endProcedure();
     FOCUSSOLOG(mDaliComm, "After scanBus complete: retriedWrites=%ld, retriedReads=%ld", mDaliComm.mRetriedWrites, mDaliComm.mRetriedReads);
+    if (Error::isOK(aError) && mUnusableDevices>0) {
+      aError = Error::err<DaliCommError>(DaliCommError::BrokenDevice, "Full scan found %d broken or unaddressable devices on bus -> ignored", mUnusableDevices);
+    }
     // callback
     mCallback(mFoundDevicesPtr, DaliComm::ShortAddressListPtr(), aError);
     // done, delete myself
