@@ -401,6 +401,7 @@ ApiValuePtr UbusApiConnection::newApiValue()
 ErrorPtr UbusApiConnection::sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler)
 {
   // notify subscribers of the vdcd ubus object (aMethod = notification name, mostly "pushNotification"
+  POLOG(mUbusApiServer, LOG_INFO, "sending event '%s', params=%s", aMethod.c_str(), ApiValue::text(aParams).c_str());
   mUbusVdcdObj->notify(aMethod, JsonApiValue::getAsJson(aParams));
   // Note: we don't support methods with responses, so ignoring aResponseHandler completely here
   return ErrorPtr();
