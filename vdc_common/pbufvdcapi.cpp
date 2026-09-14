@@ -1465,10 +1465,10 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
         // create request object just to hold the response ID
         VdcPbufApiRequestPtr request = VdcPbufApiRequestPtr(new VdcPbufApiRequest(VdcPbufApiConnectionPtr(this), responseForId));
         if (Error::isOK(err)) {
-          LOG(LOG_INFO, "%s -> vDC result received: id='%s', result=%s", apiName(), request->requestId().c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
+          LOG(LOG_INFO, "%s -> vDC result received: id='%s', result=%s", apiName(), request->requestId().c_str(), ApiValue::text(msgFieldsObj).c_str());
         }
         else {
-          LOG(LOG_INFO, "%s -> vDC error received: id='%s', error=%s, errordata=%s", apiName(), request->requestId().c_str(), err->text(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
+          LOG(LOG_INFO, "%s -> vDC error received: id='%s', error=%s, errordata=%s", apiName(), request->requestId().c_str(), err->text(), ApiValue::text(msgFieldsObj).c_str());
         }
         cb(this, request, err, msgFieldsObj); // call handler
       }
@@ -1486,10 +1486,10 @@ ErrorPtr VdcPbufApiConnection::processMessage(const uint8_t *aPackedMessageP, si
         // method call, we need a request reference object
         request = VdcPbufApiRequestPtr(new VdcPbufApiRequest(VdcPbufApiConnectionPtr(this), decodedMsg->message_id));
         request->mResponseType = (Vdcapi__Type)responseType; // save the response type for sending answers later
-        LOG(LOG_INFO, "%s -> vDC method call received: requestid='%d', method='%s', params=%s", apiName(), request->mReqId, method.c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
+        LOG(LOG_INFO, "%s -> vDC method call received: requestid='%d', method='%s', params=%s", apiName(), request->mReqId, method.c_str(), ApiValue::text(msgFieldsObj).c_str());
       }
       else {
-        LOG(LOG_INFO, "%s -> vDC notification received: method='%s', params=%s", apiName(), method.c_str(), msgFieldsObj ? msgFieldsObj->description().c_str() : "<none>");
+        LOG(LOG_INFO, "%s -> vDC notification received: method='%s', params=%s", apiName(), method.c_str(), ApiValue::text(msgFieldsObj).c_str());
       }
       if (Error::notOK(err)) {
         // error decoding message
@@ -1592,10 +1592,10 @@ ErrorPtr VdcPbufApiConnection::sendRequest(const string &aMethod, ApiValuePtr aP
     protobuf_c_message_free_unpacked(subMessageP, NULL);
     // log
     if (aResponseHandler) {
-      LOG(LOG_INFO, "%s <- vDC id=%d: method='%s', params=%s", apiName(), mRequestIdCounter, aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
+      LOG(LOG_INFO, "%s <- vDC id=%d: method='%s', params=%s", apiName(), mRequestIdCounter, aMethod.c_str(), ApiValue::text(aParams).c_str());
     }
     else {
-      LOG(LOG_INFO, "%s <- vDC: notification='%s', params=%s", apiName(), aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
+      LOG(LOG_INFO, "%s <- vDC: notification='%s', params=%s", apiName(), aMethod.c_str(), ApiValue::text(aParams).c_str());
     }
   }
   // done

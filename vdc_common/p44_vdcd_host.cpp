@@ -424,7 +424,7 @@ VdcApiConnectionPtr UbusApiRequest::connection()
 
 ErrorPtr UbusApiRequest::sendResult(ApiValuePtr aResult)
 {
-  POLOG(mUbusRequest->server(), LOG_INFO, "sending result: %s", aResult ? aResult->description().c_str() : "<none>");
+  POLOG(mUbusRequest->server(), LOG_INFO, "sending result: %s", ApiValue::text(aResult).c_str());
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
   JsonObjectPtr r;
   if (result) r = result->jsonObject();
@@ -841,7 +841,7 @@ VdcApiConnectionPtr P44JsonApiRequest::connection()
 
 ErrorPtr P44JsonApiRequest::sendResult(ApiValuePtr aResult)
 {
-  POLOG(mJsonApi, LOG_INFO, "sending result: %s", aResult ? aResult->description().c_str() : "<none>");
+  POLOG(mJsonApi, LOG_INFO, "sending result: %s", ApiValue::text(aResult).c_str());
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
   if (result) {
     P44VdcHost::sendJsonApiResponse(mJsonComm, result->jsonObject(), ErrorPtr(), mRequestId, *mJsonApi);

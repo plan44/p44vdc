@@ -203,7 +203,7 @@ VdcApiConnectionPtr VdcJsonApiRequest::connection()
 
 ErrorPtr VdcJsonApiRequest::sendResult(ApiValuePtr aResult)
 {
-  LOG(LOG_INFO, "%s <- vDC, id=%s: result=%s", requestId().c_str(), apiName(), aResult ? aResult->description().c_str() : "<none>");
+  LOG(LOG_INFO, "%s <- vDC, id=%s: result=%s", requestId().c_str(), apiName(), ApiValue::text(aResult).c_str());
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
   return mJsonConnection->mJsonRpcComm->sendResult(JsonObject::newString(requestId()), result ? result->jsonObject() : NULL);
 }
@@ -254,11 +254,11 @@ void VdcJsonApiConnection::jsonRequestHandler(const char *aMethod, const JsonObj
     if (aJsonRpcId) {
       // Method
       request = VdcJsonApiRequestPtr(new VdcJsonApiRequest(VdcJsonApiConnectionPtr(this), aJsonRpcId->stringValue()));
-      LOG(LOG_INFO, "%s -> vDC, id=%s: called method '%s', params=%s", apiName(), request->requestId().c_str(), aMethod, params ? params->description().c_str() : "<none>");
+      LOG(LOG_INFO, "%s -> vDC, id=%s: called method '%s', params=%s", apiName(), request->requestId().c_str(), aMethod, ApiValue::text(params).c_str());
     }
     else {
       // Notification
-      LOG(LOG_INFO, "%s -> vDC: sent notification '%s', params=%s", apiName(), aMethod, params ? params->description().c_str() : "<none>");
+      LOG(LOG_INFO, "%s -> vDC: sent notification '%s', params=%s", apiName(), aMethod, ApiValue::text(params).c_str());
     }
     // call handler
     mApiRequestHandler(VdcJsonApiConnectionPtr(this), request, aMethod, params);
@@ -278,12 +278,12 @@ ErrorPtr VdcJsonApiConnection::sendRequest(const string &aMethod, ApiValuePtr aP
   ErrorPtr err;
   if (aResponseHandler) {
     // method call expecting response
-    LOG(LOG_INFO, "%s <- vDC, id=%d: calling method '%s', params=%s", apiName(), mJsonRpcComm->lastRequestId(), aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
+    LOG(LOG_INFO, "%s <- vDC, id=%d: calling method '%s', params=%s", apiName(), mJsonRpcComm->lastRequestId(), aMethod.c_str(), ApiValue::text(aParams).c_str());
     err = mJsonRpcComm->sendRequest(aMethod.c_str(), params->jsonObject(), boost::bind(&VdcJsonApiConnection::jsonResponseHandler, this, aResponseHandler, _1, _2, _3));
   }
   else {
     // notification
-    LOG(LOG_INFO, "%s <- vDC: sending notification '%s', params=%s", apiName(), aMethod.c_str(), aParams ? aParams->description().c_str() : "<none>");
+    LOG(LOG_INFO, "%s <- vDC: sending notification '%s', params=%s", apiName(), aMethod.c_str(), ApiValue::text(aParams).c_str());
     err = mJsonRpcComm->sendRequest(aMethod.c_str(), params->jsonObject(), NoOP);
   }
   return err;
@@ -298,10 +298,10 @@ void VdcJsonApiConnection::jsonResponseHandler(VdcApiResponseCB aResponseHandler
     ApiValuePtr resultOrErrorData = JsonApiValue::newValueFromJson(aResultOrErrorData);
     VdcApiRequestPtr request = VdcJsonApiRequestPtr(new VdcJsonApiRequest(VdcJsonApiConnectionPtr(this), respId));
     if (Error::isOK(aError)) {
-      LOG(LOG_INFO, "%s -> vDC, id='%s', result=%s", apiName(), request->requestId().c_str(), resultOrErrorData ? resultOrErrorData->description().c_str() : "<none>");
+      LOG(LOG_INFO, "%s -> vDC, id='%s', result=%s", apiName(), request->requestId().c_str(), ApiValue::text(resultOrErrorData).c_str());
     }
     else {
-      LOG(LOG_INFO, "%s -> vDC, id='%s', error=%s, errordata=%s", apiName(), request->requestId().c_str(), aError->text(), resultOrErrorData ? resultOrErrorData->description().c_str() : "<none>");
+      LOG(LOG_INFO, "%s -> vDC, id='%s', error=%s, errordata=%s", apiName(), request->requestId().c_str(), aError->text(), ApiValue::text(resultOrErrorData).c_str());
     }
     aResponseHandler(VdcApiConnectionPtr(this), request, aError, resultOrErrorData);
   }

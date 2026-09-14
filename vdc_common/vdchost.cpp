@@ -2677,7 +2677,7 @@ VdcApiConnectionPtr ScriptApiRequest::connection()
 
 ErrorPtr ScriptApiRequest::sendResult(ApiValuePtr aResult)
 {
-  LOG(LOG_DEBUG, "script <- vdcd (JSON) result: %s", aResult ? aResult->description().c_str() : "<none>");
+  LOG(LOG_DEBUG, "script <- vdcd (JSON) result: %s", ApiValue::text(aResult).c_str());
   JsonApiValuePtr result = boost::dynamic_pointer_cast<JsonApiValue>(aResult);
   #if ENABLE_P44SCRIPT
   mBuiltinFunctionContext->finish(result ? ScriptObj::valueFromJSON(result->jsonObject()) : ScriptObjPtr(new AnnotatedNullValue("no vdcapi result")));

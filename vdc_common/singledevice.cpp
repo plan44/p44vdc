@@ -496,7 +496,7 @@ ErrorPtr ActionMacro::validateParams(ApiValuePtr aParams, ApiValuePtr aValidated
       return TextError::err("invalid parameter '%s' for custom action '%s': %s", key.c_str(), actionId.c_str(), err->text());
     }
   }
-  SOLOG(singleDevice, LOG_DEBUG, "validated params: %s", aValidatedParams ? aValidatedParams->description().c_str() : "<none>");
+  SOLOG(singleDevice, LOG_DEBUG, "validated params: %s", ApiValue::text(aValidatedParams).c_str());
   return ErrorPtr(); // all parameters conform (or aSkipInvalid)
 }
 
