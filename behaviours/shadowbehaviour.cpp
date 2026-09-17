@@ -816,11 +816,14 @@ void ShadowBehaviour::moveStarted(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
 void ShadowBehaviour::progressReport(MLMicroSeconds aNow)
 {
   // issue an intermediate output channel progress report
-  mPosition->updateTimedTransition(aNow, 0.9); // do not simulate progress beyond 90%
-  mAngle->updateTimedTransition(aNow, 0.9); // do not simulate progress beyond 90%
+  bool transitionInProgress = false;
+  if (mPosition->updateTimedTransition(aNow, 0.9)) transitionInProgress = true; // do not simulate progress beyond 90%
+  if (mAngle->updateTimedTransition(aNow, 0.9))  transitionInProgress = true; // do not simulate progress beyond 90%
   reportOutputState();
-  // - reschedule
-  mProgressTicket.executeOnce(boost::bind(&ShadowBehaviour::progressReport, this, _2), outputReportInterval());
+  if (transitionInProgress) {
+    // - reschedule
+    mProgressTicket.executeOnce(boost::bind(&ShadowBehaviour::progressReport, this, _2), outputReportInterval());
+  }
 }
 
 
