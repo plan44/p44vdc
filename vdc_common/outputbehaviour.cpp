@@ -373,6 +373,10 @@ bool OutputBehaviour::pushOutputState(bool aDS, bool aBridges)
     // fire and forget for generic API push, does not functionally count as push failure
     mDevice.pushNotification(api, query, ApiValuePtr());
   }
+  else {
+    // we do not report this as requestedPushDone==false, because it's perfectly valid not to have generic event subscribers
+    OLOG(LOG_DEBUG, "no generic API subscribers to push to");
+  }
   #endif // ENABLE_GENERIC_API_PUSH
   // true if requested pushes are done or irrelevant (e.g. bridge push requested w/o bridging enabled at all)
   return requestedPushDone;
