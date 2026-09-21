@@ -668,7 +668,7 @@ void ColorLightBehaviour::adjustChannelsCoupledTo(ChannelBehaviourPtr aChannel)
     mChannelCouplingScript.run(inherit, boost::bind(&ColorLightBehaviour::channelCouplingScriptDone, this, _1), threadLocals, 1*Second);
     return;
   }
-  #endif
+  #endif // P44SCRIPT_FULL_SUPPORT
 }
 
 
@@ -678,7 +678,7 @@ void ColorLightBehaviour::channelCouplingScriptDone(ScriptObjPtr aResult)
   if (!aResult || !aResult->isErr()) return;
   OLOG(LOG_ERR, "channel coupling script error: %s", ScriptObj::describe(aResult).c_str());
 }
-#endif
+#endif // P44SCRIPT_FULL_SUPPORT
 
 
 

@@ -402,7 +402,7 @@ namespace p44 {
     double getAngle();
     void moveTimerStart();
     void moveTimerStop();
-    void progressReport(MLMicroSeconds aNow);
+    void progressSimulation(MLMicroSeconds aNow);
     void stop(SimpleCB aApplyDoneCB);
     void stopped(SimpleCB aApplyDoneCB, bool delay=false);
     void processStopped(SimpleCB aApplyDoneCB);

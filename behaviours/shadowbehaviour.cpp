@@ -614,6 +614,7 @@ void ShadowBehaviour::allDone(SimpleCB aApplyDoneCB)
     // push final state to bridges (not to dS)
     OLOG(LOG_INFO, "- was a long movement, apply confirmed earlier -> re-push output state to bridges");
     // - end simulation transitions
+    mProgressTicket.cancel();
     mPosition->setTransitionProgress(1);
     mAngle->setTransitionProgress(1);
     reportOutputState();
@@ -801,10 +802,11 @@ void ShadowBehaviour::moveStarted(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
       if (aApplyDoneCB) aApplyDoneCB();
       // - and prevent calling back again later
       aApplyDoneCB = NoOP;
-      // schedule progress updates
-      MLMicroSeconds r = outputReportInterval();
+      // schedule movement progress simulation
+      MLMicroSeconds r = outputReportInterval(); // use output report interval for simulation step
       if (r!=Never) {
-        mProgressTicket.executeOnce(boost::bind(&ShadowBehaviour::progressReport, this, _2), r);
+        mProgressTicket.executeOnce(boost::bind(&ShadowBehaviour::progressSimulation, this, _2), r);
+        reportOutputState(); // start reporting, reportOutputState automatically schedules further reports as long as we are in transition
       }
     }
     FOCUSOLOG("- move started, scheduling stop in %.3f Seconds", (double)aStopIn/Second);
@@ -813,16 +815,15 @@ void ShadowBehaviour::moveStarted(MLMicroSeconds aStopIn, SimpleCB aApplyDoneCB)
 }
 
 
-void ShadowBehaviour::progressReport(MLMicroSeconds aNow)
+void ShadowBehaviour::progressSimulation(MLMicroSeconds aNow)
 {
-  // issue an intermediate output channel progress report
+  // simulate movement
   bool transitionInProgress = false;
   if (mPosition->updateTimedTransition(aNow, 0.9)) transitionInProgress = true; // do not simulate progress beyond 90%
   if (mAngle->updateTimedTransition(aNow, 0.9))  transitionInProgress = true; // do not simulate progress beyond 90%
-  reportOutputState();
   if (transitionInProgress) {
     // - reschedule
-    mProgressTicket.executeOnce(boost::bind(&ShadowBehaviour::progressReport, this, _2), outputReportInterval());
+    mProgressTicket.executeOnce(boost::bind(&ShadowBehaviour::progressSimulation, this, _2), outputReportInterval());
   }
 }
 
