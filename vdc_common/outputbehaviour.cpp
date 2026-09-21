@@ -38,14 +38,14 @@ OutputBehaviour::OutputBehaviour(Device &aDevice) :
   mDefaultOutputMode(outputmode_disabled), // none by default, hardware should set a default matching the actual HW capabilities
   mPushChangesToDS(false), // do not push changes
   // volatile settings
-  #if ENABLE_JSONBRIDGEAPI
-  mBridgePushInterval(10*Second), // default to decent progress update for waiting user
+  #if ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
+  mReportInterval(10*Second), // default to decent progress update for waiting user
   mMinReportInterval(2*Second), // min push interval
   #endif
   // volatile state
   mLocalPriority(false), // no local priority
   mTransitionTime(0) // immediate transitions by default
-  #if ENABLE_JSONBRIDGEAPI
+  #if ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
   , mLastOutputStateReport(Never)
   #endif
 {
@@ -288,23 +288,40 @@ double OutputBehaviour::channelValueAccordingToMode(double aOutputValue, int aCh
 
 bool OutputBehaviour::reportOutputState()
 {
-  #if ENABLE_JSONBRIDGEAPI
+  #if ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
+  bool pushed = false;
   mDelayedReportTicket.cancel();
-  if (!mPushChangesToDS && mBridgePushInterval==Infinite) return false; // cannot report anything
+  MLMicroSeconds reportInterval = outputReportInterval();
+  if (reportInterval==Never) return false; // no output reporting
+  // output update pushes are enabled
   MLMicroSeconds now = MainLoop::now();
   MLMicroSeconds timeToNextReport = mLastOutputStateReport+mMinReportInterval-now;
   if (mLastOutputStateReport==Never || timeToNextReport<=0) {
-    if (pushOutputState(mPushChangesToDS, mBridgePushInterval!=Infinite)) {
+    // push is allowed now
+    if (pushOutputState(mPushChangesToDS, true)) {
       mLastOutputStateReport = now;
-      return true; // pushed
+      pushed = true; // we did push right now
+      // check for end of transitions
+      MLMicroSeconds timeToEndOfTransitions = remainingTransitionTime();
+      if (timeToEndOfTransitions>0) {
+        timeToNextReport = timeToEndOfTransitions;
+        if (timeToNextReport<mMinReportInterval) timeToNextReport = mMinReportInterval; // make sure this does not happen too soon
+        else if (timeToNextReport>reportInterval) timeToNextReport = reportInterval; // but for long transitions probably several times
+        OLOG(LOG_DEBUG, "schedule another report in %lld ms (reportinterval %lld ms, end of transitions in %lld ms)", timeToNextReport/MilliSecond, reportInterval/MilliSecond, timeToEndOfTransitions/MilliSecond);
+      }
+      else {
+        timeToNextReport = Infinite;
+      }
     }
   }
   else {
-    // too soon, report after minimal interval
-    mDelayedReportTicket.executeOnce(boost::bind(&OutputBehaviour::reportOutputState, this), timeToNextReport);
-    return false; // could not be reported RIGHT NOW
+    OLOG(LOG_DEBUG, "reporting now is too soon, postponing by %lld ms", timeToNextReport/MilliSecond);
   }
-  return false; // could not be reported
+  if (timeToNextReport>0) {
+    // We need another report later: either because this one would be too soon, or because we should report ongoing/ending transitions
+    mDelayedReportTicket.executeOnce(boost::bind(&OutputBehaviour::reportOutputState, this), timeToNextReport);
+  }
+  return pushed;
   #else
   // simplified DS-only (and probably never to be used) direct push
   return pushOutputState(mPushChangesToDS, false);
@@ -314,11 +331,11 @@ bool OutputBehaviour::reportOutputState()
 
 MLMicroSeconds OutputBehaviour::outputReportInterval()
 {
-  #if ENABLE_JSONBRIDGEAPI
-  if (mBridgePushInterval==Infinite || mBridgePushInterval==Never) return Never; // no regular updates
-  return mBridgePushInterval; // bridges want regular updates in about this intervals when e.g. a transition is going on
+  #if ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
+  if (mReportInterval==Infinite || mReportInterval==Never) return Never; // no regular updates
+  return mReportInterval; // bridges want regular updates in about this intervals when e.g. a transition is going on
   #else
-  return Never; // no bridge API -> DS does not want to track output changes
+  return mPushChangesToDS ? 10*Second : Never; // no bridge API and no generic push -> DS does not want to track output changes
   #endif
 }
 
@@ -468,6 +485,19 @@ void OutputBehaviour::stopTransitions()
     (*pos)->stopTransition();
   }
 }
+
+
+MLMicroSeconds OutputBehaviour::remainingTransitionTime()
+{
+  MLMicroSeconds maxrem = Never;
+  for (ChannelBehaviourVector::iterator pos = mChannels.begin(); pos!=mChannels.end(); ++pos) {
+    MLMicroSeconds rem = (*pos)->remainingTransitionTime();
+    if (rem>maxrem) maxrem = rem;
+  }
+  return maxrem;
+}
+
+
 
 
 void OutputBehaviour::setTransitionTimeOverride(MLMicroSeconds aTransitionTimeOverride)
@@ -774,7 +804,7 @@ const PropertyDescriptorPtr OutputBehaviour::getDescDescriptorByIndex(int aPropI
 enum {
   mode_key,
   pushChangesToDs_key,
-  #if ENABLE_JSONBRIDGEAPI
+  #if ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
   bridgePushInterval_key,
   minReportInterval_key,
   #endif
@@ -789,7 +819,7 @@ const PropertyDescriptorPtr OutputBehaviour::getSettingsDescriptorByIndex(int aP
   static const PropertyDescription properties[numSettingsProperties] = {
     { "mode", apivalue_uint64, mode_key+settings_key_offset, OKEY(output_key) },
     { "pushChanges", apivalue_bool, pushChangesToDs_key+settings_key_offset, OKEY(output_key) },
-    #if ENABLE_JSONBRIDGEAPI
+    #if ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
     { "x-p44-bridgePushInterval", apivalue_double, bridgePushInterval_key+settings_key_offset, OKEY(output_key) },
     { "x-p44-minReportInterval", apivalue_double, minReportInterval_key+settings_key_offset, OKEY(output_key) },
     #endif
@@ -867,15 +897,15 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           aPropValue->setBoolValue(mPushChangesToDS);
           return true;
         // Operational, non-persistent settings
-        #if ENABLE_JSONBRIDGEAPI
+        #if ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
         case bridgePushInterval_key+settings_key_offset:
-          if (mBridgePushInterval==Infinite) aPropValue->setNull();
-          aPropValue->setDoubleValue((double)mBridgePushInterval/Second);
+          if (mReportInterval==Infinite) aPropValue->setNull();
+          aPropValue->setDoubleValue((double)mReportInterval/Second);
           return true;
         case minReportInterval_key+settings_key_offset:
           aPropValue->setDoubleValue((double)mMinReportInterval/Second);
           return true;
-        #endif // ENABLE_JSONBRIDGEAPI
+        #endif // ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
         // State properties
         case localPriority_key+states_key_offset:
           aPropValue->setBoolValue(mLocalPriority);
@@ -896,14 +926,14 @@ bool OutputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           setPVar(mPushChangesToDS, aPropValue->boolValue());
           return true;
         // Operational, non-persistent settings
-        #if ENABLE_JSONBRIDGEAPI
+        #if ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
         case bridgePushInterval_key+settings_key_offset:
-          mBridgePushInterval = aPropValue->isNull() ? Infinite : aPropValue->doubleValue()*Second;
+          mReportInterval = aPropValue->isNull() ? Infinite : aPropValue->doubleValue()*Second;
           return true;
         case minReportInterval_key+settings_key_offset:
           mMinReportInterval = aPropValue->doubleValue()*Second;
           return true;
-        #endif
+        #endif // ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
         // State properties
         case localPriority_key+states_key_offset:
           mLocalPriority = aPropValue->boolValue();

@@ -64,8 +64,8 @@ namespace p44 {
 
     /// @name non-persistent operational settings
     /// @{
-    #if ENABLE_JSONBRIDGEAPI
-    MLMicroSeconds mBridgePushInterval; ///< Infinite: do not push. 0: push final values. Other: how often bridge would want updates (e.g. during transitions)
+    #if ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
+    MLMicroSeconds mReportInterval; ///< Infinite: do not push. 0: push final values. Other: how often bridge would want updates (e.g. during transitions)
     MLMicroSeconds mMinReportInterval; ///< minimal time between output state reports
     #endif
     /// @}
@@ -74,7 +74,7 @@ namespace p44 {
     /// @{
     bool mLocalPriority; ///< if set device is in local priority mode
     MLMicroSeconds mTransitionTime; ///< default transition time when changing this output
-    #if ENABLE_JSONBRIDGEAPI
+    #if ENABLE_JSONBRIDGEAPI || ENABLE_GENERIC_API_PUSH
     MLMicroSeconds mLastOutputStateReport; ///< minimal time between output state reports
     MLTicket mDelayedReportTicket; ///< timer for delayed final report
     #endif
@@ -129,8 +129,9 @@ namespace p44 {
     /// @return true if requested pushes could be done (or none are requested at all)
     bool pushOutputState(bool aDS, bool aBridges);
 
-    /// report current output state to interested consumers
-    /// @note mPushChangesToDS and mBridgePushInterval determine what to push. Does not actually report more
+    /// start reporting current output state to interested consumers. Ongoing transitions will be reported
+    /// according to mReportInterval automatically, no need to call reportOutputState repeatedly.
+    /// @note mPushChangesToDS and mReportInterval determine where to push to. Does not actually report more
     ///   often than mMinOutputReportInterval
     /// @return true when output state could be reported right now. false when reporting is not possible, has failed
     ///   or will happen later because report was requested earlier than mMinOutputReportInterval from last report.
@@ -237,6 +238,9 @@ namespace p44 {
 
     /// will be called to stop ongoing transitions
     void stopTransitions();
+
+    /// time until all currently running transitions are done (0==Never: no transitions running)
+    MLMicroSeconds remainingTransitionTime();
 
     /// Override transition time for all channels that need to be applied
     /// @param aTransitionTimeOverride if not Infinite, this overrides the transition time for all channels
