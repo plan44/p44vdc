@@ -203,11 +203,15 @@ bool ChannelBehaviour::updateTimedTransition(MLMicroSeconds aNow, double aMaxPro
       OLOG(LOG_INFO, "initialized for transition in %d mS", (int)(mNextTransitionTime/MilliSecond));
       mTransitionStarted = MainLoop::now();
       mProgress = 0;
-      return true;
+      return true; // in transition
     }
     // a previous transition is still running, but no channel update is pending
     // This means the transition should just keep running without re-initializing
     OLOG(LOG_INFO, "no channel update pending: keep previous transition running");
+  }
+  else {
+    // prevent starting new transition in case this one is done already
+    if (!inTransition()) return false; // not in transition any more, nothing to update
   }
   // calculate new progress
   double progress = mNextTransitionTime==0 ? 1 : (double)(aNow-mTransitionStarted)/mNextTransitionTime;

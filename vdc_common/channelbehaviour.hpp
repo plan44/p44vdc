@@ -220,7 +220,7 @@ namespace p44 {
 
     /// set transition progress
     /// @param aProgress progress between 0 (just started) to 1 (completed).
-    /// @return true if no longer in transition (aProgress>=1)
+    /// @return true if still in transition
     bool setTransitionProgress(double aProgress);
 
     /// end transition, making current transitional value the cached one
