@@ -304,7 +304,7 @@ bool OutputBehaviour::reportOutputState()
       // check for end of transitions
       MLMicroSeconds timeToEndOfTransitions = remainingTransitionTime();
       if (timeToEndOfTransitions>0) {
-        timeToNextReport = timeToEndOfTransitions;
+        timeToNextReport = timeToEndOfTransitions+50*MilliSecond; // some headroom for actually finishing the transition
         if (timeToNextReport<mMinReportInterval) timeToNextReport = mMinReportInterval; // make sure this does not happen too soon
         else if (timeToNextReport>reportInterval) timeToNextReport = reportInterval; // but for long transitions probably several times
         OLOG(LOG_DEBUG, "schedule another report in %lld ms (reportinterval %lld ms, end of transitions in %lld ms)", timeToNextReport/MilliSecond, reportInterval/MilliSecond, timeToEndOfTransitions/MilliSecond);
