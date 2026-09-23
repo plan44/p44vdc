@@ -297,20 +297,28 @@ bool OutputBehaviour::reportOutputState()
   MLMicroSeconds now = MainLoop::now();
   MLMicroSeconds timeToNextReport = mLastOutputStateReport+mMinReportInterval-now;
   if (mLastOutputStateReport==Never || timeToNextReport<=0) {
-    // push is allowed now
-    if (pushOutputState(mPushChangesToDS, true)) {
-      mLastOutputStateReport = now;
-      pushed = true; // we did push right now
-      // check for end of transitions
-      MLMicroSeconds timeToEndOfTransitions = remainingTransitionTime();
-      if (timeToEndOfTransitions>0) {
-        timeToNextReport = timeToEndOfTransitions+50*MilliSecond; // some headroom for actually finishing the transition
-        if (timeToNextReport<mMinReportInterval) timeToNextReport = mMinReportInterval; // make sure this does not happen too soon
-        else if (timeToNextReport>reportInterval) timeToNextReport = reportInterval; // but for long transitions probably several times
-        OLOG(LOG_DEBUG, "schedule another report in %lld ms (reportinterval %lld ms, end of transitions in %lld ms)", timeToNextReport/MilliSecond, reportInterval/MilliSecond, timeToEndOfTransitions/MilliSecond);
-      }
-      else {
-        timeToNextReport = Infinite;
+    // could push right now
+    MLMicroSeconds timeToEndOfTransitions = remainingTransitionTime();
+    if (timeToEndOfTransitions>0 && timeToEndOfTransitions<mMinReportInterval) {
+      // transition is in progress but ends sooner than min report interval: do not push now, but after finishing the transition
+      timeToNextReport = timeToEndOfTransitions+50*MilliSecond; // some headroom for actually finishing the transition
+      OLOG(LOG_DEBUG, "postpone output report to when transition ends in %lld ms", timeToNextReport/MilliSecond);
+    }
+    else {
+      // push is allowed now
+      if (pushOutputState(mPushChangesToDS, true)) {
+        mLastOutputStateReport = now;
+        pushed = true; // we did push right now
+        // check for end of transitions
+        if (timeToEndOfTransitions>0) {
+          timeToNextReport = timeToEndOfTransitions+50*MilliSecond; // some headroom for actually finishing the transition
+          if (timeToNextReport<mMinReportInterval) timeToNextReport = mMinReportInterval; // make sure this does not happen too soon
+          else if (timeToNextReport>reportInterval) timeToNextReport = reportInterval; // but for long transitions probably several times
+          OLOG(LOG_DEBUG, "schedule another report in %lld ms (reportinterval %lld ms, end of transitions in %lld ms)", timeToNextReport/MilliSecond, reportInterval/MilliSecond, timeToEndOfTransitions/MilliSecond);
+        }
+        else {
+          timeToNextReport = Infinite;
+        }
       }
     }
   }
