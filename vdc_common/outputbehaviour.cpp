@@ -551,6 +551,7 @@ bool OutputBehaviour::performApplySceneToChannels(DsScenePtr aScene, SceneCmd aS
     aSceneCmd==scene_cmd_max
   ) {
     // apply stored scene value(s) to channels
+    mLastOutputStateReport = Never; // allow this scene call's result to get reported, even when happening before mMinReportInterval since last change.
     loadChannelsFromScene(aScene);
     OLOG(LOG_INFO, "- Scene(%s): new channel value(s) loaded from scene, ready to apply",  VdcHost::sceneText(aScene->mSceneNo).c_str());
     return true;
