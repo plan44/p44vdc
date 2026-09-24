@@ -610,7 +610,7 @@ namespace p44 {
 
     /// @return  currently applied or in-progress-to-be-applied scene, can be INVALID\_SCENE\_NO
     SceneNo currentSceneNo() { return mCurrentSceneNo; };
-    #endif
+    #endif // P44SCRIPT_FULL_SUPPORT
 
     /// abort any currently ongoing scene action
     /// @note base class just calls stopSceneActions() on the output

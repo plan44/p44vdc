@@ -319,12 +319,16 @@ ErrorPtr CustomDevice::processJsonMessage(string aMessageType, JsonObjectPtr aMe
       }
       else if (aMessageType=="opstate") {
         JsonObjectPtr o;
+        bool opStaChg = false;
         if (aMessage->get("level", o)) {
-          mOpStateLevel = o->int32Value();
+          int l = o->int32Value();
+          if (l!=mOpStateLevel) { mOpStateLevel = l; opStaChg = true; }
         }
         if (aMessage->get("text", o)) {
-          mOpStateText = o->stringValue();
+          string t = o->stringValue();
+          if (t!=mOpStateText) { mOpStateText = t; opStaChg = true; }
         }
+        if (opStaChg) reportOpState();
         return ErrorPtr(); // no answer
       }
       else if (aMessageType=="button") {

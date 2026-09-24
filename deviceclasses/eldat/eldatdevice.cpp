@@ -214,6 +214,7 @@ void EldatDevice::handleMessage(EldatMode aMode, int aRSSI, string aData)
   if (aMode==0 && aData.size()==1) {
     handleFunction(aData[0]);
   }
+  reportOpState();
 }
 
 

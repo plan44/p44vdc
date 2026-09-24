@@ -93,6 +93,9 @@ namespace p44 {
     /// @return true if addressable is public
     virtual bool isPublicDS();
 
+    /// update/push operational state
+    void reportOpState();
+
     #if ENABLE_JSONBRIDGEAPI
 
     /// @return true if addressable can and should be bridged

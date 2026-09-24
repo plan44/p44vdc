@@ -395,6 +395,7 @@ bool OutputBehaviour::pushOutputState(bool aDS, bool aBridges)
     query->setType(apivalue_object);
     query->add("channelStates", query->newValue(apivalue_null));
     query->add("outputState", query->newValue(apivalue_null));
+    query->add("x-p44-statusText", query->newValue(apivalue_null)); // also include new status text, likely to change with output state change
     // fire and forget for generic API push, does not functionally count as push failure
     mDevice.pushNotification(api, query, ApiValuePtr());
   }

@@ -517,6 +517,7 @@ void WbfDevice::deviceInfoReceived(PresenceCB aPresenceResultHandler, JsonObject
     if (aDeviceInfo->get("last_seen", o)) {
       mLastSeen = MainLoop::now()-(o->doubleValue()*Second);
       reachable = MainLoop::now()-mLastSeen < PRESENT_WHEN_SEEN_EARLIER_THAN;
+      reportOpState();
     }
   }
   aPresenceResultHandler(reachable);

@@ -67,6 +67,8 @@ void DsBehaviour::setHardwareError(VdcHardwareError aHardwareError)
     mHardwareErrorUpdated = MainLoop::now();
     // push the error status change to dS and bridges
     pushBehaviourState(true, true);
+    // also push the opstate
+    mDevice.reportOpState();
   }
 }
 
@@ -107,6 +109,7 @@ bool DsBehaviour::pushBehaviourState(bool aDS, bool aBridges)
   if (api) {
     ApiValuePtr q = api->newApiValue();
     q = q->wrapNull(getApiId(api->getApiVersion()))->wrapAs(string(getTypeName()).append("States"));
+    q->wrapNull("x-p44-statusText"); // also include new status text, likely to change with behaviour state change
     // fire and forget for generic API push, does not functionally count as push failure
     mDevice.pushNotification(api, q, ApiValuePtr());
   }

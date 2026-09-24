@@ -334,6 +334,7 @@ void EnoceanDevice::updateRadioMetrics(Esp3PacketPtr aEsp3PacketPtr)
     mLastPacketTime = MainLoop::now();
     mLastRSSI = aEsp3PacketPtr->radioDBm();
     mLastRepeaterCount = aEsp3PacketPtr->radioRepeaterCount();
+    reportOpState();
   }
 }
 

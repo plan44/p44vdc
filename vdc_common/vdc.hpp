@@ -377,7 +377,7 @@ namespace p44 {
 
     /// set vdc-global error
     /// @param aVdcError if NotOK, vdc cannot collect devices any more (or at all)
-    void setVdcError(ErrorPtr aVdcError) { mVdcErr = aVdcError; };
+    void setVdcError(ErrorPtr aVdcError);
 
     #if SELFTESTING_ENABLED
     /// perform self test

@@ -488,7 +488,11 @@ void DsAddressable::updatePresenceState(bool aPresent)
     if (api) {
       ApiValuePtr q = api->newApiValue();
       q = q->wrapNull("active");
+      // add op state with presence state change
+      q->add("x-p44-opStateLevel", q->newNull());
+      q->add("x-p44-opStateText", q->newNull());
       pushNotification(api, q, ApiValuePtr());
+      reportOpState();
     }
     #endif // ENABLE_GENERIC_API_PUSH
   }
@@ -694,6 +698,31 @@ void DsAddressable::pushBridgeable() {
   #endif // ENABLE_GENERIC_API_PUSH
 }
 #endif // ENABLE_JSONBRIDGEAPI
+
+
+void DsAddressable::reportOpState() {
+  #if ENABLE_JSONBRIDGEAPI
+  VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
+  if (api) {
+    ApiValuePtr q = api->newApiValue();
+    q = q->wrapNull("x-p44-opStateLevel");
+    q->add("x-p44-opStateText", q->newNull());
+    pushNotification(api, q, ApiValuePtr());
+  }
+  #endif // ENABLE_JSONBRIDGEAPI
+  #if ENABLE_GENERIC_API_PUSH
+  // when we have a webui capable of receiving pushes, always push
+  api = getVdcHost().genericPushApi();
+  if (api) {
+    ApiValuePtr q = api->newApiValue();
+    q = q->wrapNull("x-p44-opStateLevel");
+    q->add("x-p44-opStateText", q->newNull());
+    pushNotification(api, q, ApiValuePtr());
+  }
+  #endif // ENABLE_GENERIC_API_PUSH
+}
+
+
 
 // MARK: - icon loading
 

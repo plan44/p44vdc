@@ -938,6 +938,7 @@ void Vdc::collectDevices(StatusCB aCompletedCB, RescanMode aRescanFlags)
     return;
   }
   mCollecting = true;
+  reportOpState();
   // call actual vdc's implementation
   scanForDevices(
     boost::bind(&Vdc::collectedDevices, this, aCompletedCB, _1),
@@ -954,6 +955,7 @@ void Vdc::collectedDevices(StatusCB aCompletedCB, ErrorPtr aError)
   setVdcError(aError);
   // done
   mCollecting = false;
+  if (Error::isOK(aError)) reportOpState(); // end of collecting is an opstate change (but when we had an error, it is already reported by now)
   // now schedule periodic recollect
   schedulePeriodicRecollecting();
 }
@@ -1693,6 +1695,15 @@ string Vdc::description()
     Error::isOK(mVdcErr) ? "OK" : mVdcErr->text()
   );
   return d;
+}
+
+
+void Vdc::setVdcError(ErrorPtr aVdcError)
+{
+  if (mVdcErr != aVdcError) {
+    mVdcErr = aVdcError;
+    reportOpState();
+  }
 }
 
 
