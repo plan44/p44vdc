@@ -52,26 +52,6 @@ namespace p44 {
 
   class Trigger;
 
-  /// Group kind flags
-  enum {
-    group_standard = 0x01, ///< standard group with direct scene calls
-    group_application = 0x02, ///< joker
-    group_controller = 0x04, ///< group (and scene calls) are managed by a contoller (such as heating, etc.)
-    group_global = 0x08, ///< global group like security and access
-    group_domain = 0x10, ///< group is a control domain (building, flat, ...)
-  };
-  typedef uint8_t GroupKind;
-
-  /// Global group info
-  typedef struct {
-    DsGroup no;
-    GroupKind kind;
-    const char *name;
-    const char *symbol;
-    uint32_t hexcolor;
-  } GroupDescriptor;
-
-
   /// zone state
   class ZoneState
   {
@@ -556,18 +536,6 @@ namespace p44 {
     void signalActivity();
 
     /// @}
-
-    /// get info (name, kind) about a group
-    static const GroupDescriptor* groupInfo(DsGroup aGroup);
-
-    /// get info about a group by name
-    static const GroupDescriptor* groupInfoByName(const string aGroupName);
-
-
-    /// filter group mask to only contain standard groups
-    /// @param aGroups bitmask of groups
-    /// @return filtered to contain only standard room scene groups
-    static DsGroupMask standardRoomGroups(DsGroupMask aGroups);
 
     /// localcontroller specific method handling
     bool handleLocalControllerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams);

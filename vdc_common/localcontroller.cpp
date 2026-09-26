@@ -1981,67 +1981,6 @@ ErrorPtr LocalController::save()
 
 // MARK: - LocalController specific root (vdchost) level method handling
 
-
-static const GroupDescriptor groupInfos[] = {
-  { group_undefined,               group_global,      "undefined",                "", 0x000000 },
-  { group_yellow_light,            group_standard,    "light",                    "🟡", 0xFFFF00 },
-  { group_grey_shadow,             group_standard,    "shadow",                   "⚪️", 0x999999 },
-  { group_blue_heating,            group_standard,    "heating",                  "🔵", 0x0000FF },
-  { group_cyan_audio,              group_standard,    "audio",                    "🟣", 0x00FFFF },
-  { group_magenta_video,           group_standard,    "video",                    "🟣", 0xFF00FF },
-  { group_red_security,            group_global,      "security",                 "🔴", 0xFF0000 },
-  { group_green_access,            group_global,      "access",                   "🟢", 0x00FF00 },
-  { group_black_variable,          group_application, "joker",                    "⚫️", 0x000000 },
-  { group_blue_cooling,            group_standard,    "cooling",                  "🔵", 0x0000FF },
-  { group_blue_ventilation,        group_standard,    "ventilation",              "🔵", 0x0000FF },
-  { group_blue_windows,            group_standard,    "windows",                  "🔵", 0x0000FF },
-  { group_blue_air_recirculation,  group_controller,  "air recirculation",        "🔵", 0x0000FF },
-  { group_roomtemperature_control, group_controller,  "room temperature control", "🔵", 0x0000FF },
-  { group_ventilation_control,     group_controller,  "ventilation control",      "🔵", 0x0000FF },
-  { group_undefined,               0 /* terminator */,"" }
-};
-
-
-const GroupDescriptor* LocalController::groupInfo(DsGroup aGroup)
-{
-  const GroupDescriptor *giP = groupInfos;
-  while (giP && giP->kind!=0) {
-    if (aGroup==giP->no) {
-      return giP;
-    }
-    giP++;
-  }
-  return NULL;
-}
-
-
-const GroupDescriptor* LocalController::groupInfoByName(const string aGroupName)
-{
-  const GroupDescriptor *giP = groupInfos;
-  while (giP && giP->kind!=0) {
-    if (uequals(aGroupName.c_str(), giP->name)) {
-      return giP;
-    }
-    giP++;
-  }
-  return NULL;
-}
-
-
-
-DsGroupMask LocalController::standardRoomGroups(DsGroupMask aGroups)
-{
-  return aGroups & (
-    (1ll<<group_yellow_light) |
-    (1ll<<group_grey_shadow) |
-    (1ll<<group_blue_heating) |
-    (1ll<<group_cyan_audio) |
-    (1ll<<group_blue_cooling) |
-    (1ll<<group_blue_ventilation)
-  );
-}
-
-
 bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiRequestPtr aRequest,  const string &aMethod, ApiValuePtr aParams)
 {
   if (aMethod=="x-p44-queryScenes") {
@@ -2108,13 +2047,13 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
     }
     bool allGroups = false;
     o = aParams->get("all"); if (o) allGroups = o->boolValue();
-    if (!allGroups) groups = standardRoomGroups(groups);
     // create answer object
     ApiValuePtr result = aRequest->newApiValue();
     result->setType(apivalue_object);
     for (int i = 0; i<64; ++i) {
       if (groups & (1ll<<i)) {
-        const GroupDescriptor* gi = groupInfo((DsGroup)i);
+        const GroupDescriptor* gi = VdcHost::groupInfo((DsGroup)i);
+        if (!allGroups && (!gi || gi->kind!=group_standard)) continue;
         ApiValuePtr g = result->newObject();
         g->add("name", g->newString(gi ? gi->name : "UNKNOWN"));
         g->add("kind", g->newUint64(gi ? gi->kind : 0));
@@ -2353,7 +2292,7 @@ static void scene_func(BuiltinFunctionContextPtr f)
   }
   // targeting zone, there might be an extra group arg
   if (f->numArgs()>ai) {
-    const GroupDescriptor* gdP = LocalController::groupInfoByName(f->arg(ai)->stringValue());
+    const GroupDescriptor* gdP = VdcHost::groupInfoByName(f->arg(ai)->stringValue());
     if (!gdP) {
       f->finish(new ErrorValue(ScriptError::NotFound, "unknown group '%s'", f->arg(ai)->stringValue().c_str()));
       return;
@@ -2385,7 +2324,7 @@ static void savescene_func(BuiltinFunctionContextPtr f)
   }
   // targeting zone, there might be an extra group arg
   if (f->numArgs()>ai) {
-    const GroupDescriptor* gdP = LocalController::groupInfoByName(f->arg(ai)->stringValue());
+    const GroupDescriptor* gdP = VdcHost::groupInfoByName(f->arg(ai)->stringValue());
     if (!gdP) {
       f->finish(new ErrorValue(ScriptError::NotFound, "unknown group '%s'", f->arg(ai)->stringValue().c_str()));
       return;
@@ -2430,7 +2369,7 @@ static void set_func(BuiltinFunctionContextPtr f)
     // - might have an optional group argument
     DsGroup group = group_yellow_light; // default to light
     if (f->numArgs()>4) {
-      const GroupDescriptor* gdP = LocalController::groupInfoByName(f->arg(4)->stringValue());
+      const GroupDescriptor* gdP = VdcHost::groupInfoByName(f->arg(4)->stringValue());
       if (!gdP) {
         f->finish(new ErrorValue(ScriptError::NotFound, "unknown group '%s'", f->arg(4)->stringValue().c_str()));
         return;

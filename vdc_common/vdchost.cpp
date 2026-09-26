@@ -1874,6 +1874,7 @@ enum {
   #endif
   #if !REDUCED_FOOTPRINT
   scenesList_key,
+  groupsList_key,
   #endif
   nextVersion_key,
   deviceHardwareId_key,
@@ -1913,6 +1914,7 @@ PropertyDescriptorPtr VdcHost::getDescriptorByIndex(int aPropIndex, int aDomain,
     #endif
     #if !REDUCED_FOOTPRINT
     { "x-p44-scenesList", apivalue_null, scenesList_key, OKEY(vdchost_obj) },
+    { "x-p44-groupsList", apivalue_null, groupsList_key, OKEY(vdchost_obj) },
     #endif
     { "x-p44-nextVersion", apivalue_string, nextVersion_key, OKEY(vdchost_obj) },
     { "x-p44-deviceHardwareId", apivalue_string, deviceHardwareId_key, OKEY(vdchost_obj) },
@@ -1982,6 +1984,10 @@ bool VdcHost::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prop
         case scenesList_key:
           aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
           createScenesList(aPropValue);
+          return true;
+        case groupsList_key:
+          aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
+          createGroupsList(aPropValue);
           return true;
         #endif // !REDUCED_FOOTPRINT
         case persistentChannels_key:
@@ -2502,6 +2508,71 @@ SceneNo VdcHost::getSceneIdByKind(string aSceneKindName)
     if (sceneNo>=0 && sceneNo<NUM_VALID_SCENES) return sceneNo;
   }
   return INVALID_SCENE_NO;
+}
+
+
+
+static const GroupDescriptor groupInfos[] = {
+  { group_undefined,               group_global,      "undefined",                "", 0x000000 },
+  { group_yellow_light,            group_standard,    "light",                    "🟡", 0xFFFF00 },
+  { group_grey_shadow,             group_standard,    "shadow",                   "⚪️", 0x999999 },
+  { group_blue_heating,            group_standard,    "heating",                  "🔵", 0x0000FF },
+  { group_cyan_audio,              group_standard,    "audio",                    "🟣", 0x00FFFF },
+  { group_magenta_video,           group_standard,    "video",                    "🟣", 0xFF00FF },
+  { group_red_security,            group_global,      "security",                 "🔴", 0xFF0000 },
+  { group_green_access,            group_global,      "access",                   "🟢", 0x00FF00 },
+  { group_black_variable,          group_application, "joker",                    "⚫️", 0x000000 },
+  { group_blue_cooling,            group_standard,    "cooling",                  "🔵", 0x0000FF },
+  { group_blue_ventilation,        group_standard,    "ventilation",              "🔵", 0x0000FF },
+  { group_blue_windows,            group_standard,    "windows",                  "🔵", 0x0000FF },
+  { group_blue_air_recirculation,  group_controller,  "air recirculation",        "🔵", 0x0000FF },
+  { group_roomtemperature_control, group_controller,  "room temperature control", "🔵", 0x0000FF },
+  { group_ventilation_control,     group_controller,  "ventilation control",      "🔵", 0x0000FF },
+  { group_undefined,               0 /* terminator */,"" }
+};
+
+
+const GroupDescriptor* VdcHost::groupInfo(DsGroup aGroup)
+{
+  const GroupDescriptor *giP = groupInfos;
+  while (giP && giP->kind!=0) {
+    if (aGroup==giP->no) {
+      return giP;
+    }
+    giP++;
+  }
+  return NULL;
+}
+
+
+const GroupDescriptor* VdcHost::groupInfoByName(const string aGroupName)
+{
+  const GroupDescriptor *giP = groupInfos;
+  while (giP && giP->kind!=0) {
+    if (uequals(aGroupName.c_str(), giP->name)) {
+      return giP;
+    }
+    giP++;
+  }
+  return NULL;
+}
+
+
+void VdcHost::createGroupsList(ApiValuePtr aApiObjectValue)
+{
+  const GroupDescriptor *giP = groupInfos;
+  int idx = 0; // to keep the order
+  while (giP && giP->kind!=0) {
+    ApiValuePtr gr = aApiObjectValue->newObject();
+    gr->add("index", gr->newInt64(idx));
+    gr->add("name", gr->newString(giP->name));
+    gr->add("kind", gr->newInt64(giP->kind));
+    gr->add("color", gr->newString(string_format("#%06X", giP->hexcolor)));
+    gr->add("symbol", gr->newString(giP->symbol));
+    aApiObjectValue->add(string_format("%d",giP->no), gr);
+    idx++;
+    giP++;
+  }
 }
 
 #endif // !REDUCED_FOOTPRINT

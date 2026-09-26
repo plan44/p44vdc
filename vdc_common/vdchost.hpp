@@ -50,6 +50,26 @@ namespace p44 {
   typedef boost::intrusive_ptr<Vdc> VdcPtr;
   typedef boost::intrusive_ptr<Device> DevicePtr;
 
+  /// Group kind flags
+  enum {
+    group_standard = 0x01, ///< standard group with direct scene calls
+    group_application = 0x02, ///< joker
+    group_controller = 0x04, ///< group (and scene calls) are managed by a contoller (such as heating, etc.)
+    group_global = 0x08, ///< global group like security and access
+    group_domain = 0x10, ///< group is a control domain (building, flat, ...)
+  };
+  typedef uint8_t GroupKind;
+
+  /// Global group info
+  typedef struct {
+    DsGroup no;
+    GroupKind kind;
+    const char *name;
+    const char *symbol;
+    uint32_t hexcolor;
+  } GroupDescriptor;
+
+
   /// Callback for learn events
   /// @param aLearnIn true if new device learned in, false if device learned out
   /// @param aError error occurred during learn-in
@@ -683,6 +703,12 @@ namespace p44 {
     /// @return dS scene number or INVALID_SCENE_NO if none is found
     static SceneNo getSceneIdByKind(string aSceneKindName);
 
+    /// get info (name, kind) about a group
+    static const GroupDescriptor* groupInfo(DsGroup aGroup);
+
+    /// get info about a group by name
+    static const GroupDescriptor* groupInfoByName(const string aGroupName);
+
     #endif // !REDUCED_FOOTPRINT
 
     /// get a text description for a scene number
@@ -779,7 +805,11 @@ namespace p44 {
     /// get a list of scene number/name associations
     /// @param aApiObjectValue must be an object typed API value, will receive a list of scenes with dS-id, name etc.
     void createScenesList(ApiValuePtr aApiObjectValue);
-    #endif
+
+    /// get a list of group number/name associations
+    /// @param aApiObjectValue must be an object typed API value, will receive a list of groups with groupno, name etc.
+    void createGroupsList(ApiValuePtr aApiObjectValue);
+    #endif // !REDUCED_FOOTPRINT
 
     #if ENABLE_LOCALCONTROLLER && ENABLE_PROXYDEVICES
     void proxyMethodCalled(P44LoggingObj* aLogResultToP, ErrorPtr aError, JsonObjectPtr aJsonObject);
