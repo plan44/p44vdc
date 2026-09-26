@@ -2661,7 +2661,7 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
           if (!mDeviceSettings) return false;
           if (mDeviceSettings->setPVar(mDeviceSettings->mBridgingFlags, (DeviceSettings::BridgingFlags)(aPropValue->int32Value() & DeviceSettings::bridge_flags_mask))) {
             // bridge flags changed, push to bridge
-            pushBridgeable();
+            pushBridgingStatus(true);
           }
           return true;
         #endif // ENABLE_JSONBRIDGEAPI

@@ -245,13 +245,14 @@ bool ProxyDevice::localPropertyOverride(JsonObjectPtr aProps, PropertyAccessMode
     if (aProps->get("x-p44-bridged", o)) {
       #if ENABLE_JSONBRIDGEAPI
       mBridged = o->boolValue();
+      pushBridgingStatus(false); // report as generic API push, not to bridge
       #endif
       aProps->del("x-p44-bridged"); // do not propagate write to proxy!
     }
     if (aProps->get("x-p44-bridgingFlags", o)) {
       #if ENABLE_JSONBRIDGEAPI
       if (mDeviceSettings->setPVar(mDeviceSettings->mBridgingFlags, (DeviceSettings::BridgingFlags)o->int32Value())) {
-        pushBridgeable();
+        pushBridgingStatus(true);
       }
       #endif
       aProps->del("x-p44-bridgingFlags"); // do not propagate write to proxy!

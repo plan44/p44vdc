@@ -854,7 +854,7 @@ void VdcHost::deviceInitialized(DevicePtr aDevice, ErrorPtr aError)
     #endif
     aDevice->addedAndInitialized();
     #if ENABLE_JSONBRIDGEAPI
-    aDevice->pushBridgeable();
+    aDevice->pushBridgingStatus(true);
     #endif
   }
 }

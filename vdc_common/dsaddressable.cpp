@@ -633,7 +633,9 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         case isBridged_key: {
           bool br = aPropValue->boolValue();
           if (!bridgeable() && br) return false; // cannot turn ON bridged status when not bridgeable
-          mBridged = br; return true; // but turning OFF bridged status is ok (bridge confirming un-bridging)
+          mBridged = br;
+          pushBridgingStatus(false); // do not echo to bridge (comes from there), just generic API push
+          return true; // but turning OFF bridged status is ok (bridge confirming un-bridging)
         }
         #endif // ENABLE_JSONBRIDGEAPI
       }
@@ -680,12 +682,17 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
 
 
 #if ENABLE_JSONBRIDGEAPI
-void DsAddressable::pushBridgeable() {
-  VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
-  if (api) {
-    ApiValuePtr q = api->newApiValue();
-    q = q->wrapNull("x-p44-bridgeable");
-    pushNotification(api, q, ApiValuePtr());
+void DsAddressable::pushBridgingStatus(bool aToBridges)
+{
+  VdcApiConnectionPtr api;
+  if (aToBridges) {
+    api = getVdcHost().getBridgeApi();
+    if (api) {
+      ApiValuePtr q = api->newApiValue();
+      q = q->wrapNull("x-p44-bridgeable");
+      q->add("x-p44-bridged", q->newNull());
+      pushNotification(api, q, ApiValuePtr());
+    }
   }
   #if ENABLE_GENERIC_API_PUSH
   // when we have a webui capable of receiving pushes, always push
@@ -693,6 +700,7 @@ void DsAddressable::pushBridgeable() {
   if (api) {
     ApiValuePtr q = api->newApiValue();
     q = q->wrapNull("x-p44-bridgeable");
+    q->add("x-p44-bridged", q->newNull());
     pushNotification(api, q, ApiValuePtr());
   }
   #endif // ENABLE_GENERIC_API_PUSH
@@ -700,9 +708,11 @@ void DsAddressable::pushBridgeable() {
 #endif // ENABLE_JSONBRIDGEAPI
 
 
-void DsAddressable::reportOpState() {
+void DsAddressable::reportOpState()
+{
+  VdcApiConnectionPtr api;
   #if ENABLE_JSONBRIDGEAPI
-  VdcApiConnectionPtr api = getVdcHost().getBridgeApi();
+  api = getVdcHost().getBridgeApi();
   if (api) {
     ApiValuePtr q = api->newApiValue();
     q = q->wrapNull("x-p44-opStateLevel");

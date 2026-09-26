@@ -101,8 +101,9 @@ namespace p44 {
     /// @return true if addressable can and should be bridged
     virtual bool bridgeable() { return false; } // by default, bridging an addressable is not enabled
 
-    /// report current bridgeable status
-    void pushBridgeable();
+    /// report current bridgeable/bridging status
+    /// @param aToBridges if set, status is reported to bridges, otherwise only to generic API
+    void pushBridgingStatus(bool aToBridges);
 
     /// This string may help the bridge to determine how to bridge this device.
     /// @return non-empty string if there is a bridging hint keyword that will be exposed as x-p44-bridgeAs.
