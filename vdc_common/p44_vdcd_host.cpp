@@ -437,12 +437,8 @@ ErrorPtr UbusApiRequest::sendResult(ApiValuePtr aResult)
 
 ErrorPtr UbusApiRequest::sendError(ErrorPtr aError)
 {
-  ErrorPtr err;
-  if (!aError) {
-    aError = Error::ok();
-  }
-  POLOG(mUbusRequest->server(), LOG_INFO, "sending error: %d (%s)", aError->getErrorCode(), aError->getErrorMessage());
-  sendResponse(JsonObjectPtr(), err);
+  POLOG(mUbusRequest->server(), LOG_INFO, "sending error: %s", Error::text(aError));
+  sendResponse(JsonObjectPtr(), aError);
   return ErrorPtr();
 }
 
@@ -857,11 +853,7 @@ ErrorPtr P44JsonApiRequest::sendResult(ApiValuePtr aResult)
 
 ErrorPtr P44JsonApiRequest::sendError(ErrorPtr aError)
 {
-  ErrorPtr err;
-  if (!aError) {
-    aError = Error::ok();
-  }
-  POLOG(mJsonApi, LOG_DEBUG, "sending error: %ld (%s)", aError->getErrorCode(), aError->getErrorMessage());
+  POLOG(mJsonApi, LOG_INFO, "sending error: %s", Error::text(aError));
   P44VdcHost::sendJsonApiResponse(mJsonComm, JsonObjectPtr(), aError, mRequestId, *mJsonApi);
   return ErrorPtr();
 }
