@@ -109,7 +109,7 @@ bool DsBehaviour::pushBehaviourState(bool aDS, bool aBridges)
   if (api) {
     ApiValuePtr q = api->newApiValue();
     q = q->wrapNull(getApiId(api->getApiVersion()))->wrapAs(string(getTypeName()).append("States"));
-    q->wrapNull("x-p44-statusText"); // also include new status text, likely to change with behaviour state change
+    q->add("x-p44-statusText", q->newNull()); // also include new status text, likely to change with behaviour state change
     // fire and forget for generic API push, does not functionally count as push failure
     mDevice.pushNotification(api, q, ApiValuePtr());
   }
