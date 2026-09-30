@@ -43,6 +43,7 @@ namespace p44 {
   class Device;
   class ButtonBehaviour;
   class SensorBehaviour;
+  class BinaryInputBehaviour;
   class DsUid;
   class LocalController;
   class NotificationDeliveryState;
@@ -543,6 +544,13 @@ namespace p44 {
     /// @return true if acted on the change locally
     bool checkForLocalSensorHandling(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue);
 
+    /// have binary input changes checked for local handling
+    /// @param aBinaryInputBehaviour the binary input behaviour that has pushed a change
+    /// @param aCurrentState the current input state
+    /// @param aPreviousState the previous input state (sometimes relevant for user switch sync)
+    /// @return true if acted on the change locally
+    bool checkForLocalInputHandling(BinaryInputBehaviour &aBinaryInputBehaviour, int aCurrentState, int aPreviousState);
+
     #if ENABLE_PROXYDEVICES
     
     /// Call a method on all vdchosts we have a proxy for
@@ -709,6 +717,13 @@ namespace p44 {
     /// get info about a group by name
     static const GroupDescriptor* groupInfoByName(const string aGroupName);
 
+    /// get scene kind descriptor by sceneNo (and aIsGlobal)
+    /// @param aSceneNo the scene number to get the descriptor for
+    /// @param aIsGlobal if set, global descriptors are used for ambiguous scenes
+    ///   (those that have different meaning in room context vs. in global context),
+    ///   otherwise, room scene descriptors are returned.
+    static const SceneKindDescriptor* getSceneKindByNo(SceneNo aSceneNo, bool aIsGlobal);
+
     #endif // !REDUCED_FOOTPRINT
 
     /// get a text description for a scene number
@@ -717,6 +732,7 @@ namespace p44 {
     ///   (those that have different meaning in room context vs. in global context),
     ///   otherwise, room scene names are used in the description text
     /// @param aAsId return as ID that is recognized by getSceneIdByKind()
+    /// @note with REDUCED\_FOOTPRINT, the text is just the sceneNo
     static string sceneText(SceneNo aSceneNo, bool aIsGlobal = false, bool aAsId = false);
 
   protected:

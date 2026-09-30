@@ -177,6 +177,12 @@ void BinaryInputBehaviour::updateInputState(InputState aNewState)
     // input state change is considered a (regular!) user action, have it checked globally first
     mDevice.getVdcHost().signalDeviceUserAction(mDevice, true);
     // Note: even if global identify handler processes this, still report state changes (otherwise upstream could get out of sync)
+    #if ENABLE_LOCALCONTROLLER
+    // also let vdchost know for local dimmer dial handling etc., but only those considered new values, no small jitter etc.!
+    if (!isBridgeExclusive()) {
+      mDevice.getVdcHost().checkForLocalInputHandling(*this, mCurrentState, aNewState);
+    }
+    #endif // ENABLE_LOCALCONTROLLER
   }
   OLOG(changedState ? LOG_NOTICE : LOG_INFO, "reports %s state = %d", changedState ? "NEW" : "same", aNewState);
   // in all cases, binary input state changes must be forwarded long term

@@ -422,7 +422,7 @@ bool ClimateControlBehaviour::checkForcedOffWake()
       }
     }
   }
-  #endif
+  #endif // ENABLE_FCU_SUPPORT
   return false; // no output channel change by default
 }
 

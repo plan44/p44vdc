@@ -1156,6 +1156,7 @@ void VdcHost::handleClickLocally(ButtonBehaviour &aButtonBehaviour)
 
 
 #if ENABLE_LOCALCONTROLLER
+
 bool VdcHost::checkForLocalSensorHandling(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue)
 {
   if (mLocalController) {
@@ -1166,6 +1167,19 @@ bool VdcHost::checkForLocalSensorHandling(SensorBehaviour &aSensorBehaviour, dou
   }
   return false; // nothing happened due to sensor change
 }
+
+
+bool VdcHost::checkForLocalInputHandling(BinaryInputBehaviour &aBinaryInputBehaviour, int aCurrentValue, int aPreviousValue)
+{
+  if (mLocalController) {
+    if (mLocalController->processInputChange(aBinaryInputBehaviour, aCurrentValue, aPreviousValue)) {
+      LOG(LOG_INFO, "localcontroller has acted on change of Input[%zu] '%s' in %s", aBinaryInputBehaviour.mIndex, aBinaryInputBehaviour.getHardwareName().c_str(), aBinaryInputBehaviour.mDevice.shortDesc().c_str());
+      return true; // acted on the change
+    }
+  }
+  return false; // nothing happened due to sensor change
+}
+
 #endif // ENABLE_LOCALCONTROLLER
 
 
@@ -1558,6 +1572,15 @@ ErrorPtr VdcHost::handleNotificationForParams(VdcApiConnectionPtr aApiConnection
           audienceOk = true; // zone_id/group is valid audience spec
           DsGroup group = (DsGroup)o->uint16Value();
           addToAudienceByZoneAndGroup(audience, zone, group);
+          #if ENABLE_LOCALCONTROLLER
+          if (mLocalController && !audience.empty()) {
+            // it is important not to call this for empty audiences, as it instantiates zone states!
+            if (!mLocalController->processNotificationToZoneAndGroup(zone, group, aMethod, aParams)) {
+              LOG(LOG_INFO, "processNotificationToZoneAndGroup returned false and prevented devlivering notification");
+              return respErr;
+            }
+          }
+          #endif // ENABLE_LOCALCONTROLLER
         }
       }
     }
@@ -2575,6 +2598,26 @@ void VdcHost::createGroupsList(ApiValuePtr aApiObjectValue)
   }
 }
 
+
+const SceneKindDescriptor* VdcHost::getSceneKindByNo(SceneNo aSceneNo, bool aIsGlobal)
+{
+  if (aSceneNo==INVALID_SCENE_NO) return nullptr;
+  // look up info from scene kind description tables
+  const SceneKindDescriptor* skP = aIsGlobal ? globalScenes : roomScenes;
+  for (int i=0; i<2; i++) {
+    while (skP->no!=INVALID_SCENE_NO) {
+      if (skP->no==aSceneNo) {
+        // found
+        return skP;
+      }
+      skP++;
+    }
+    // try other table
+    skP = !aIsGlobal ? globalScenes : roomScenes;
+  }
+  return nullptr;
+}
+
 #endif // !REDUCED_FOOTPRINT
 
 
@@ -2583,26 +2626,16 @@ string VdcHost::sceneText(SceneNo aSceneNo, bool aIsGlobal, bool aAsId)
   if (aSceneNo==INVALID_SCENE_NO) return "none";
   #if !REDUCED_FOOTPRINT
   // look up info from scene description tables
-  const SceneKindDescriptor* skP = aIsGlobal ? globalScenes : roomScenes;
-  for (int i=0; i<2; i++) {
-    while (skP->no!=INVALID_SCENE_NO) {
-      if (skP->no==aSceneNo) {
-        // found
-        if (aAsId) return skP->actionName; // just the action name
-        else return string_format("#%d: %s", aSceneNo, skP->actionName); // formatted for log
-      }
-      skP++;
-    }
-    // try other table
-    skP = !aIsGlobal ? globalScenes : roomScenes;
+  const SceneKindDescriptor* skP = getSceneKindByNo(aSceneNo, aIsGlobal);
+  if (skP) {
+    if (aAsId) return skP->actionName; // just the action name
+    else return string_format("#%d: %s", aSceneNo, skP->actionName); // formatted for log
   }
   // no description found
   #endif // !REDUCED_FOOTPRINT
   // we don't have anything but the scene number
   return string_format("#%d", aSceneNo); // #x also recogniozed by getSceneIdByKind()
 }
-
-
 
 
 #if P44SCRIPT_FULL_SUPPORT

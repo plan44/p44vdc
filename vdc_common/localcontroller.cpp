@@ -45,10 +45,19 @@ using namespace p44;
 
 // MARK: - ZoneState
 
+#define INVALID_NUM (-9999999)
+
 ZoneState::ZoneState() :
   mLastGlobalScene(INVALID_SCENE_NO),
   mLastDim(dimmode_stop),
-  mLastLightScene(INVALID_SCENE_NO)
+  mLastLightScene(INVALID_SCENE_NO),
+  mLastShadowScene(INVALID_SCENE_NO),
+  mLastHeatingScene(INVALID_SCENE_NO),
+  mLastCoolingScene(INVALID_SCENE_NO),
+  mLastVentilationScene(INVALID_SCENE_NO),
+  mCurrentTemp(INVALID_NUM),
+  mTempSetPoint(INVALID_NUM),
+  mHeatingLevel(INVALID_NUM)
 {
   for (SceneArea i=0; i<=num_areas; ++i) {
     mLightOn[i] = false;
@@ -60,8 +69,8 @@ ZoneState::ZoneState() :
 bool ZoneState::stateFor(int aGroup, int aArea)
 {
   switch(aGroup) {
-    case group_yellow_light : return mLightOn[aArea];
-    case group_grey_shadow : return mShadesOpen[aArea];
+    case group_yellow_light: return mLightOn[aArea];
+    case group_grey_shadow: return mShadesOpen[aArea];
     default: return false;
   }
 }
@@ -70,11 +79,107 @@ bool ZoneState::stateFor(int aGroup, int aArea)
 void ZoneState::setStateFor(int aGroup, int aArea, bool aState)
 {
   switch(aGroup) {
-    case group_yellow_light : mLightOn[aArea] = aState;
-    case group_grey_shadow : mShadesOpen[aArea] = aState;
+    case group_yellow_light: mLightOn[aArea] = aState; break;
+    case group_grey_shadow: mShadesOpen[aArea] = aState; break;
   }
 }
 
+
+void ZoneState::setLastSceneFor(int aGroup, SceneNo aSceneNo)
+{
+  switch(aGroup) {
+    case group_undefined: mLastGlobalScene = aSceneNo; break;
+    case group_yellow_light: mLastLightScene = aSceneNo; break;
+    case group_grey_shadow: mLastShadowScene = aSceneNo; break;
+    case group_blue_heating: mLastHeatingScene = aSceneNo; break;
+    case group_blue_cooling: mLastCoolingScene = aSceneNo; break;
+    case group_blue_ventilation: mLastVentilationScene = aSceneNo; break;
+  }
+}
+
+
+SceneNo ZoneState::lastSceneFor(int aGroup)
+{
+  switch(aGroup) {
+    case group_undefined: return mLastGlobalScene;
+    case group_yellow_light: return mLastLightScene;
+    case group_grey_shadow: return mLastShadowScene;
+    case group_blue_heating: return mLastHeatingScene;
+    case group_blue_cooling: return mLastCoolingScene;
+    case group_blue_ventilation: return mLastVentilationScene;
+    default: return INVALID_SCENE_NO;
+  }
+}
+
+
+#define SCENE_API_VALUE(c, s) (s==INVALID_SCENE_NO ? c->newNull() : c->newInt64(s))
+#define NUM_API_VALUE(c, t) (t==INVALID_NUM ? c->newNull() : c->newDouble(t))
+
+
+string ZoneState::description()
+{
+  return string_format("Zone state:\n"
+    "- lastGlobalScene:%s\n"
+    "- lastLightScene:%s, lastDim=%d, lightOn=%d/areas1234=%d%d%d%d\n"
+    "- lastShadowScene:%s, shadesOpen=%d/%d%d%d%d\n"
+    "- lastHeatingScene:%s, lastCoolingScene:%s, lastVentilationScene:%s\n"
+    "- currentTemp: %.1f ºC, setPoint: %.1f ºC",
+    VdcHost::sceneText(mLastGlobalScene, true).c_str(),
+    VdcHost::sceneText(mLastLightScene, false).c_str(), (int)mLastDim,
+    mLightOn[0], mLightOn[1], mLightOn[2], mLightOn[3], mLightOn[4],
+    VdcHost::sceneText(mLastShadowScene, false).c_str(),
+    mShadesOpen[0], mShadesOpen[1], mShadesOpen[2], mShadesOpen[3], mShadesOpen[4],
+    VdcHost::sceneText(mLastHeatingScene, false).c_str(),
+    VdcHost::sceneText(mLastCoolingScene, false).c_str(),
+    VdcHost::sceneText(mLastVentilationScene, false).c_str(),
+    mCurrentTemp, mTempSetPoint
+  );
+}
+
+
+void ZoneState::getApiRepresentation(ApiValuePtr aApiObjectValue)
+{
+  // represent the groups
+  ApiValuePtr gs;
+  // global/app
+  gs = aApiObjectValue->newObject();
+  gs->add("scene", SCENE_API_VALUE(gs, lastSceneFor(group_undefined)));
+  aApiObjectValue->add(string_format("%d", group_undefined), gs);
+  // light
+  gs = aApiObjectValue->newObject();
+  gs->add("scene", SCENE_API_VALUE(gs, lastSceneFor(group_yellow_light)));
+  gs->add("room", gs->newBool(mLightOn[0]));
+  for (int a=1; a<=4; a++) {
+    gs->add(string_format("area%d", a), gs->newBool(mLightOn[a]));
+  }
+  aApiObjectValue->add(string_format("%d", group_yellow_light), gs);
+  // shades
+  gs = aApiObjectValue->newObject();
+  gs->add("scene", SCENE_API_VALUE(gs, lastSceneFor(group_grey_shadow)));
+  gs->add("room", gs->newBool(mShadesOpen[0]));
+  for (int a=1; a<=4; a++) {
+    gs->add(string_format("area%d", a), gs->newBool(mShadesOpen[a]));
+  }
+  aApiObjectValue->add(string_format("%d", group_grey_shadow), gs);
+  // heating
+  gs = aApiObjectValue->newObject();
+  gs->add("scene", SCENE_API_VALUE(gs, lastSceneFor(group_blue_heating)));
+  aApiObjectValue->add(string_format("%d", group_blue_heating), gs);
+  // cooling
+  gs = aApiObjectValue->newObject();
+  gs->add("scene", SCENE_API_VALUE(gs, lastSceneFor(group_blue_cooling)));
+  aApiObjectValue->add(string_format("%d", group_blue_cooling), gs);
+  // ventilation
+  gs = aApiObjectValue->newObject();
+  gs->add("scene", SCENE_API_VALUE(gs, lastSceneFor(group_blue_ventilation)));
+  aApiObjectValue->add(string_format("%d", group_blue_ventilation), gs);
+  // temperature control
+  gs = aApiObjectValue->newObject();
+  gs->add("TemperatureZone", NUM_API_VALUE(gs, mCurrentTemp));
+  gs->add("TemperatureSetPoint", NUM_API_VALUE(gs, mTempSetPoint));
+  gs->add("heatingLevel", NUM_API_VALUE(gs, mTempSetPoint));
+  aApiObjectValue->add(string_format("%d", group_roomtemperature_control), gs);
+}
 
 
 // MARK: - ZoneDescriptor
@@ -173,7 +278,33 @@ size_t ZoneDescriptor::devicesInZone() const
 }
 
 
-
+void ZoneDescriptor::reportZoneState(const string& aReason, DsGroup aAffectedGroup)
+{
+  // notify listeners
+  #if ENABLE_P44SCRIPT
+  // send event
+  sendStateEvent(aAffectedGroup);
+  #endif
+  // Note: for now we do not push zone states to bridges, because there's no use for those there
+  #if ENABLE_GENERIC_API_PUSH
+  // when we have a webui capable of receiving pushes, always push
+  VdcApiConnectionPtr api = VdcHost::sharedVdcHost()->genericPushApi();
+  if (api) {
+    // the state property query
+    ApiValuePtr q = api->newApiValue();
+    q = q->wrapNull("state")->wrapAs(string_format("%d", mZoneID))->wrapAs("zones")->wrapAs("x-p44-localController");
+    // the event list
+    ApiValuePtr e = api->newApiValue();
+    e->setStringValue(aReason);
+    e = e->wrapAs("reason");
+    ApiValuePtr g = api->newApiValue();
+    g->setInt8Value(aAffectedGroup);
+    e->add("group", g);
+    // fire and forget for generic API push, does not functionally count as push failure
+    VdcHost::sharedVdcHost()->pushNotification(api, q, e);
+  }
+  #endif // ENABLE_GENERIC_API_PUSH
+}
 
 
 // MARK: - ZoneDescriptor persistence
@@ -258,6 +389,7 @@ enum {
   zoneName_key,
   deviceCount_key,
   zoneDevices_key,
+  zoneState_key,
   numZoneProperties
 };
 
@@ -310,6 +442,7 @@ PropertyDescriptorPtr ZoneDescriptor::getDescriptorByIndex(int aPropIndex, int a
     { "name", apivalue_string, zoneName_key, OKEY(zonedescriptor_key) },
     { "deviceCount", apivalue_uint64, deviceCount_key, OKEY(zonedescriptor_key) },
     { "devices", apivalue_object+propflag_needsreadprep+propflag_needswriteprep+propflag_container+propflag_nowildcard, zoneDevices_key, OKEY(zonedevices_container_key) },
+    { "state", apivalue_null, zoneState_key, OKEY(zonedescriptor_key) },
   };
   if (aParentDescriptor->isRootOfObject()) {
     // root level property of this object hierarchy
@@ -340,7 +473,6 @@ void ZoneDescriptor::finishAccess(PropertyAccessMode aMode, PropertyDescriptorPt
 }
 
 
-
 bool ZoneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
 {
   if (aPropertyDescriptor->hasObjectKey(zonedescriptor_key)) {
@@ -348,6 +480,10 @@ bool ZoneDescriptor::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValu
       switch (aPropertyDescriptor->fieldKey()) {
         case zoneName_key: aPropValue->setStringValue(mZoneName); return true;
         case deviceCount_key: aPropValue->setUint64Value(devicesInZone()); return true;
+        case zoneState_key:
+          aPropValue->setType(apivalue_object); // make object (incoming object is NULL)
+          mZoneState.getApiRepresentation(aPropValue);
+          return true;
       }
     }
     else {
@@ -1527,6 +1663,12 @@ void LocalController::processGlobalEvent(VdchostEvent aActivity)
 }
 
 
+bool LocalController::processInputChange(BinaryInputBehaviour &aBinaryInputBehaviour, int aCurrentState, int aPreviousState)
+{
+  return false; // NOP
+}
+
+
 bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue)
 {
   DsZoneID zoneID = aSensorBehaviour.mDevice.getZoneID();
@@ -1870,8 +2012,78 @@ void LocalController::deviceChangesZone(DevicePtr aDevice, DsZoneID aFromZone, D
 }
 
 
+bool LocalController::processNotificationToZoneAndGroup(DsZoneID aZoneId, DsGroup aGroup, const string &aNotification, ApiValuePtr aParams)
+{
+  // Notes:
+  // - this is called only once for notifications actually addressed to a zone and group, and the audience is not-empty
+  // - this is called **before** actual delivery and can prevent it by returning false
+  // - zone will be created when not yet existing in the local zones list (but this method is called only when audience is not empty)
+  ZoneDescriptorPtr zone = mLocalZones.getZoneById(aZoneId, true);
+  if (zone) {
+    ApiValuePtr o;
+    if (aNotification=="callScene") {
+      if ((o = aParams->get("scene"))) {
+        SceneNo sceneNo = o->int32Value();
+        // update last scene call
+        zone->mZoneState.setLastSceneFor(aGroup, sceneNo);
+        bool isOffScene = false;
+        const SceneKindDescriptor* skP = VdcHost::getSceneKindByNo(sceneNo, aGroup==group_undefined);
+        if (skP && skP->kind&scene_off) isOffScene = true;
+        int area = SimpleScene::areaForScene(sceneNo);
+        zone->mZoneState.setStateFor(aGroup, area, !isOffScene);
+        if (sceneNo==DEEP_OFF) {
+          // force areas off as well
+          zone->mZoneState.setStateFor(aGroup, 1, false);
+          zone->mZoneState.setStateFor(aGroup, 2, false);
+          zone->mZoneState.setStateFor(aGroup, 3, false);
+          zone->mZoneState.setStateFor(aGroup, 4, false);
+        }
+        // group specific additions
+        if (aGroup==group_yellow_light) {
+          // calling on scenes is remembered as dimming default channel up (so next dim will go down) and vice versa
+          zone->mZoneState.mLastDimChannel = channeltype_default;
+          zone->mZoneState.mLastDim = isOffScene ? dimmode_down : dimmode_up;
+        }
+        // getting a zone level callScene is a room state change
+        zone->reportZoneState(aNotification, aGroup);
+      }
+    }
+    else if (aNotification=="setControlValue") {
+      if ((o = aParams->get("name"))) {
+        string name = o->stringValue();
+        if ((o = aParams->get("value"))) {
+          // get value
+          double value = o->doubleValue();
+          // now process the value (updates channel values, but does not yet apply them)
+          if (name=="TemperatureZone") {
+            zone->mZoneState.mCurrentTemp = value;
+          }
+          else if (name=="TemperatureSetPoint") {
+            zone->mZoneState.mTempSetPoint = value;
+          }
+          else if (name=="heatingLevel") {
+            zone->mZoneState.mHeatingLevel = value;
+          }
+          else {
+            // unknown value, silently ignore, no push
+            return true; // must return true, otherwise delivery of this notification is prevented!
+          }
+          // change of temperature or set point is a room state change
+          zone->reportZoneState(aNotification, group_roomtemperature_control);
+        }
+      }
+    }
+  } // if zone
+  return true; // must return true, otherwise delivery of this notification is prevented!
+}
+
+  
+#warning "todo: process zone relevant sensors"
+
+
 void LocalController::deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState)
 {
+  // this is called once for every device in the audience
   ZoneDescriptorPtr zone = mLocalZones.getZoneById(aDevice->getZoneID(), false);
   if (zone && aDevice->getOutput()) {
     DsGroupMask affectedGroups = aDevice->getOutput()->groupMemberships();
@@ -1890,25 +2102,6 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
             // is area on scene, set local priority in the device
             aDevice->setLocalPriority(calledScene.mSceneNo);
           }
-          if (calledScene.getKindFlags()&scene_global) {
-            zone->mZoneState.mLastGlobalScene = calledScene.mSceneNo;
-          }
-          // group specific
-          bool isOffScene = calledScene.getKindFlags()&scene_off;
-          if (g==group_yellow_light) {
-            zone->mZoneState.mLastLightScene = calledScene.mSceneNo;
-            // calling on scenes is remembered as dimming default channel up (so next dim will go down)
-            zone->mZoneState.mLastDimChannel = channeltype_default;
-            zone->mZoneState.mLastDim = isOffScene ? dimmode_down : dimmode_up;
-          }
-          zone->mZoneState.setStateFor(g, area, !isOffScene);
-          if (calledScene.mSceneNo==DEEP_OFF) {
-            // force areas off as well
-            zone->mZoneState.setStateFor(g, 1, false);
-            zone->mZoneState.setStateFor(g, 2, false);
-            zone->mZoneState.setStateFor(g, 3, false);
-            zone->mZoneState.setStateFor(g, 4, false);
-          }
         }
       }
     }
@@ -1923,17 +2116,6 @@ void LocalController::deviceWillApplyNotification(DevicePtr aDevice, Notificatio
         }
       }
     }
-    OLOG(LOG_INFO,
-      "Zone '%s' (%d) state updated: lastLightScene:%d, lastDim=%d, lastGlobalScene:%d, lightOn=%d/areas1234=%d%d%d%d, shadesOpen=%d/%d%d%d%d",
-      zone->getName().c_str(), zone->getZoneId(),
-      zone->mZoneState.mLastLightScene,
-      (int)zone->mZoneState.mLastDim,
-      zone->mZoneState.mLastGlobalScene,
-      zone->mZoneState.mLightOn[0],
-      zone->mZoneState.mLightOn[1], zone->mZoneState.mLightOn[2], zone->mZoneState.mLightOn[3], zone->mZoneState.mLightOn[4],
-      zone->mZoneState.mShadesOpen[0],
-      zone->mZoneState.mShadesOpen[1], zone->mZoneState.mShadesOpen[2], zone->mZoneState.mShadesOpen[3], zone->mZoneState.mShadesOpen[4]
-    );
   }
 }
 
@@ -2168,6 +2350,27 @@ PropertyContainerPtr LocalController::getContainer(const PropertyDescriptorPtr a
 using namespace P44Script;
 
 // MARK: - Local controller specific functions
+
+void ZoneDescriptor::sendStateEvent(DsGroup aAffectedGroup)
+{
+  if (!hasSinks()) return; // optimisation
+#warning "TODO: implement"
+  return;
+  //sendEvent(new ZoneStateObj(this, aAffectedGroup));
+}
+
+
+// ZoneStateObj
+// - needs to have the zoneID, name included
+// - needs to include affectedGroup, too
+// filterable zonevent() value source
+// function for direct access to zone state
+// function to emit control value changes
+
+// **separate** mechanism to receive and process zone/appt/building/outside scoped sensors
+// - provide automatic standard processing of those -> just emit controlvalues 1:1
+// - flag to disable standard processing, allow more sophisticated multi-sensor ave
+
 
 // trigger('triggername')    execute a trigger's action script
 FUNC_ARG_DEFS(trigger, { text } );

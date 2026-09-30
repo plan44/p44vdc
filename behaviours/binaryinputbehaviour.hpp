@@ -42,6 +42,9 @@ namespace p44 {
   {
     typedef DsBehaviour inherited;
     friend class Device;
+    friend class VdcHost;
+    friend class LocalController; // for full standalone mode
+    friend class ProxyDevice; // for proxy behaviour setup
 
     MLTicket mTimeoutTicket;
     MLTicket mUpdateTicket;

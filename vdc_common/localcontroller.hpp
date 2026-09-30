@@ -65,18 +65,45 @@ namespace p44 {
     DsChannelType mLastDimChannel; ///< last dimming channel in this zone
     SceneNo mLastLightScene; ///< last light scene called
     bool mLightOn[5]; ///< set if light is on in this zone and area
+
+    // Shadow state
+    SceneNo mLastShadowScene; ///< last shadow scene called
     bool mShadesOpen[5]; ///< set if shades are open in this zone and area
+
+    // Heating State
+    SceneNo mLastHeatingScene; ///< last heating scene called
+
+    // Heating State
+    SceneNo mLastCoolingScene; ///< last cooling scene called
+
+    // Ventilation State
+    SceneNo mLastVentilationScene; ///< last ventilation scene called
+
+    // Temperature control
+    double mCurrentTemp; ///< current room temperature, as collected from room sensors
+    double mTempSetPoint; ///< current temperature set point
+    double mHeatingLevel; ///< current heating/cooling level
 
     ZoneState();
     bool stateFor(int aGroup, int aArea);
     void setStateFor(int aGroup, int aArea, bool aState);
+    void setLastSceneFor(int aGroup, SceneNo aSceneNo);
+    SceneNo lastSceneFor(int aGroup);
+
+    string description();
+
+    void getApiRepresentation(ApiValuePtr aApiObjectValue);
 
   };
 
 
   /// zone descriptor
   /// holds information about a zone
-  class ZoneDescriptor : public PropertyContainer, public PersistentParams
+  class ZoneDescriptor :
+    public PropertyContainer, public PersistentParams
+    #if ENABLE_P44SCRIPT
+    ,public EventSource
+    #endif
   {
     typedef PropertyContainer inherited;
     typedef PersistentParams inheritedParams;
@@ -119,7 +146,16 @@ namespace p44 {
     /// @return number of devices in this zone
     size_t devicesInZone() const;
 
+    /// report zone state updates (push to APIs, p44script event)
+    /// @param aReason the reason that caused the zone state to update (notification name)
+    /// @param aAffectedGroup the affected group
+    void reportZoneState(const string& aReason, DsGroup aAffectedGroup);
+
   protected:
+
+    #if ENABLE_P44SCRIPT
+    void sendStateEvent(DsGroup aOriginatingGroup);
+    #endif
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
@@ -505,6 +541,12 @@ namespace p44 {
     /// @return true if acted on the change locally
     bool processSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue);
 
+    /// called when input value is pushed
+    /// @param aBinaryInputBehaviour the binary input behaviour that has pushed a change
+    /// @param aCurrentState the current input state
+    /// @param aPreviousState the previous input state (sometimes relevant for user switch sync)
+    /// @return true if acted on the change locally
+    bool processInputChange(BinaryInputBehaviour &aBinaryInputBehaviour, int aCurrentState, int aPreviousState);
 
     /// device was added
     /// @param aDevice device being added
@@ -557,6 +599,12 @@ namespace p44 {
     /// @note this is not called for all types of notifications, only callScene and dimchannel
     /// @note aDeliveryState lifetime may immediately end when this method returns
     void deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState);
+
+    /// called *only* when a notification is delivered addressed via zone and group
+    /// @note deviceWillApplyNotification() will still be called once for every device that gets the notification.
+    /// @note this method is primarily meant to update zone state
+    /// @return the method can return false to suppress actual delivery to the addressed audience
+    bool processNotificationToZoneAndGroup(DsZoneID aZoneId, DsGroup aGroup, const string &aNotification, ApiValuePtr aParams);
 
   protected:
 
