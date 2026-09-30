@@ -100,7 +100,8 @@ namespace p44 {
 
     /// @name persistent settings
     /// @{
-    DsClass mColorClass; 
+    DsClass mColorClass;
+    VdcControllerFunction mControllerFunction;
     /// @}
 
     /// @name internal volatile state

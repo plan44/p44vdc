@@ -675,6 +675,15 @@ typedef enum {
 } VdcUsageHint;
 
 
+/// designated zone/global controller function
+typedef enum {
+  controllerFunc_none = 0, ///< no controller function
+  controllerFunc_zone_input = 1, ///< zone scoped sensor or input (such as room temp/humidity/CO2 or temperature preset)
+  controllerFunc_appartment_input = 2, ///< sensor or input representing all zones in our scope (which is the appartment)
+  controllerFunc_building_input = 3, ///< sensor or input representing the entire building
+  controllerFunc_outside_input = 4, ///< global sensor or input representing outside/outdoor values
+} VdcControllerFunction;
+
 /// @}
 
-#endif
+#endif // !p44vdc_dsdefs_h

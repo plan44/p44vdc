@@ -37,6 +37,7 @@ DsBehaviour::DsBehaviour(Device &aDevice, const string aBehaviourId) :
   mDevice(aDevice),
   mHardwareName(""), // empty, will show behaviour ID by default
   mColorClass(class_undefined), // inherit color from device
+  mControllerFunction(controllerFunc_none), // no controller function by default
   mHardwareError(hardwareError_none),
   mHardwareErrorUpdated(p44::Never)
 {
@@ -151,7 +152,7 @@ ErrorPtr DsBehaviour::forget()
 
 /// Note: we do NOT define a `tableName()`, each specific behaviour has its own table
 
-static const size_t numFields = 1;
+static const size_t numFields = 2;
 
 size_t DsBehaviour::numFieldDefs()
 {
@@ -163,6 +164,7 @@ const FieldDefinition *DsBehaviour::getFieldDef(size_t aIndex)
 {
   static const FieldDefinition dataDefs[numFields] = {
     { "colorClass", SQLITE_INTEGER },
+    { "controllerFunc", SQLITE_INTEGER }
   };
   if (aIndex<inheritedParams::numFieldDefs())
     return inheritedParams::getFieldDef(aIndex);
@@ -179,6 +181,7 @@ void DsBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex, uin
   inheritedParams::loadFromRow(aRow, aIndex, NULL); // no common flags in base class
   // get the fields
   aRow->getCastedIfNotNull<DsClass, int>(aIndex++, mColorClass); // if not present in DB, leave it untouched (class_undefined)
+  aRow->getCastedIfNotNull<VdcControllerFunction, int>(aIndex++, mControllerFunction); // if not present in DB, leave it untouched
 }
 
 
@@ -187,6 +190,7 @@ void DsBehaviour::bindToStatement(sqlite3pp::statement &aStatement, int &aIndex,
 {
   inheritedParams::bindToStatement(aStatement, aIndex, aParentIdentifier, aCommonFlags);
   aStatement.bind(aIndex++, mColorClass);
+  aStatement.bind(aIndex++, mControllerFunction);
 }
 
 
@@ -233,6 +237,7 @@ enum {
 enum {
   colorClass_key,
   logLevelOffset_key,
+  controllerFunc_key,
   numDsBehaviourSettingsProperties
 };
 
@@ -283,6 +288,7 @@ PropertyDescriptorPtr DsBehaviour::getDescriptorByIndex(int aPropIndex, int aDom
   };
   static const PropertyDescription settingsProperties[numDsBehaviourSettingsProperties] = {
     { "x-p44-logLevelOffset", apivalue_int64, logLevelOffset_key+settings_key_offset, OKEY(dsBehaviour_Key) },
+    { "x-p44-controllerFunction", apivalue_uint64, controllerFunc_key+settings_key_offset, OKEY(dsBehaviour_Key) },
     { "colorClass", apivalue_uint64, colorClass_key+settings_key_offset, OKEY(dsBehaviour_Key) },
   };
   static const PropertyDescription stateProperties[numDsBehaviourStateProperties] = {
@@ -345,6 +351,7 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
         // settings
         case logLevelOffset_key+settings_key_offset: { int o=getLocalLogLevelOffset(); if (o==0) return false; else aPropValue->setInt32Value(o); return true; }
         case colorClass_key+settings_key_offset: aPropValue->setUint16Value(getColorClass()); return true;
+        case controllerFunc_key+settings_key_offset: aPropValue->setUint16Value(mControllerFunction); return true;
         // state
         case error_key+states_key_offset: aPropValue->setUint16Value(mHardwareError); return true;
       }
@@ -358,6 +365,9 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
           return true;
         case colorClass_key+settings_key_offset:
           setPVar(mColorClass, (DsClass)aPropValue->uint16Value());
+          return true;
+        case controllerFunc_key+settings_key_offset:
+          setPVar(mControllerFunction, (VdcControllerFunction)aPropValue->uint16Value());
           return true;
       }
     }
