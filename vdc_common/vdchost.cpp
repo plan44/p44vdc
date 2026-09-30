@@ -2536,21 +2536,21 @@ SceneNo VdcHost::getSceneIdByKind(string aSceneKindName)
 
 
 static const GroupDescriptor groupInfos[] = {
-  { group_undefined,               group_global,      "undefined",                "", 0x000000 },
-  { group_yellow_light,            group_standard,    "light",                    "🟡", 0xFFFF00 },
+  { group_undefined,               group_global,      "undefined",                "⚫️", 0x000000 },
+  { group_yellow_light,            group_standard,    "light",                    "🟡", 0xF8D849 },
   { group_grey_shadow,             group_standard,    "shadow",                   "⚪️", 0x999999 },
-  { group_blue_heating,            group_standard,    "heating",                  "🔵", 0x0000FF },
-  { group_cyan_audio,              group_standard,    "audio",                    "🟣", 0x00FFFF },
-  { group_magenta_video,           group_standard,    "video",                    "🟣", 0xFF00FF },
-  { group_red_security,            group_global,      "security",                 "🔴", 0xFF0000 },
-  { group_green_access,            group_global,      "access",                   "🟢", 0x00FF00 },
+  { group_blue_heating,            group_standard,    "heating",                  "🔵", 0x2274F7 },
+  { group_cyan_audio,              group_standard,    "audio",                    "🟣", 0x67DDE2 },
+  { group_magenta_video,           group_standard,    "video",                    "🟣", 0xDE4EEB },
+  { group_red_security,            group_global,      "security",                 "🔴", 0xC03026 },
+  { group_green_access,            group_global,      "access",                   "🟢", 0x148E24 },
   { group_black_variable,          group_application, "joker",                    "⚫️", 0x000000 },
-  { group_blue_cooling,            group_standard,    "cooling",                  "🔵", 0x0000FF },
-  { group_blue_ventilation,        group_standard,    "ventilation",              "🔵", 0x0000FF },
-  { group_blue_windows,            group_standard,    "windows",                  "🔵", 0x0000FF },
-  { group_blue_air_recirculation,  group_controller,  "air recirculation",        "🔵", 0x0000FF },
-  { group_roomtemperature_control, group_controller,  "room temperature control", "🔵", 0x0000FF },
-  { group_ventilation_control,     group_controller,  "ventilation control",      "🔵", 0x0000FF },
+  { group_blue_cooling,            group_standard,    "cooling",                  "🔵", 0x2274F7 },
+  { group_blue_ventilation,        group_standard,    "ventilation",              "🔵", 0x2274F7 },
+  { group_blue_windows,            group_standard,    "windows",                  "🔵", 0x2274F7 },
+  { group_blue_air_recirculation,  group_controller,  "air recirculation",        "🔵", 0x2274F7 },
+  { group_roomtemperature_control, group_controller,  "temperature control",      "🔵", 0x2274F7 },
+  { group_ventilation_control,     group_controller,  "ventilation control",      "🔵", 0x2274F7 },
   { group_undefined,               0 /* terminator */,"" }
 };
 
