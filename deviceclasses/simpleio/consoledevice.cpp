@@ -308,6 +308,7 @@ void ConsoleDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     ChannelBehaviourPtr ch = getChannelByIndex(i);
     if (ch && ch->needsApplying()) {
       double chVal = ch->getChannelValue();
+      double hwChVal = getOutput()->outputValueAccordingToMode(chVal, i); // possibly deactivated or binarized via threshold
       // represent full scale as 0..50 hashes
       string bar;
       double v = ch->getMin();
@@ -318,10 +319,10 @@ void ConsoleDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       }
       // show
       printf(
-         ">>> Console device %s: channel %s %s to %4.2f, transition time = %2.3f Seconds: %s\n",
+         ">>> Console device %s: channel %s %s to %4.2f (hwOut: %4.2f), transition time = %2.3f Seconds: %s\n",
          getName().c_str(), ch->getName(),
          aForDimming ? "dimmed" : "set",
-         chVal, (double)ch->transitionTimeToNewValue()/Second,
+         chVal, hwChVal, (double)ch->transitionTimeToNewValue()/Second,
          bar.c_str()
       );
       ch->channelValueApplied(); // confirm having applied the value

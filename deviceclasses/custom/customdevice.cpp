@@ -1160,7 +1160,7 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     addBehaviour(o);
   }
   else
-  #endif
+  #endif // ENABLE_CUSTOM_SINGLEDEVICE
   if (outputType=="light") {
     if (defaultGroup==group_undefined) defaultGroup = group_yellow_light;
     if (outputFunction==outputFunction_custom) outputFunction = outputFunction_dimmer;
@@ -1234,12 +1234,13 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   #endif // ENABLE_CUSTOM_EXOTIC
   else if (outputType=="heatingvalve") {
     if (defaultGroup==group_undefined) defaultGroup = group_roomtemperature_control;
+    if (outputFunction==outputFunction_custom) outputFunction = outputFunction_positional; // default to positional valve
     // - valve needs climate control scene table (ClimateControlScene)
     installSettings(DeviceSettingsPtr(new ClimateDeviceSettings(*this)));
     // - create climate control valve output
     OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_simple, hscapability_heatingAndCooling));
     cb->setGroupMembership(defaultGroup, true); // put into room temperature control group by default, NOT into standard blue)
-    cb->setHardwareOutputConfig(outputFunction_positional, outputmode_gradual, usage_room, false, 0);
+    cb->setHardwareOutputConfig(outputFunction, outputFunction==outputFunction_switch ? outputmode_binary : outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName(hardwareName);
     addBehaviour(cb);
   }

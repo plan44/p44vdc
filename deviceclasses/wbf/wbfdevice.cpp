@@ -600,7 +600,7 @@ void WbfDevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
       }
       else {
         // just output, send default channel as bri
-        targetState->add("bri", JsonObject::newInt32(ob->getChannelByType(channeltype_default)->getChannelValue()*100)); // value is in 0..10000 range for 0..100%
+        targetState->add("bri", JsonObject::newInt32(ob->channelValueAccordingToMode(ob->getChannelByType(channeltype_default)->getChannelValue(), 0)*100)); // value is in 0..10000 range for 0..100%
       }
       if (clb) {
         // color or ct light

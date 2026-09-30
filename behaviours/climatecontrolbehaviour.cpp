@@ -307,6 +307,7 @@ ClimateControlBehaviour::ClimateControlBehaviour(Device &aDevice, ClimateDeviceK
   inherited(aDevice),
   climateDeviceKind(aKind),
   mHeatingSystemCapability(aDefaultHeatingSystemCapability),
+  mOnThreshold(50), // switch binary outputs at 50%
   mHeatingSystemType(hstype_unknown),
   mClimateControlIdle(false), // assume valve active
   mClimateModeHeating(true),  // assume heating enabled
@@ -388,6 +389,19 @@ bool ClimateControlBehaviour::processControlValue(const string &aName, double aV
   }
   return inherited::processControlValue(aName, aValue);
 }
+
+
+double ClimateControlBehaviour::outputValueAccordingToMode(double aChannelValue, int aChannelIndex)
+{
+  // non-default channels and dimmable default channel
+  if (aChannelIndex!=0 || actualOutputMode()!=outputmode_binary) {
+    return inherited::outputValueAccordingToMode(aChannelValue, aChannelIndex);
+  }
+  // default channel, output mode switched -> threshold decides
+  ChannelBehaviourPtr cb = getChannelByIndex(aChannelIndex);
+  return aChannelValue >= mOnThreshold ? cb->getMax() : cb->getMin();
+}
+
 
 
 bool ClimateControlBehaviour::checkForcedOffWake()
@@ -602,7 +616,7 @@ bool ClimateControlBehaviour::performApplySceneToChannels(DsScenePtr aScene, Sce
       return false;
     }
   }
-  #endif
+  #endif // ENABLE_FCU_SUPPORT
   // let base class handle it now
   return inherited::performApplySceneToChannels(aScene, aSceneCmd);
 }
@@ -619,7 +633,7 @@ const char *ClimateControlBehaviour::tableName()
 
 // data field definitions
 
-static const size_t numFields = 2;
+static const size_t numFields = 3;
 
 size_t ClimateControlBehaviour::numFieldDefs()
 {
@@ -632,6 +646,7 @@ const FieldDefinition *ClimateControlBehaviour::getFieldDef(size_t aIndex)
   static const FieldDefinition dataDefs[numFields] = {
     { "heatingSystemCapability", SQLITE_INTEGER },
     { "heatingSystemType", SQLITE_INTEGER },
+    { "switchThreshold", SQLITE_FLOAT },
   };
   if (aIndex<inherited::numFieldDefs())
     return inherited::getFieldDef(aIndex);
@@ -652,6 +667,7 @@ void ClimateControlBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int 
   // get the fields
   aRow->getCastedIfNotNull<VdcHeatingSystemCapability, int>(aIndex++, mHeatingSystemCapability);
   aRow->getCastedIfNotNull<VdcHeatingSystemType, int>(aIndex++, mHeatingSystemType);
+  aRow->getIfNotNull<double>(aIndex++, mOnThreshold);
 }
 
 
@@ -665,6 +681,7 @@ void ClimateControlBehaviour::bindToStatement(sqlite3pp::statement &aStatement, 
   // bind the fields
   aStatement.bind(aIndex++, mHeatingSystemCapability);
   aStatement.bind(aIndex++, mHeatingSystemType);
+  aStatement.bind(aIndex++, mOnThreshold);
 }
 
 
@@ -685,6 +702,7 @@ enum {
 enum {
   heatingSystemCapability_key,
   heatingSystemType_key,
+  onThreshold_key,
   numSettingsProperties
 };
 
@@ -708,6 +726,7 @@ const PropertyDescriptorPtr ClimateControlBehaviour::getSettingsDescriptorByInde
   static const PropertyDescription properties[numSettingsProperties] = {
     { "heatingSystemCapability", apivalue_uint64, heatingSystemCapability_key+settings_key_offset, OKEY(climatecontrol_key) },
     { "heatingSystemType", apivalue_uint64, heatingSystemType_key+settings_key_offset, OKEY(climatecontrol_key) },
+    { "onThreshold", apivalue_double, onThreshold_key+settings_key_offset, OKEY(climatecontrol_key) },
   };
   int n = inherited::numSettingsProps();
   if (aPropIndex<n)
@@ -736,6 +755,9 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
         case heatingSystemType_key+settings_key_offset:
           aPropValue->setUint8Value(mHeatingSystemType);
           return true;
+        case onThreshold_key+settings_key_offset:
+          aPropValue->setDoubleValue(mOnThreshold);
+          return true;
       }
     }
     else {
@@ -747,6 +769,9 @@ bool ClimateControlBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr 
           return true;
         case heatingSystemType_key+settings_key_offset:
           setPVar(mHeatingSystemType, (VdcHeatingSystemType)aPropValue->uint8Value());
+          return true;
+        case onThreshold_key+settings_key_offset:
+          setPVar(mOnThreshold, aPropValue->doubleValue());
           return true;
       }
     }

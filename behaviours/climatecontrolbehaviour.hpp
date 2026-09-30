@@ -217,6 +217,7 @@ namespace p44 {
     /// defines how "heatingLevel" is applied to the output
     VdcHeatingSystemCapability mHeatingSystemCapability;
     VdcHeatingSystemType mHeatingSystemType;
+    double mOnThreshold; // on threshold when output mode is binary
 
     /// @}
 
@@ -272,6 +273,12 @@ namespace p44 {
     /// @note automatically resets the internal state to vs_none
     ValveService pendingServiceOperation() { ValveService s=mValveService; mValveService = vs_none; return s; };
 
+    /// Apply output-mode specific output value transformation
+    /// @param aChannelValue channel value
+    /// @param aChannelIndex channel index (might be different transformation depending on type)
+    /// @return output value limited/transformed according to outputMode
+    /// @note subclasses might implement behaviour-specific output transformations
+    virtual double outputValueAccordingToMode(double aChannelValue, int aChannelIndex) P44_OVERRIDE;
 
     /// get temperature information needed for regulation
     /// @param aCurrentTemperature will receive current zone (room) temperature

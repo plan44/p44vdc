@@ -250,7 +250,7 @@ void AnalogIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     // direct single channel PWM output, no smooth transitions
     ChannelBehaviourPtr ch = getChannelByIndex(0);
     if (ch && ch->needsApplying()) {
-      double chVal = ch->getChannelValue(true)-ch->getMin();
+      double chVal = getOutput()->outputValueAccordingToMode(ch->getChannelValue(true)-ch->getMin(),0);
       double chSpan = ch->getMax()-ch->getMin();
       mAnalogIO->setValue(chVal/chSpan*100); // 0..100%
       ch->channelValueApplied(); // confirm having applied the value
