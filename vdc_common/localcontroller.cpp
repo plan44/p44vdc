@@ -1618,9 +1618,10 @@ void TriggerList::processGlobalEvent(VdchostEvent aActivity)
 
 // MARK: - LocalController
 
-LocalController::LocalController(VdcHost &aVdcHost) :
+LocalController::LocalController(VdcHost &aVdcHost, bool aRemoteControlled) :
   mVdcHost(aVdcHost),
-  mDevicesReady(false)
+  mDevicesReady(false),
+  mRemoteControlled(aRemoteControlled)
 {
   mLocalZones.isMemberVariable();
   mLocalScenes.isMemberVariable();
@@ -1671,6 +1672,7 @@ bool LocalController::processInputChange(BinaryInputBehaviour &aBinaryInputBehav
 
 bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue)
 {
+  if (mRemoteControlled) return false; // not acted upon
   DsZoneID zoneID = aSensorBehaviour.mDevice.getZoneID();
   int area = 0;
   bool onoff = false;
@@ -1743,6 +1745,7 @@ bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, dou
 bool LocalController::processButtonClick(ButtonBehaviour &aButtonBehaviour)
 {
   LocalController::sharedLocalController()->signalActivity(); // button clicks are activity
+  if (mRemoteControlled) return false; // not acted upon
   FOCUSOLOG("processButtonClick: button = %s", aButtonBehaviour.shortDesc().c_str());
   // defaults
   DsClickType clickType = aButtonBehaviour.mClickType;
@@ -2015,6 +2018,7 @@ void LocalController::deviceChangesZone(DevicePtr aDevice, DsZoneID aFromZone, D
 bool LocalController::processNotificationToZoneAndGroup(DsZoneID aZoneId, DsGroup aGroup, const string &aNotification, ApiValuePtr aParams)
 {
   // Notes:
+  // - even in mRemoteControlled mode, we process the zone state
   // - this is called only once for notifications actually addressed to a zone and group, and the audience is not-empty
   // - this is called **before** actual delivery and can prevent it by returning false
   // - zone will be created when not yet existing in the local zones list (but this method is called only when audience is not empty)
@@ -2083,6 +2087,7 @@ bool LocalController::processNotificationToZoneAndGroup(DsZoneID aZoneId, DsGrou
 
 void LocalController::deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState)
 {
+  if (mRemoteControlled) return;
   // this is called once for every device in the audience
   ZoneDescriptorPtr zone = mLocalZones.getZoneById(aDevice->getZoneID(), false);
   if (zone && aDevice->getOutput()) {
@@ -2293,9 +2298,11 @@ enum {
   zones_key,
   scenes_key,
   triggers_key,
+  remoteControlled_key,
   numLocalControllerProperties
 };
 
+static char localcontroller_key;
 
 int LocalController::numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor)
 {
@@ -2315,6 +2322,7 @@ PropertyDescriptorPtr LocalController::getDescriptorByIndex(int aPropIndex, int 
     { "zones", apivalue_object, zones_key, OKEY(zonelist_key) },
     { "scenes", apivalue_object, scenes_key, OKEY(scenelist_key) },
     { "triggers", apivalue_object, triggers_key, OKEY(triggerlist_key) },
+    { "remoteControlled", apivalue_bool, remoteControlled_key, OKEY(localcontroller_key) },
   };
   // C++ object manages different levels, check aParentDescriptor
   if (aParentDescriptor->isRootOfObject()) {
@@ -2345,6 +2353,25 @@ PropertyContainerPtr LocalController::getContainer(const PropertyDescriptorPtr a
   // unknown here
   return inherited::getContainer(aPropertyDescriptor, aDomain);
 }
+
+
+bool LocalController::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor)
+{
+  if (aPropertyDescriptor->hasObjectKey(localcontroller_key)) {
+    if (aMode==access_read) {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case remoteControlled_key: aPropValue->setBoolValue(mRemoteControlled); return true;
+      }
+    }
+    else {
+      switch (aPropertyDescriptor->fieldKey()) {
+        case remoteControlled_key: mRemoteControlled = aPropValue->boolValue(); return true;
+      }
+    }
+  }
+  return false;
+}
+
 
 
 using namespace P44Script;

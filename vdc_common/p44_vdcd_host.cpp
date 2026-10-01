@@ -195,8 +195,8 @@ private:
 
 // MARK: - P44VdcHost
 
-P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
-  inherited(aWithLocalController, aWithPersistentChannels),
+P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels, bool aRemoteControlled) :
+  inherited(aWithLocalController, aWithPersistentChannels, aRemoteControlled),
   mWebUiPort(0)
   #if P44SCRIPT_REGISTERED_SOURCE
   ,mPlayground(sourcecode|regular|keepvars, "playground", "p44script playground", this)

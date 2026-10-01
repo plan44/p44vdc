@@ -513,7 +513,9 @@ namespace p44 {
     SceneList mLocalScenes; ///< the locally defined scenes
     TriggerList mLocalTriggers; ///< the locally defined triggers
 
-    LocalController(VdcHost &aVdcHost);
+    bool mRemoteControlled; ///< if set, controlling devices based on local sensors/inputs/buttons is disabled (assuming this to happen upstream, DS or via proxy)
+
+    LocalController(VdcHost &aVdcHost, bool aRemoteControlled);
     virtual ~LocalController();
 
     /// @return local controller, will create one if not existing
@@ -612,6 +614,7 @@ namespace p44 {
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_FINAL P44_OVERRIDE;
     virtual PropertyContainerPtr getContainer(const PropertyDescriptorPtr aPropertyDescriptor, int &aDomain) P44_FINAL P44_OVERRIDE;
     virtual PropertyDescriptorPtr getDescriptorByIndex(int aPropIndex, int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
+    bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
   };
 

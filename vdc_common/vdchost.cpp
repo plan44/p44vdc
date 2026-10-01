@@ -100,7 +100,7 @@ using namespace p44;
 
 static VdcHost *gSharedVdcHostP = nullptr;
 
-VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
+VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels, bool aRemoteControlled) :
   inheritedParams(mDSParamStore),
   mac(0),
   mNetworkConnected(true), // start with the assumption of a connected network
@@ -191,7 +191,7 @@ VdcHost::VdcHost(bool aWithLocalController, bool aWithPersistentChannels) :
   #if ENABLE_LOCALCONTROLLER
   if (aWithLocalController) {
     // create it
-    mLocalController = LocalControllerPtr(new LocalController(*this));
+    mLocalController = LocalControllerPtr(new LocalController(*this, aRemoteControlled));
   }
   #endif // ENABLE_LOCALCONTROLLER
   // initialize real time jump detection as early as possible (to catch changes happening during initialisation)

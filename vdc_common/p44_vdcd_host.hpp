@@ -444,7 +444,7 @@ namespace p44 {
     int mWebUiPort; ///< port number of the web-UI (on the same host). 0 if no Web-UI present
     string mWebUiPath; ///< path to be used in the webuiURLString
 
-    P44VdcHost(bool aWithLocalController = false, bool aWithPersistentChannels = false);
+    P44VdcHost(bool aWithLocalController = false, bool aWithPersistentChannels = false, bool aRemoteControlled = true);
 
     #if ENABLE_JSONCFGAPI
     /// enable config API

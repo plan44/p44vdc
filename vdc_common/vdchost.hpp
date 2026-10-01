@@ -253,7 +253,7 @@ namespace p44 {
 
   public:
 
-    VdcHost(bool aWithLocalController = false, bool aWithPersistentChannels = false);
+    VdcHost(bool aWithLocalController = false, bool aWithPersistentChannels = false, bool aRemoteControlled = true);
     virtual ~VdcHost();
 
     /// VdcHost is a singleton, get access to it
