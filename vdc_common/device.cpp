@@ -2300,6 +2300,7 @@ void Device::loadSettingsFromFiles()
 enum {
   // device level simple parameters
   colorClass_key,
+  dominantColorClass_key,
   zoneID_key,
   implementationId_key,
   softwareRemovable_key,
@@ -2391,6 +2392,7 @@ PropertyDescriptorPtr Device::getDescriptorByIndex(int aPropIndex, int aDomain, 
   static const PropertyDescription properties[numDeviceProperties] = {
     // common device properties
     { "primaryGroup", apivalue_uint64, colorClass_key, OKEY(device_obj) },
+    { "dominantGroup", apivalue_uint64, dominantColorClass_key, OKEY(device_obj) },
     { "zoneID", apivalue_uint64, zoneID_key, OKEY(device_obj) },
     { "implementationId", apivalue_string, implementationId_key, OKEY(device_obj) },
     { "x-p44-softwareRemovable", apivalue_bool, softwareRemovable_key, OKEY(device_obj) },
@@ -2612,6 +2614,8 @@ bool Device::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Prope
       switch (aPropertyDescriptor->fieldKey()) {
         case colorClass_key:
           aPropValue->setUint16Value(getColorClass()); return true;
+        case dominantColorClass_key:
+          aPropValue->setUint16Value(getDominantColorClass()); return true;
         case zoneID_key:
           aPropValue->setUint16Value(getZoneID()); return true;
         case implementationId_key:
