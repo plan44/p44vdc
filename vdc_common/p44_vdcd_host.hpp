@@ -546,6 +546,10 @@ namespace p44 {
     #if ENABLE_LEGACY_P44CFGAPI
     ErrorPtr processP44Request(JsonCommPtr aJsonComm, JsonObjectPtr aRequest);
     #endif
+    #endif // ENABLE_JSONCFGAPI
+
+    #if ENABLE_LEDCHAIN
+    ErrorPtr processLedDataRequest(JsonObjectPtr aRequest, string& aRawRgbResponse, JsonObjectPtr& aJsonResponse);
     #endif
 
     #if ENABLE_UBUS

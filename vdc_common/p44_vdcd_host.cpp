@@ -276,6 +276,66 @@ void P44VdcHost::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 }
 
 
+#if ENABLE_LEDCHAIN
+ErrorPtr P44VdcHost::processLedDataRequest(JsonObjectPtr aRequest, string& aRawRgbResponse, JsonObjectPtr& aJsonResponse)
+{
+  ErrorPtr err;
+  JsonObjectPtr o;
+  if (mLedChainArrangement) {
+    // which view to look at
+    P44ViewPtr view;
+    if (aRequest->get("view", o)) {
+      view = mLedChainArrangement->getRootView()->findView(o->stringValue());
+    }
+    if (!view) {
+      view = mLedChainArrangement->getRootView();
+    }
+    if (aRequest->get("dx", o)) {
+      // specific area from view
+      PixelRect area;
+      area.dx = o->int32Value();
+      area.dy = 1;
+      if (area.dx>0 && area.dy>0) {
+        if (aRequest->get("dy", o)) area.dy = o->int32Value();
+        area.x = 0;
+        if (aRequest->get("x", o)) area.x = o->int32Value();
+        area.y = 0;
+        if (aRequest->get("y", o)) area.y = o->int32Value();
+        string rawrgb;
+        view->ledRGBdata(aRawRgbResponse, area);
+      }
+    }
+    else if (aRequest->get("status", o) && o->boolValue()) {
+      // get view status
+      aJsonResponse = view->viewStatus();
+    }
+    else if (aRequest->get("configure", o)) {
+      // configure view
+      err = view->configureView(o);
+    }
+    else if (aRequest->get("cover", o) && o->boolValue()) {
+      // return the covered area
+      aJsonResponse = JsonObject::newObj();
+      PixelRect cover = mLedChainArrangement->totalCover();
+      aJsonResponse->add("x", JsonObject::newInt32(cover.x));
+      aJsonResponse->add("y", JsonObject::newInt32(cover.y));
+      aJsonResponse->add("dx", JsonObject::newInt32(cover.dx));
+      aJsonResponse->add("dy", JsonObject::newInt32(cover.dy));
+    }
+    else {
+      err = Error::err<P44VdcError>(400, "invalid leddata parameters");
+    }
+  }
+  else {
+    err = Error::err<P44VdcError>(400, "LED subsystem not initialized");
+  }
+  return err;
+}
+
+
+#endif // ENABLE_LEDCHAIN
+
+
 
 #if ENABLE_UBUS
 
@@ -295,6 +355,26 @@ static const struct blobmsg_policy vdcapi_policy[] = {
 //};
 
 
+#if P44SCRIPT_REGISTERED_SOURCE
+static const struct blobmsg_policy debugpoll_policy[] = {
+  { .name = NULL, .type = BLOBMSG_TYPE_UNSPEC },
+};
+#endif // P44SCRIPT_REGISTERED_SOURCE
+
+
+#if ENABLE_LEDCHAIN
+static const struct blobmsg_policy leddata_policy[] = {
+  { .name = NULL, .type = BLOBMSG_TYPE_UNSPEC },
+};
+#endif // ENABLE_LEDCHAIN
+
+
+#if ENABLE_P44FEATURES
+static const struct blobmsg_policy featureapi_policy[] = {
+  { .name = NULL, .type = BLOBMSG_TYPE_UNSPEC },
+};
+#endif // ENABLE_P44FEATURES
+
 
 void P44VdcHost::enableUbusApi()
 {
@@ -306,6 +386,15 @@ void P44VdcHost::enableUbusApi()
     mUbusApi->mUbusVdcdObj = new UbusObject("vdcd", boost::bind(&P44VdcHost::ubusApiRequestHandler, this, _1));
     mUbusApi->mUbusVdcdObj->addMethod("api", vdcapi_policy);
 //    mUbusApi->mUbusVdcdObj->addMethod("cfg", cfgapi_policy);
+    #if ENABLE_LEDCHAIN
+    mUbusApi->mUbusVdcdObj->addMethod("leddata", leddata_policy);
+    #endif // ENABLE_LEDCHAIN
+    #if P44SCRIPT_REGISTERED_SOURCE
+    mUbusApi->mUbusVdcdObj->addMethod("debugpoll", debugpoll_policy);
+    #endif // P44SCRIPT_REGISTERED_SOURCE
+    #if ENABLE_P44FEATURES
+    mUbusApi->mUbusVdcdObj->addMethod("featureapi", featureapi_policy);
+    #endif // ENABLE_P44FEATURES
     mUbusApi->mUbusApiServer->registerObject(mUbusApi->mUbusVdcdObj);
   }
 }
@@ -362,6 +451,42 @@ void P44VdcHost::ubusApiRequestHandler(UbusRequestPtr aUbusRequest)
       }
     }
   }
+  #if ENABLE_LEDCHAIN
+  else if (aUbusRequest->method()=="leddata") {
+    string rawrgb;
+    JsonObjectPtr response;
+    err = processLedDataRequest(aUbusRequest->msg(), rawrgb, response);
+    if (!err) {
+      if (response) {
+        aUbusRequest->sendResponse(response);
+      }
+      else {
+        // use special send-as-string response format (less data copying, same as sending json { "leddata": "RRGGBB…" }
+        aUbusRequest->sendResponse(JsonObject::newString("leddata"), UBUS_STATUS_OK, &rawrgb);
+      }
+    }
+  }
+  #endif // ENABLE_LEDCHAIN
+  #if P44SCRIPT_REGISTERED_SOURCE
+  else if (aUbusRequest->method()=="debugpoll") {
+    // poll debug essentials without this call visible in logs (to avoid log-displays-log loops)
+    JsonObjectPtr debuginfo = mScriptManager->debugPollInfo();
+    request->sendResponse(debuginfo, ErrorPtr());
+  }
+  #endif // P44SCRIPT_REGISTERED_SOURCE
+  #if ENABLE_P44FEATURES
+  else if (aUbusRequest->method()=="featureapi") {
+    // p44featured API wrapper
+    FeatureApiPtr featureApi = FeatureApi::existingSharedApi();
+    if (!featureApi) {
+      err = WebError::webErr(500, "no features instantiated, API not active");
+    }
+    else {
+      ApiRequestPtr req = ApiRequestPtr(new APICallbackRequest(aUbusRequest->msg(), boost::bind(&UbusApiRequest::sendResponse, request, _1, _2)));
+      featureApi->handleRequest(req);
+    }
+  }
+  #endif // ENABLE_P44FEATURES
   // err==NULL here means we don't have to do anything more
   // err containing an Error object here (even ErrorOK) means we must return status
   if (err) {
@@ -588,60 +713,18 @@ void P44VdcHost::configApiRequestHandler(JsonCommPtr aJsonComm, ErrorPtr aError,
       #if ENABLE_LEDCHAIN
       else if (apiselector=="leddata") {
         // raw LED data for a LED chain
-        JsonObjectPtr o;
-        if (mLedChainArrangement) {
-          // which view to look at
-          P44ViewPtr view;
-          if (request->get("view", o)) {
-            view = mLedChainArrangement->getRootView()->findView(o->stringValue());
-          }
-          if (!view) {
-            view = mLedChainArrangement->getRootView();
-          }
-          if (request->get("dx", o)) {
-            // specific area from view
-            PixelRect area;
-            area.dx = o->int32Value();
-            area.dy = 1;
-            if (area.dx>0 && area.dy>0) {
-              if (request->get("dy", o)) area.dy = o->int32Value();
-              area.x = 0;
-              if (request->get("x", o)) area.x = o->int32Value();
-              area.y = 0;
-              if (request->get("y", o)) area.y = o->int32Value();
-              string rawrgb;
-              view->ledRGBdata(rawrgb, area);
-              rawrgb += "\n"; // message terminator
-              aJsonComm->sendRaw(rawrgb);
-              return;
-            }
-          }
-          else if (request->get("status", o) && o->boolValue()) {
-            // get view status
-            sendJsonApiResponse(aJsonComm, view->viewStatus(), ErrorPtr(), reqid, *mConfigApi);
-            return;
-          }
-          else if (request->get("configure", o)) {
-            // configure view
-            aError = Error::ok(view->configureView(o));
-          }
-          else if (request->get("cover", o) && o->boolValue()) {
-            // return the covered area
-            JsonObjectPtr res = JsonObject::newObj();
-            PixelRect cover = mLedChainArrangement->totalCover();
-            res->add("x", JsonObject::newInt32(cover.x));
-            res->add("y", JsonObject::newInt32(cover.y));
-            res->add("dx", JsonObject::newInt32(cover.dx));
-            res->add("dy", JsonObject::newInt32(cover.dy));
-            sendJsonApiResponse(aJsonComm, res, ErrorPtr(), reqid, *mConfigApi);
-            return;
+        string rawrgb;
+        JsonObjectPtr response;
+        aError = processLedDataRequest(request, rawrgb, response);
+        if (!aError) {
+          if (response) {
+            sendJsonApiResponse(aJsonComm, response, ErrorPtr(), reqid, *mConfigApi);
           }
           else {
-            aError = Error::err<P44VdcError>(400, "invalid leddata parameters");
+            rawrgb += "\n"; // message terminator
+            aJsonComm->sendRaw(rawrgb);
+            return;
           }
-        }
-        else {
-          aError = Error::err<P44VdcError>(400, "LED subsystem not initialized");
         }
       }
       #endif // ENABLE_LEDCHAIN
