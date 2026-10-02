@@ -140,6 +140,9 @@ namespace p44 {
     /// get group
     virtual DsGroup getGroup() { return group_undefined; /* not defined in base class */ };
 
+    /// get group
+    VdcControllerFunction getControllerFunction() { return mControllerFunction; };
+
     /// get color class
     /// @note if no colorClass is explicitly set (`colorClass` property), this
     ///   returns the color class derived from the behaviour's group, and if that does not

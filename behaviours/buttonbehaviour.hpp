@@ -246,6 +246,9 @@ namespace p44 {
     /// get operation level (how good/critical the operation state of the underlying device is)
     virtual int getSourceOpLevel() P44_OVERRIDE;
 
+    /// get info object
+    virtual ScriptObjPtr getInfo() P44_OVERRIDE;
+
     /// @}
 
     #endif // ENABLE_LOCALCONTROLLER && ENABLE_P44SCRIPT

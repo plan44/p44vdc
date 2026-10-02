@@ -175,6 +175,9 @@ const ScriptObjPtr ValueSourceObj::memberByName(const string aName, TypeInfo aMe
   else if (uequals(aName, "sourceID")) {
     if (mValueSource) val = new StringValue(mValueSource->getSourceId());
   }
+  else if (uequals(aName, "info")) {
+    if (mValueSource) val = mValueSource->getInfo();
+  }
   return val;
 }
 
@@ -185,6 +188,7 @@ void ValueSourceMapper::appendMemberNames(FieldNameList& aList, TypeInfo aIntere
   aList.push_back("valid");
   aList.push_back("oplevel");
   aList.push_back("sourceID");
+  aList.push_back("info");
 }
 
 

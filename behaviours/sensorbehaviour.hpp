@@ -228,6 +228,8 @@ namespace p44 {
     /// @return the sensor type
     VdcSensorType getSensorType() { return mSensorType; };
 
+    VdcUsageHint getUsage() { return mSensorUsage; }
+
     /// get the update interval
     /// @return the update interval
     MLMicroSeconds getUpdateInterval() { return mUpdateInterval; };
@@ -332,6 +334,9 @@ namespace p44 {
 
     /// get operation level (how good/critical the operation state of the underlying device is)
     virtual int getSourceOpLevel() P44_OVERRIDE;
+
+    /// get info object
+    virtual ScriptObjPtr getInfo() P44_OVERRIDE;
 
     /// @}
     #endif // ENABLE_P44SCRIPT

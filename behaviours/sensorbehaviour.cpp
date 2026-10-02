@@ -612,6 +612,23 @@ int SensorBehaviour::getSourceOpLevel()
   return mDevice.opStateLevel();
 }
 
+
+ScriptObjPtr SensorBehaviour::getInfo()
+{
+  ObjectValuePtr info = new ObjectValue;
+  info->setMemberByName("behaviour", new StringValue(behaviourTypeIdentifier()));
+  info->setMemberByName("unit", new StringValue(valueUnitName(getSensorUnit(), false)));
+  info->setMemberByName("symbol", new StringValue(valueUnitName(getSensorUnit(), true)));
+  info->setMemberByName("type", new StringValue(sensorTypeIds[getSensorType()]));
+  info->setMemberByName("usage", new NumericValue(getUsage()));
+  info->setMemberByName("min", new NumericValue(getMin()));
+  info->setMemberByName("max", new NumericValue(getMax()));
+  info->setMemberByName("resolution", new NumericValue(getResolution()));
+  return info;
+}
+
+
+
 #endif // ENABLE_P44SCRIPT
 
 
@@ -936,7 +953,7 @@ void SensorBehaviour::loadFromRow(sqlite3pp::query::iterator &aRow, int &aIndex,
   aRow->getIfNotNull(aIndex++, mRRDBpath);
   // make sure logging is ready (if enabled at all)
   prepareLogging();
-  #endif
+  #endif // ENABLE_RRDB
   #if !REDUCED_FOOTPRINT
   aRow->getCastedIfNotNull<VdcSensorFunc, int>(aIndex++, mSensorFunc);
   aRow->getCastedIfNotNull<DsChannelType, int>(aIndex++, mSensorChannel);
@@ -1179,7 +1196,7 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case rrdbConfig_key+settings_key_offset:
           aPropValue->setStringValue(mRRDBconfig);
           return true;
-        #endif
+        #endif // ENABLE_RRDB
         // States properties
         case value_key+states_key_offset:
           // value
@@ -1224,7 +1241,7 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
         case sync_key+settings_key_offset:
           setPVar(mDialSyncMode, (VdcDialSyncMode)aPropValue->int32Value());
           return true;
-        #endif
+        #endif // !REDUCED_FOOTPRINT
         case minPushInterval_key+settings_key_offset:
           setPVar(mMinPushInterval, (MLMicroSeconds)(aPropValue->doubleValue()*Second));
           return true;
@@ -1236,7 +1253,7 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
           // volatile, does not make settings dirty
           mBridgeExclusive = aPropValue->boolValue();
           return true;
-        #endif
+        #endif // ENABLE_JSONBRIDGEAPI
         case moderated_key+settings_key_offset:
           // volatile, does not make settings dirty
           defaultModeration(aPropValue->boolValue());
@@ -1254,7 +1271,7 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
             prepareLogging();
           }
           return true;
-        #endif
+        #endif // ENABLE_RRDB
       }
     }
   }

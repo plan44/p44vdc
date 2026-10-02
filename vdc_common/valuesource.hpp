@@ -73,6 +73,10 @@ namespace p44 {
     /// @return the current value
     virtual double getSourceValue() = 0;
 
+    /// get info object
+    /// @return a structured value with info such as unit, usage or null if none available
+    virtual ScriptObjPtr getInfo() { return new AnnotatedNullValue("no valuesource info available"); };
+
     /// get last update
     /// @return the timestamp of when the source was last updated. Never means that there is no current value
     virtual MLMicroSeconds getSourceLastUpdate() = 0;

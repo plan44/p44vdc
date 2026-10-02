@@ -174,6 +174,16 @@ int ChannelBehaviour::getSourceOpLevel()
   return mOutput.mDevice.opStateLevel();
 }
 
+
+ScriptObjPtr ChannelBehaviour::getInfo()
+{
+  ObjectValuePtr info = new ObjectValue;
+  info->setMemberByName("behaviour", new StringValue("outputchannel"));
+  return info;
+}
+
+
+
 #endif // P44SCRIPT_FULL_SUPPORT
 
 

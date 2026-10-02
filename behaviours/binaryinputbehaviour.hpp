@@ -124,6 +124,8 @@ namespace p44 {
     /// make button bridge exclusive, i.e. not causing any local or DS actions
     void setBridgeExclusive();
 
+    VdcUsageHint getUsage() { return mInputUsage; }
+
     /// @name interface towards actual device hardware (or simulation)
     /// @{
 
@@ -176,8 +178,11 @@ namespace p44 {
     /// get operation level (how good/critical the operation state of the underlying device is)
     virtual int getSourceOpLevel() P44_OVERRIDE;
 
+    /// get info object
+    virtual ScriptObjPtr getInfo() P44_OVERRIDE;
+
     /// @}
-    #endif
+    #endif // ENABLE_P44SCRIPT
 
 
     /// description of object, mainly for debug and logging

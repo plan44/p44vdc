@@ -1024,6 +1024,18 @@ int ButtonBehaviour::getSourceOpLevel()
   return mDevice.opStateLevel();
 }
 
+
+ScriptObjPtr ButtonBehaviour::getInfo()
+{
+  ObjectValuePtr info = new ObjectValue;
+  info->setMemberByName("behaviour", new StringValue(behaviourTypeIdentifier()));
+  info->setMemberByName("function", new IntegerValue(mButtonFunc));
+  info->setMemberByName("mode", new IntegerValue(mButtonMode));
+  info->setMemberByName("channel", new IntegerValue(mButtonChannel));
+  return info;
+}
+
+
 #endif // ENABLE_LOCALCONTROLLER
 
 // MARK: - persistence implementation
