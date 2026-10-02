@@ -33,6 +33,7 @@
 
 #include "outputbehaviour.hpp"
 #include "buttonbehaviour.hpp"
+#include "binaryinputbehaviour.hpp"
 #include "sensorbehaviour.hpp"
 #include "simplescene.hpp"
 
@@ -187,7 +188,7 @@ static ScriptObjPtr lastSceneStateObj(SceneNo aLastSceneNo)
   ScriptObjPtr obj = new ObjectValue;
   ScriptObjPtr val;
   if (aLastSceneNo==INVALID_SCENE_NO) val = new AnnotatedNullValue("no scene called");
-  else val = new NumericValue(aLastSceneNo);
+  else val = new IntegerValue(aLastSceneNo);
   obj->setMemberByName("scene", val);
   return obj;
 }
@@ -339,6 +340,22 @@ void ZoneDescriptor::reportZoneState(const string& aReason, DsGroup aAffectedGro
     VdcHost::sharedVdcHost()->pushNotification(api, q, e);
   }
   #endif // ENABLE_GENERIC_API_PUSH
+}
+
+
+
+void ZoneDescriptor::processZoneSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue)
+{
+  // TODO: enhance, like averaging etc.
+  // process sensors relevant for room temperature
+  if (aSensorBehaviour.getSensorType()==sensorType_temperature && aSensorBehaviour.getUsage()==usage_room) {
+    mZoneState.mCurrentTemp = aCurrentValue;
+    reportZoneState("sensor", group_roomtemperature_control);
+  }
+  else if (aSensorBehaviour.getSensorType()==sensorType_temperature && aSensorBehaviour.getUsage()==usage_user) {
+    mZoneState.mTempSetPoint = aCurrentValue;
+    reportZoneState("user", group_roomtemperature_control);
+  }
 }
 
 
@@ -1707,14 +1724,84 @@ void LocalController::processGlobalEvent(VdchostEvent aActivity)
 }
 
 
+static const char* controllerFunctionText(VdcControllerFunction aControllerFunction)
+{
+  switch (aControllerFunction) {
+    case controllerFunc_none: return "none";
+    case controllerFunc_zone_input: return "zone";
+    case controllerFunc_appartment_input: return "appartment";
+    case controllerFunc_building_input: return "building";
+    case controllerFunc_outside_input: return "outside";
+    default: return "unknown";
+  }
+}
+
+
 bool LocalController::processInputChange(BinaryInputBehaviour &aBinaryInputBehaviour, int aCurrentState, int aPreviousState)
 {
+  // check for scoped inputs
+  VdcControllerFunction cf = aBinaryInputBehaviour.getControllerFunction();
+  if (cf!=controllerFunc_none) {
+    DsZoneID zoneID = aBinaryInputBehaviour.getDevice().getZoneID();
+    DsGroup group = aBinaryInputBehaviour.getGroup();
+    if (cf==controllerFunc_zone_input) {
+      // notify the ZoneDescriptor for default functionality
+      ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID);
+      if (zone) {
+        SOLOG(aBinaryInputBehaviour, LOG_NOTICE, "zone function for '%s': new input state: %d", zone->getName().c_str(), aCurrentState);
+        //zone->processZoneInputChange(aBinaryInputBehaviour, aCurrentState, aPreviousState);
+      }
+    }
+    // send to event sinks of localcontroller
+    // TODO: generalize for inputs and buttons
+    if (hasSinks()) {
+      ObjectValuePtr e = new ObjectValue;
+      e->setMemberByName("event", new StringValue("controllerinput"));
+      e->setMemberByName("controllerfunction", new StringValue(controllerFunctionText(cf)));
+      e->setMemberByName("zoneID", new IntegerValue(zoneID));
+      e->setMemberByName("group", new IntegerValue(group));
+      e->setMemberByName("previousvalue", new IntegerValue(aPreviousState));
+      e->setMemberByName("value", new ValueSourceObj(&aBinaryInputBehaviour));
+      sendEvent(e);
+    }
+  }
+  // local actions
+  if (mRemoteControlled) return false; // not acted upon
+  // TODO: maybe there are direct actions like bell to add here
   return false; // NOP
 }
 
 
+
 bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue)
 {
+  // check for scoped sensors
+  VdcControllerFunction cf = aSensorBehaviour.getControllerFunction();
+  if (cf!=controllerFunc_none) {
+    DsZoneID zoneID = aSensorBehaviour.getDevice().getZoneID();
+    DsGroup group = aSensorBehaviour.getGroup();
+    if (cf==controllerFunc_zone_input) {
+      // notify the ZoneDescriptor for default functionality
+      ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID);
+      if (zone) {
+        SOLOG(aSensorBehaviour, LOG_NOTICE, "zone function for '%s': new input state: %.3f", zone->getName().c_str(), aCurrentValue);
+        zone->processZoneSensorChange(aSensorBehaviour, aCurrentValue, aPreviousValue);
+      }
+    }
+    // send to event sinks of localcontroller
+    // TODO: generalize for inputs and buttons
+    if (hasSinks()) {
+      ObjectValuePtr e = new ObjectValue;
+      e->setMemberByName("event", new StringValue("controllerinput"));
+      e->setMemberByName("controllerfunction", new StringValue(controllerFunctionText(cf)));
+      e->setMemberByName("zoneID", new IntegerValue(zoneID));
+      e->setMemberByName("group", new IntegerValue(group));
+      e->setMemberByName("previousvalue", new NumericValue(aPreviousValue));
+      e->setMemberByName("value", new ValueSourceObj(&aSensorBehaviour));
+      sendEvent(e);
+    }
+  }
+  // local actions
   if (mRemoteControlled) return false; // not acted upon
   DsZoneID zoneID = aSensorBehaviour.mDevice.getZoneID();
   int area = 0;
@@ -2124,8 +2211,6 @@ bool LocalController::processNotificationToZoneAndGroup(DsZoneID aZoneId, DsGrou
   return true; // must return true, otherwise delivery of this notification is prevented!
 }
 
-  
-#warning "todo: process zone relevant sensors"
 
 
 void LocalController::deviceWillApplyNotification(DevicePtr aDevice, NotificationDeliveryState &aDeliveryState)
@@ -2487,7 +2572,7 @@ static ScriptObjPtr affectedgroup_accessor(BuiltInMemberLookup& aMemberLookup, S
 {
   ZoneObj* z = dynamic_cast<ZoneObj*>(aParentObj.get());
   assert(z);
-  return new IntegerValue(z->zone()->getZoneId());
+  return new IntegerValue(z->affectedGroup());
 }
 
 
@@ -2890,6 +2975,21 @@ static void zoneevent_func(BuiltinFunctionContextPtr f)
 }
 
 
+// controllerevent()
+// TODO: maybe add filters
+FUNC_ARG_DEFS(controllerevent, { text|numeric|null|optionalarg }, { text|numeric|null|optionalarg }, { text|optionalarg } );
+static void controllerevent_func(BuiltinFunctionContextPtr f)
+{
+  f->finish(
+    new OneShotEventNullValue(
+      LocalController::sharedLocalController().get(), // controller is the event emitter
+      "no controller event now"
+      // ,filter // TODO: add filters
+    )
+  );
+}
+
+
 static const BuiltinMemberDescriptor localControllerFuncs[] = {
   FUNC_DEF_W_ARG(trigger, executable|anyvalid),
   FUNC_DEF_W_ARG(scene, executable|anyvalid),
@@ -2900,6 +3000,7 @@ static const BuiltinMemberDescriptor localControllerFuncs[] = {
   FUNC_DEF_W_ARG(zone, executable|objectvalue),
   FUNC_DEF_W_ARG(zoneevent, executable|objectvalue),
   FUNC_DEF_W_ARG(setcontrolvalue, executable|objectvalue),
+  FUNC_DEF_W_ARG(controllerevent, executable|objectvalue),
   BUILTINS_TERMINATOR
 };
 

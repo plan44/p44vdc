@@ -152,6 +152,9 @@ namespace p44 {
 
     ScriptObjPtr getGroupState(DsGroup aGroup) { return mZoneState.getGroupState(aGroup); }
 
+    void processZoneSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue);
+
+
   protected:
 
     // property access implementation
@@ -496,7 +499,7 @@ namespace p44 {
 
   /// local controller
   /// manages local zones, scenes, triggers
-  class LocalController : public PropertyContainer
+  class LocalController : public PropertyContainer, public EventSource
   {
     typedef PropertyContainer inherited;
     friend class ZoneDescriptor;
@@ -607,6 +610,7 @@ namespace p44 {
     /// @return the method can return false to suppress actual delivery to the addressed audience
     bool processNotificationToZoneAndGroup(DsZoneID aZoneId, DsGroup aGroup, const string &aNotification, ApiValuePtr aParams);
 
+
   protected:
 
     // property access implementation
@@ -619,6 +623,7 @@ namespace p44 {
 
 
   namespace P44Script {
+
 
     /// represents changed zone state
     class ZoneObj : public StructuredLookupObject
