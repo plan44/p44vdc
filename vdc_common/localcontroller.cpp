@@ -182,6 +182,43 @@ void ZoneState::getApiRepresentation(ApiValuePtr aApiObjectValue)
 }
 
 
+static ScriptObjPtr lastSceneStateObj(SceneNo aLastSceneNo)
+{
+  ScriptObjPtr obj = new ObjectValue;
+  ScriptObjPtr val;
+  if (aLastSceneNo==INVALID_SCENE_NO) val = new AnnotatedNullValue("no scene called");
+  else val = new NumericValue(aLastSceneNo);
+  obj->setMemberByName("scene", val);
+  return obj;
+}
+
+#define NUM_SCRIPT_VALUE(t) (t==INVALID_NUM ? ScriptObjPtr(new AnnotatedNullValue("unknown")) : ScriptObjPtr(new NumericValue(t)))
+
+ScriptObjPtr ZoneState::getGroupState(DsGroup aGroup)
+{
+  ScriptObjPtr state = lastSceneStateObj(lastSceneFor(aGroup));
+  switch (aGroup) {
+    case group_yellow_light:
+    case group_grey_shadow:
+      // additionally have room/area state
+      state->setMemberByName("room", new BoolValue(stateFor(aGroup, 0)));
+      for (int a=1; a<=4; a++) {
+        state->setMemberByName(string_format("area%d", a), new BoolValue(stateFor(aGroup, a)));
+      }
+      break;
+    case group_roomtemperature_control:
+      state->setMemberByName("TemperatureZone", NUM_SCRIPT_VALUE(mCurrentTemp));
+      state->setMemberByName("TemperatureSetPoint", NUM_SCRIPT_VALUE(mTempSetPoint));
+      state->setMemberByName("heatingLevel", NUM_SCRIPT_VALUE(mTempSetPoint));
+      break;
+    default:
+      break;
+  }
+  return state;
+}
+
+
+
 // MARK: - ZoneDescriptor
 
 ZoneDescriptor::ZoneDescriptor() :
@@ -281,10 +318,8 @@ size_t ZoneDescriptor::devicesInZone() const
 void ZoneDescriptor::reportZoneState(const string& aReason, DsGroup aAffectedGroup)
 {
   // notify listeners
-  #if ENABLE_P44SCRIPT
   // send event
-  sendStateEvent(aAffectedGroup);
-  #endif
+  LocalController::sharedLocalController()->mLocalZones.sendZoneEvent(this, aAffectedGroup, aReason);
   // Note: for now we do not push zone states to bridges, because there's no use for those there
   #if ENABLE_GENERIC_API_PUSH
   // when we have a webui capable of receiving pushes, always push
@@ -305,6 +340,7 @@ void ZoneDescriptor::reportZoneState(const string& aReason, DsGroup aAffectedGro
   }
   #endif // ENABLE_GENERIC_API_PUSH
 }
+
 
 
 // MARK: - ZoneDescriptor persistence
@@ -529,7 +565,7 @@ ZoneDescriptorPtr ZoneList::getZoneById(DsZoneID aZoneId, bool aCreateNewIfNotEx
 }
 
 
-ZoneDescriptorPtr ZoneList::getZoneByName(const string aZoneName)
+ZoneDescriptorPtr ZoneList::getZoneByNameOrId(const string aZoneName)
 {
   int numName = -1;
   sscanf(aZoneName.c_str(), "%d", &numName);
@@ -547,11 +583,18 @@ ZoneDescriptorPtr ZoneList::getZoneByName(const string aZoneName)
 
 int ZoneList::getZoneIdByName(const string aZoneNameOrId)
 {
-  ZoneDescriptorPtr zone = getZoneByName(aZoneNameOrId);
+  ZoneDescriptorPtr zone = getZoneByNameOrId(aZoneNameOrId);
   if (zone) return zone->getZoneId();
   int zi;
   if (sscanf(aZoneNameOrId.c_str(), "%d", &zi)==1) return zi;
   return -1;
+}
+
+
+void ZoneList::sendZoneEvent(ZoneDescriptorPtr aZone, DsGroup aAffectedGroup, const string& aReason)
+{
+  if (!hasSinks()) return; // optimisation
+  sendEvent(new ZoneObj(aZone, aAffectedGroup, aReason));
 }
 
 
@@ -2378,16 +2421,41 @@ using namespace P44Script;
 
 // MARK: - Local controller specific functions
 
-void ZoneDescriptor::sendStateEvent(DsGroup aAffectedGroup)
+// MARK: Zone state
+
+#define NO_ZONE 0xFFFF
+
+class ZoneFilter : public EventFilter
 {
-  if (!hasSinks()) return; // optimisation
-#warning "TODO: implement"
-  return;
-  //sendEvent(new ZoneStateObj(this, aAffectedGroup));
-}
+  DsZoneID mZoneIDFilter; // which zone - NO_ZONE = all, 0 = appartment only
+  DsGroup mGroupNoFilter; // which affected group - 0/group_undefined = all groups
+  string mReasonFilter; // which reason
+public:
+  ZoneFilter(DsZoneID aZoneIDFilter, DsGroup aGroupNoFilter, const string& aReasonFilter) :
+    mZoneIDFilter(aZoneIDFilter), mGroupNoFilter(aGroupNoFilter), mReasonFilter(aReasonFilter) {};
+
+  virtual bool filteredEventObj(ScriptObjPtr &aEventObj) P44_OVERRIDE
+  {
+    if (!aEventObj) return false;
+    ZoneObj* z = dynamic_cast<ZoneObj*>(aEventObj.get());
+    assert(z);
+    if (mZoneIDFilter!=NO_ZONE) {
+      // we have a zone filter
+      if (mZoneIDFilter!=z->zone()->getZoneId()) return false;  // wrong zone
+    }
+    if (mGroupNoFilter!=group_undefined) {
+      if (mGroupNoFilter!=z->affectedGroup()) return false; // wrong affected group
+    }
+    if (!mReasonFilter.empty()) {
+      if (mReasonFilter!=z->eventReason()) return false; // not the event we are waiting for
+    }
+    // message passes filter, can be forwarded as-is
+    return true;
+  }
+};
 
 
-// ZoneStateObj
+// ZoneObj
 // - needs to have the zoneID, name included
 // - needs to include affectedGroup, too
 // filterable zonevent() value source
@@ -2398,6 +2466,153 @@ void ZoneDescriptor::sendStateEvent(DsGroup aAffectedGroup)
 // - provide automatic standard processing of those -> just emit controlvalues 1:1
 // - flag to disable standard processing, allow more sophisticated multi-sensor ave
 
+
+static ScriptObjPtr zoneid_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite, BuiltinMemberDescriptor*)
+{
+  ZoneObj* z = dynamic_cast<ZoneObj*>(aParentObj.get());
+  assert(z);
+  return new IntegerValue(z->zone()->getZoneId());
+}
+
+
+static ScriptObjPtr name_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite, BuiltinMemberDescriptor*)
+{
+  ZoneObj* z = dynamic_cast<ZoneObj*>(aParentObj.get());
+  assert(z);
+  return new StringValue(z->zone()->getName());
+}
+
+
+static ScriptObjPtr affectedgroup_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite, BuiltinMemberDescriptor*)
+{
+  ZoneObj* z = dynamic_cast<ZoneObj*>(aParentObj.get());
+  assert(z);
+  return new IntegerValue(z->zone()->getZoneId());
+}
+
+
+static ScriptObjPtr reason_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite, BuiltinMemberDescriptor*)
+{
+  ZoneObj* z = dynamic_cast<ZoneObj*>(aParentObj.get());
+  assert(z);
+  return new StringValue(z->eventReason());
+}
+
+
+
+// state(group_no_or_name)
+FUNC_ARG_DEFS(state, { text } );
+static void state_func(BuiltinFunctionContextPtr f)
+{
+  ZoneObj* z = dynamic_cast<ZoneObj*>(f->thisObj().get());
+  assert(z);
+  const GroupDescriptor* gdP = VdcHost::groupInfoByNameOrNo(f->arg(0)->stringValue());
+  ScriptObjPtr state;
+  if (gdP) {
+    state = z->zone()->getGroupState(gdP->no);
+  }
+  if (!state) {
+    state = new AnnotatedNullValue("no group zone state");
+  }
+  f->finish(state);
+}
+
+
+// setcontrolvalue(name, value) // send to all devices (zone0) with no group
+// setcontrolvalue(name, value, zone_or_device) // send to devices in zone of any group
+// setcontrolvalue(name, value, zone_or_device, groupname_or_id) // send to devices in zone that are member of specified group
+FUNC_ARG_DEFS(setcontrolvalue, { text }, { numeric }, { text|numeric|optionalarg }, { text|numeric|optionalarg } );
+static void setcontrolvalue_func(BuiltinFunctionContextPtr f)
+{
+  ZoneObj* z = dynamic_cast<ZoneObj*>(f->thisObj().get());
+  assert(z);
+  string name = f->arg(0)->stringValue();
+  double value = f->arg(1)->doubleValue();
+
+  DevicePtr device;
+  DsZoneID zoneid = 0;
+  DsGroup group = group_undefined;
+  if (f->numArgs()>2) {
+    ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByNameOrId(f->arg(1)->stringValue());
+    if (zone) {
+      // is a zone
+      zoneid = zone->getZoneId();
+    }
+    else {
+      // might be a device
+      device = VdcHost::sharedVdcHost()->getDeviceByNameOrDsUid(f->arg(2)->stringValue());
+      if (!device) {
+        f->finish(new ErrorValue(ScriptError::NotFound, "Zone or Device '%s' not found", f->arg(1)->stringValue().c_str()));
+      }
+    }
+    if (f->numArgs()>3) {
+      const GroupDescriptor* gdP = VdcHost::groupInfoByNameOrNo(f->arg(3)->stringValue());
+      if (!gdP) {
+        f->finish(new ErrorValue(ScriptError::NotFound, "Group '%s' not found", f->arg(1)->stringValue().c_str()));
+      }
+      group = gdP->no;
+    }
+  }
+  // issue to audience
+  NotificationAudience audience;
+  if (device) {
+    VdcHost::sharedVdcHost()->addToAudienceByDsuid(audience, device->getDsUid());
+  }
+  else {
+    VdcHost::sharedVdcHost()->addToAudienceByZoneAndGroup(audience, zoneid, group);
+  }
+  JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
+  params->setType(apivalue_object);
+  // { "notification":"saveScene", "zone_id":0, "group":1, "scene":5 }
+  string method = "setControlValue";
+  params->add("name", params->newString(name));
+  params->add("value", params->newDouble(value));
+  VdcHost::sharedVdcHost()->deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
+  f->finish();
+}
+
+
+static const BuiltinMemberDescriptor zoneMembers[] = {
+  MEMBER_DEF(zoneid, builtinvalue),
+  MEMBER_DEF(name, builtinvalue),
+  MEMBER_DEF(affectedgroup, builtinvalue),
+  MEMBER_DEF(reason, builtinvalue),
+  FUNC_DEF_W_ARG(state, executable|objectvalue),
+  BUILTINS_TERMINATOR
+};
+
+
+static BuiltInMemberLookup* sharedZoneMemberLookupP = NULL;
+
+ZoneObj::ZoneObj(ZoneDescriptorPtr aZoneDescriptor, DsGroup aAffectedGroup, const string& aReason) :
+  mZone(aZoneDescriptor),
+  mAffectedGroup(aAffectedGroup),
+  mReason(aReason)
+{
+  registerSharedLookup(sharedZoneMemberLookupP, zoneMembers);
+}
+
+
+void ZoneObj::deactivate()
+{
+  mZone.reset();
+  inherited::deactivate();
+}
+
+
+string ZoneObj::getAnnotation() const
+{
+  return "Zone info";
+}
+
+
+TypeInfo ZoneObj::getTypeInfo() const
+{
+  return inherited::getTypeInfo()|keeporiginal|freezable;
+}
+
+
+// MARK: Triggers
 
 // trigger('triggername')    execute a trigger's action script
 FUNC_ARG_DEFS(trigger, { text } );
@@ -2430,7 +2645,7 @@ static bool findSceneAndTarget(int &ai, BuiltinFunctionContextPtr f, SceneNo &aS
     }
     // get zone or device
     aDevice.reset();
-    ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByName(f->arg(1)->stringValue());
+    ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByNameOrId(f->arg(1)->stringValue());
     if (zone) {
       // is a zone
       aZoneid = zone->getZoneId();
@@ -2522,7 +2737,7 @@ static void scene_func(BuiltinFunctionContextPtr f)
   }
   // targeting zone, there might be an extra group arg
   if (f->numArgs()>ai) {
-    const GroupDescriptor* gdP = VdcHost::groupInfoByName(f->arg(ai)->stringValue());
+    const GroupDescriptor* gdP = VdcHost::groupInfoByNameOrNo(f->arg(ai)->stringValue());
     if (!gdP) {
       f->finish(new ErrorValue(ScriptError::NotFound, "unknown group '%s'", f->arg(ai)->stringValue().c_str()));
       return;
@@ -2554,7 +2769,7 @@ static void savescene_func(BuiltinFunctionContextPtr f)
   }
   // targeting zone, there might be an extra group arg
   if (f->numArgs()>ai) {
-    const GroupDescriptor* gdP = VdcHost::groupInfoByName(f->arg(ai)->stringValue());
+    const GroupDescriptor* gdP = VdcHost::groupInfoByNameOrNo(f->arg(ai)->stringValue());
     if (!gdP) {
       f->finish(new ErrorValue(ScriptError::NotFound, "unknown group '%s'", f->arg(ai)->stringValue().c_str()));
       return;
@@ -2595,11 +2810,11 @@ static void set_func(BuiltinFunctionContextPtr f)
     channelId = f->arg(3)->stringValue();
   }
   // get zone or device
-  if (ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByName(f->arg(0)->stringValue())) {
+  if (ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByNameOrId(f->arg(0)->stringValue())) {
     // - might have an optional group argument
     DsGroup group = group_yellow_light; // default to light
     if (f->numArgs()>4) {
-      const GroupDescriptor* gdP = VdcHost::groupInfoByName(f->arg(4)->stringValue());
+      const GroupDescriptor* gdP = VdcHost::groupInfoByNameOrNo(f->arg(4)->stringValue());
       if (!gdP) {
         f->finish(new ErrorValue(ScriptError::NotFound, "unknown group '%s'", f->arg(4)->stringValue().c_str()));
         return;
@@ -2626,6 +2841,55 @@ static void set_func(BuiltinFunctionContextPtr f)
 }
 
 
+// zone(zone_name_or_id)
+FUNC_ARG_DEFS(zone, { text|numeric } );
+static void zone_func(BuiltinFunctionContextPtr f)
+{
+  ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByNameOrId(f->arg(0)->stringValue());
+  if (!zone) {
+    f->finish(new ErrorValue(ScriptError::NotFound, "no zone named '%s' found", f->arg(0)->stringValue().c_str()));
+    return;
+  }
+  f->finish(new ZoneObj(zone));
+}
+
+
+// zoneevent(zone_filter, group_filter, reason_filter)
+FUNC_ARG_DEFS(zoneevent, { text|numeric|null|optionalarg }, { text|numeric|null|optionalarg }, { text|optionalarg } );
+static void zoneevent_func(BuiltinFunctionContextPtr f)
+{
+  DsZoneID zoneFilter = NO_ZONE; // all zones
+  DsGroup affectedGroupFilter = group_undefined; // all groups
+  string reasonFilter;
+  if (f->arg(0)->defined()) {
+    ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByNameOrId(f->arg(0)->stringValue());
+    if (!zone) {
+      f->finish(new ErrorValue(ScriptError::NotFound, "no zone named '%s' found", f->arg(0)->stringValue().c_str()));
+      return;
+    }
+    zoneFilter = zone->getZoneId();
+  }
+  if (f->arg(1)->defined()) {
+    const GroupDescriptor* gdP = VdcHost::groupInfoByNameOrNo(f->arg(1)->stringValue());
+    if (!gdP) {
+      f->finish(new ErrorValue(ScriptError::NotFound, "no group named '%s' found", f->arg(1)->stringValue().c_str()));
+      return;
+    }
+    affectedGroupFilter = gdP->no;
+  }
+  if (f->arg(2)->defined()) {
+    reasonFilter = f->arg(2)->stringValue();
+  }
+  f->finish(
+    new OneShotEventNullValue(
+      &LocalController::sharedLocalController()->mLocalZones, // localzones is the event emitter
+      "no zone event now",
+      new ZoneFilter(zoneFilter, affectedGroupFilter, reasonFilter)
+    )
+  );
+}
+
+
 static const BuiltinMemberDescriptor localControllerFuncs[] = {
   FUNC_DEF_W_ARG(trigger, executable|anyvalid),
   FUNC_DEF_W_ARG(scene, executable|anyvalid),
@@ -2633,6 +2897,9 @@ static const BuiltinMemberDescriptor localControllerFuncs[] = {
   FUNC_DEF_C_ARG(sceneno, executable|numeric, sceneid_no),
   FUNC_DEF_W_ARG(savescene, executable|anyvalid),
   FUNC_DEF_W_ARG(set, executable|anyvalid),
+  FUNC_DEF_W_ARG(zone, executable|objectvalue),
+  FUNC_DEF_W_ARG(zoneevent, executable|objectvalue),
+  FUNC_DEF_W_ARG(setcontrolvalue, executable|objectvalue),
   BUILTINS_TERMINATOR
 };
 

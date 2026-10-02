@@ -715,7 +715,7 @@ namespace p44 {
     static const GroupDescriptor* groupInfo(DsGroup aGroup);
 
     /// get info about a group by name
-    static const GroupDescriptor* groupInfoByName(const string aGroupName);
+    static const GroupDescriptor* groupInfoByNameOrNo(const string aGroupName);
 
     /// get scene kind descriptor by sceneNo (and aIsGlobal)
     /// @param aSceneNo the scene number to get the descriptor for

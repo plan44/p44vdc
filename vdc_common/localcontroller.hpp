@@ -94,6 +94,8 @@ namespace p44 {
 
     void getApiRepresentation(ApiValuePtr aApiObjectValue);
 
+    ScriptObjPtr getGroupState(DsGroup aGroup);
+
   };
 
 
@@ -101,9 +103,6 @@ namespace p44 {
   /// holds information about a zone
   class ZoneDescriptor :
     public PropertyContainer, public PersistentParams
-    #if ENABLE_P44SCRIPT
-    ,public EventSource
-    #endif
   {
     typedef PropertyContainer inherited;
     typedef PersistentParams inheritedParams;
@@ -151,11 +150,9 @@ namespace p44 {
     /// @param aAffectedGroup the affected group
     void reportZoneState(const string& aReason, DsGroup aAffectedGroup);
 
-  protected:
+    ScriptObjPtr getGroupState(DsGroup aGroup) { return mZoneState.getGroupState(aGroup); }
 
-    #if ENABLE_P44SCRIPT
-    void sendStateEvent(DsGroup aOriginatingGroup);
-    #endif
+  protected:
 
     // property access implementation
     virtual int numProps(int aDomain, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
@@ -180,7 +177,7 @@ namespace p44 {
 
   /// zone list
   /// list of known zones
-  class ZoneList : public PropertyContainer
+  class ZoneList : public PropertyContainer, public EventSource
   {
     typedef PropertyContainer inherited;
 
@@ -207,13 +204,15 @@ namespace p44 {
     /// get zone by name
     /// @param aZoneName a user-assigned zone name to look for
     /// @return zone or NULL if none with this name is found
-    ZoneDescriptorPtr getZoneByName(const string aZoneName);
+    ZoneDescriptorPtr getZoneByNameOrId(const string aZoneName);
 
     /// get DS zone ID by zone name or literal zone id (number)
     /// @param aZoneName a user-assigned zone name to look for, or a decimal number directly specifying the DS zoneId
     /// @return zoneID or -1 if no specific zone could be found
     int getZoneIdByName(const string aZoneNameOrId);
 
+    /// send a zone event
+    void sendZoneEvent(ZoneDescriptorPtr aZone, DsGroup aOriginatingGroup, const string& aReason);
 
   protected:
 
@@ -620,6 +619,25 @@ namespace p44 {
 
 
   namespace P44Script {
+
+    /// represents changed zone state
+    class ZoneObj : public StructuredLookupObject
+    {
+      typedef StructuredLookupObject inherited;
+      ZoneDescriptorPtr mZone;
+      DsGroup mAffectedGroup;
+      string mReason;
+    public:
+      ZoneObj(ZoneDescriptorPtr aZoneDescriptor, DsGroup aAffectedGroup = group_undefined, const string& aReason = "");
+      virtual void deactivate() P44_OVERRIDE;
+      virtual string getAnnotation() const P44_OVERRIDE;
+      virtual TypeInfo getTypeInfo() const P44_OVERRIDE;
+
+      ZoneDescriptorPtr zone() const { return mZone; }
+      DsGroup affectedGroup() const { return mAffectedGroup; }
+      string& eventReason() { return mReason; }
+    };
+
 
     /// represents the global objects related to localController
     class LocalControllerLookup : public BuiltInMemberLookup

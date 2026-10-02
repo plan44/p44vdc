@@ -2568,8 +2568,13 @@ const GroupDescriptor* VdcHost::groupInfo(DsGroup aGroup)
 }
 
 
-const GroupDescriptor* VdcHost::groupInfoByName(const string aGroupName)
+const GroupDescriptor* VdcHost::groupInfoByNameOrNo(const string aGroupName)
 {
+  int numName = -1;
+  if (sscanf(aGroupName.c_str(), "%d", &numName)>0) {
+    // numeric group specification
+    return groupInfo((DsGroup)numName);
+  }
   const GroupDescriptor *giP = groupInfos;
   while (giP && giP->kind!=0) {
     if (uequals(aGroupName.c_str(), giP->name)) {
