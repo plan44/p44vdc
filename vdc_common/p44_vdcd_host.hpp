@@ -353,7 +353,11 @@ namespace p44 {
     MLMicroSeconds mDebuggerTimeout; ///< how long the debugger remains active without getting any of the script manager calls
     MLTicket mDebuggerTimer; ///< timer that will stop the debugger when no longer connected
     
-    string mCollectedLogText; ///< log line collector for debugger
+    string mCollectedLogText; ///< log line collector for debugger in polling mode (legacy)
+
+    #if ENABLE_UBUS
+    int mLogPushLevel; ///< up to what level log messages should be pushed as events
+    #endif
 
   public:
 
@@ -374,7 +378,13 @@ namespace p44 {
     static void setResultAndPosInfo(ApiValuePtr aIntoApiValue, ScriptObjPtr aResult, const SourceCursor* aCursorP = nullptr);
 
     /// regularily to-be (silently) polled debug info
+    /// @note resets debug watchdog when called
+    /// @note includes debugStateInfo
     JsonObjectPtr debugPollInfo();
+
+    /// debugger state info that might get pushed when we have a push API
+    JsonObjectPtr debugStateInfo();
+
 
   protected:
 
@@ -433,6 +443,8 @@ namespace p44 {
 
   public:
 
+    static P44VdcHost& sharedP44VdcHost();
+
     #if P44SCRIPT_IMPLEMENTED_CUSTOM_API
     ScriptApiLookup mScriptedApiLookup; ///< custom API implemented via p44script, is also the event source for requests
     #endif // P44SCRIPT_IMPLEMENTED_CUSTOM_API
@@ -463,6 +475,12 @@ namespace p44 {
     /// enable ubus API
     /// @note ubus server will be started only at initialize()
     void enableUbusApi();
+
+    /// push log info as ubus event
+    void ubusLogPush(int aLevel, const char *aLinePrefix, const char *aLogMessage);
+
+    /// push debug info as ubus event
+    void ubusDebuginfoPush(JsonObjectPtr aDebugInfo);
 
     #endif // ENABLE_UBUS
 

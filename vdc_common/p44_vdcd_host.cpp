@@ -216,6 +216,14 @@ P44VdcHost::P44VdcHost(bool aWithLocalController, bool aWithPersistentChannels, 
 }
 
 
+P44VdcHost& P44VdcHost::sharedP44VdcHost()
+{
+  P44VdcHost* h = dynamic_cast<P44VdcHost*>(VdcHost::sharedVdcHost().get());
+  assert(h);
+  return *h;
+}
+
+
 void P44VdcHost::selfTest(StatusCB aCompletedCB, ButtonInputPtr aButton, IndicatorOutputPtr aRedLED, IndicatorOutputPtr aGreenLED, bool aNoTestableHw)
 {
   #if SELFTESTING_ENABLED
@@ -461,17 +469,21 @@ void P44VdcHost::ubusApiRequestHandler(UbusRequestPtr aUbusRequest)
         aUbusRequest->sendResponse(response);
       }
       else {
+        int prev = mUbusApi->mUbusApiServer->silentSetLogLeveloffset(-3); // totally silence while delivering LED data
         // use special send-as-string response format (less data copying, same as sending json { "leddata": "RRGGBB…" }
         aUbusRequest->sendResponse(JsonObject::newString("leddata"), UBUS_STATUS_OK, &rawrgb);
+        mUbusApi->mUbusApiServer->silentSetLogLeveloffset(prev); // restore previous verbosity
       }
     }
   }
   #endif // ENABLE_LEDCHAIN
   #if P44SCRIPT_REGISTERED_SOURCE
   else if (aUbusRequest->method()=="debugpoll") {
+    int prev = mUbusApi->mUbusApiServer->silentSetLogLeveloffset(-3); // totally silence while delivering log content
     // poll debug essentials without this call visible in logs (to avoid log-displays-log loops)
     JsonObjectPtr debuginfo = mScriptManager->debugPollInfo();
     request->sendResponse(debuginfo, ErrorPtr());
+    mUbusApi->mUbusApiServer->silentSetLogLeveloffset(prev); // restore previous verbosity
   }
   #endif // P44SCRIPT_REGISTERED_SOURCE
   #if ENABLE_P44FEATURES
@@ -493,6 +505,26 @@ void P44VdcHost::ubusApiRequestHandler(UbusRequestPtr aUbusRequest)
     request->sendResponse(JsonObjectPtr(), err);
   }
 }
+
+
+void P44VdcHost::ubusLogPush(int aLevel, const char *aLinePrefix, const char *aLogMessage)
+{
+  if (mUbusApi && mUbusApi->mUbusVdcdObj && mUbusApi->mUbusVdcdObj->hasSubscribers()) {
+    JsonObjectPtr logmsg = JsonObject::newInt32(aLevel)->wrapAs("level");
+    logmsg->add("prefix", JsonObject::newString(aLinePrefix));
+    logmsg->add("msg", JsonObject::newString(aLogMessage));
+    mUbusApi->mUbusVdcdObj->notify("loginfo", logmsg);
+  }
+}
+
+
+void P44VdcHost::ubusDebuginfoPush(JsonObjectPtr aDebugInfo)
+{
+  if (mUbusApi && mUbusApi->mUbusVdcdObj && mUbusApi->mUbusVdcdObj->hasSubscribers()) {
+    mUbusApi->mUbusVdcdObj->notify("debuginfo", aDebugInfo);
+  }
+}
+
 
 
 #if ENABLE_GENERIC_API_PUSH
@@ -525,7 +557,7 @@ ApiValuePtr UbusApiConnection::newApiValue()
 
 ErrorPtr UbusApiConnection::sendRequest(const string &aMethod, ApiValuePtr aParams, VdcApiResponseCB aResponseHandler)
 {
-  // notify subscribers of the vdcd ubus object (aMethod = notification name, mostly "pushNotification"
+  // notify subscribers of the vdcd ubus object (aMethod = notification name, mostly "pushNotification")
   POLOG(mUbusApiServer, LOG_INFO, "sending event '%s', params=%s", aMethod.c_str(), ApiValue::text(aParams).c_str());
   mUbusVdcdObj->notify(aMethod, JsonApiValue::getAsJson(aParams));
   // Note: we don't support methods with responses, so ignoring aResponseHandler completely here
@@ -1409,6 +1441,9 @@ void P44VdcHost::identifyHandler(VdcApiRequestPtr aRequest, DevicePtr aDevice)
 P44ScriptManager::P44ScriptManager(ScriptingDomainPtr aScriptingDomain) :
   mScriptingDomain(aScriptingDomain),
   mDebuggerTimeout(Never)
+  #if ENABLE_UBUS
+  ,mLogPushLevel(0)
+  #endif
 {
   assert(mScriptingDomain);
   mScriptingDomain->setPauseHandler(boost::bind(&P44ScriptManager::pausedHandler, this, _1));
@@ -1427,6 +1462,9 @@ void P44ScriptManager::pausedHandler(ScriptCodeThreadPtr aPausedThread)
   pausedThread.mThread = aPausedThread;
   pausedThread.mSourceHost = mScriptingDomain->getHostForThread(aPausedThread);
   mPausedThreads.push_back(pausedThread);
+  #if ENABLE_UBUS
+  P44VdcHost::sharedP44VdcHost().ubusDebuginfoPush(debugStateInfo());
+  #endif // ENABLE_UBUS
 }
 
 
@@ -1466,6 +1504,12 @@ void P44ScriptManager::setDebugging(bool aDebug)
 
 void P44ScriptManager::logCollectHandler(int aLevel, const char *aLinePrefix, const char *aLogMessage)
 {
+  #if ENABLE_UBUS
+  if (mLogPushLevel>=aLevel) {
+    P44VdcHost::sharedP44VdcHost().ubusLogPush(aLevel, aLinePrefix, aLogMessage);
+    return; // do not collect
+  }
+  #endif // ENABLE_UBUS
   mCollectedLogText += aLinePrefix;
   mCollectedLogText += aLogMessage;
   mCollectedLogText += "\n";
@@ -1476,20 +1520,26 @@ void P44ScriptManager::logCollectHandler(int aLevel, const char *aLinePrefix, co
 }
 
 
+JsonObjectPtr P44ScriptManager::debugStateInfo()
+{
+  // timestamp of latest paused thread
+  JsonObjectPtr debugInfo = JsonObject::newObj();
+  debugInfo->add("latestpaused", mPausedThreads.size()>0 ? JsonObject::newInt64(mPausedThreads[0].mPausedAt) : JsonObject::newNull());
+  return debugInfo;
+}
+
+
 JsonObjectPtr P44ScriptManager::debugPollInfo()
 {
   debuggerWatchdog(); // polling triggers debugger watchdog
-  JsonObjectPtr debugInfo = JsonObject::newObj();
+  JsonObjectPtr debugInfo = debugStateInfo();
   // accumulated log text, clear accumulator
   debugInfo->add("logtext", JsonObject::newString(mCollectedLogText));
   mCollectedLogText.clear();
   // current loglevel
   debugInfo->add("loglevel", JsonObject::newInt32(LOGLEVEL));
-  // timestamp of latest paused thread
-  debugInfo->add("latestpaused", mPausedThreads.size()>0 ? JsonObject::newInt64(mPausedThreads[0].mPausedAt) : JsonObject::newNull());
   return debugInfo;
 }
-
 
 
 void P44ScriptManager::setResultAndPosInfo(ApiValuePtr aIntoApiValue, ScriptObjPtr aResult, const SourceCursor* aCursorP)
@@ -1521,6 +1571,9 @@ enum {
   debugging_key,
   logtext_key,
   loglevel_key,
+  #if ENABLE_UBUS
+  logpushlevel_key,
+  #endif
   numScriptManagerProperties
 };
 
@@ -1655,6 +1708,9 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
     { "debugging", apivalue_bool, debugging_key, OKEY(scriptmanager_key) },
     { "logtext", apivalue_string, logtext_key, OKEY(scriptmanager_key) },
     { "loglevel", apivalue_int64, loglevel_key, OKEY(scriptmanager_key) },
+    #if ENABLE_UBUS
+    { "logpushlevel", apivalue_int64, logpushlevel_key, OKEY(scriptmanager_key) },
+    #endif
   };
   // sourcehost level properties
   static const PropertyDescription scripthostProperties[numScriptHostProperties] = {
@@ -1731,6 +1787,11 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         case loglevel_key:
           aPropValue->setInt32Value(LOGLEVEL);
           return true;
+        #if ENABLE_UBUS
+        case logpushlevel_key:
+          aPropValue->setInt32Value(mLogPushLevel);
+          return true;
+        #endif
       }
     }
     else {
@@ -1738,6 +1799,11 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
         case debugging_key:
           setDebugging(aPropValue->boolValue());
           return true;
+        #if ENABLE_UBUS
+        case logpushlevel_key:
+          mLogPushLevel = aPropValue->int32Value();
+          return true;
+        #endif
       }
     }
   }
@@ -2146,12 +2212,11 @@ FUNC_ARG_DEFS(webrequest, { text|optionalarg }, { text|optionalarg } );
 static void webrequest_func(BuiltinFunctionContextPtr f)
 {
   // return API request event source place holder, actual value will be delivered via event
-  P44VdcHost* h = dynamic_cast<P44VdcHost*>(VdcHost::sharedVdcHost().get());
-  assert(h);
+  P44VdcHost& h = P44VdcHost::sharedP44VdcHost();
   string ep, peer;
   if (f->arg(0)->defined()) ep = f->arg(0)->stringValue();
   if (f->arg(1)->defined()) peer = f->arg(1)->stringValue();
-  f->finish(new OneShotEventNullValue(&h->mScriptedApiLookup, "web request", new WebRequestUriFilter(ep, peer)));
+  f->finish(new OneShotEventNullValue(&h.mScriptedApiLookup, "web request", new WebRequestUriFilter(ep, peer)));
 }
 
 static const BuiltinMemberDescriptor scriptApiGlobals[] = {
