@@ -2162,7 +2162,7 @@ void LocalController::deviceChangesZone(DevicePtr aDevice, DsZoneID aFromZone, D
 }
 
 
-bool LocalController::processNotificationToZoneAndGroup(DsZoneID aZoneId, DsGroup aGroup, const string &aNotification, ApiValuePtr aParams)
+void LocalController::notificationDeliveredToZoneAndGroup(DsZoneID aZoneId, DsGroup aGroup, const string &aNotification, ApiValuePtr aParams)
 {
   // Notes:
   // - even in mRemoteControlled mode, we process the zone state

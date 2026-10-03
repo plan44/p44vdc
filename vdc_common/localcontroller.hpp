@@ -611,8 +611,7 @@ namespace p44 {
     /// called *only* when a notification is delivered addressed via zone and group
     /// @note deviceWillApplyNotification() will still be called once for every device that gets the notification.
     /// @note this method is primarily meant to update zone state
-    /// @return the method can return false to suppress actual delivery to the addressed audience
-    bool processNotificationToZoneAndGroup(DsZoneID aZoneId, DsGroup aGroup, const string &aNotification, ApiValuePtr aParams);
+    void notificationDeliveredToZoneAndGroup(DsZoneID aZoneId, DsGroup aGroup, const string &aNotification, ApiValuePtr aParams);
 
 
   protected:

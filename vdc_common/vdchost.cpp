@@ -1302,7 +1302,7 @@ void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectio
   #if ENABLE_LOCALCONTROLLER
   if (mLocalController && aAudience.mZoneGroupAddressed && !aAudience.empty()) {
     // it is important not to call this for empty audiences, as it instantiates zone states!
-    mLocalController->processNotificationToZoneAndGroup(aAudience.mZoneID, aAudience.mGroup, aNotification, aParams);
+    mLocalController->notificationDeliveredToZoneAndGroup(aAudience.mZoneID, aAudience.mGroup, aNotification, aParams);
   }
   #endif // ENABLE_LOCALCONTROLLER
 }
