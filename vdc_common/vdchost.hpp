@@ -152,7 +152,17 @@ namespace p44 {
     VdcPtr mVdc; ///< the vDC that might be able to handle a notification for all (device)members together. NULL if members can also be vdcs or vdchost.
     DsAddressablesList mMembers; ///< list of addressables (devices only if vdc is not NULL)
   };
-  typedef list<NotificationGroup> NotificationAudience;
+
+  class NotificationAudience : public list<NotificationGroup>
+  {
+  public:
+    bool mZoneGroupAddressed;
+    DsZoneID mZoneID;
+    DsGroup mGroup;
+    NotificationAudience();
+    ~NotificationAudience();
+  };
+
 
   #if P44SCRIPT_FULL_SUPPORT
   class MainScriptLogger : public P44LoggingObj

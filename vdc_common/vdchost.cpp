@@ -1196,6 +1196,16 @@ NotificationGroup::NotificationGroup(VdcPtr aVdc, DsAddressablePtr aFirstMember)
 }
 
 
+NotificationAudience::NotificationAudience() :
+  mZoneGroupAddressed(false)
+{
+}
+
+
+NotificationAudience::~NotificationAudience()
+{
+}
+
 
 void VdcHost::addTargetToAudience(NotificationAudience &aAudience, DsAddressablePtr aTarget)
 {
@@ -1253,6 +1263,11 @@ void VdcHost::addToAudienceByZoneAndGroup(NotificationAudience &aAudience, DsZon
 {
   // Zone 0 = all zones
   // group_undefined (0) = all groups
+  // - remember zone/group addressing
+  aAudience.mZoneID = aZone;
+  aAudience.mGroup = aGroup;
+  aAudience.mZoneGroupAddressed = true;
+  // - add devices/vdcs
   for (DsDeviceMap::iterator pos = mDSDevices.begin(); pos!=mDSDevices.end(); ++pos) {
     Device *devP = pos->second.get();
     if (
@@ -1268,6 +1283,7 @@ void VdcHost::addToAudienceByZoneAndGroup(NotificationAudience &aAudience, DsZon
 
 void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectionPtr aApiConnection, const string &aNotification, ApiValuePtr aParams)
 {
+  // deliver first
   for (NotificationAudience::iterator gpos = aAudience.begin(); gpos!=aAudience.end(); ++gpos) {
     if (gpos->mVdc) {
       OLOG(LOG_INFO, "==== passing '%s' for %lu devices for delivery to vDC %s\n- params:%s", aNotification.c_str(), gpos->mMembers.size(), gpos->mVdc->shortDesc().c_str(), ApiValue::text(aParams).c_str());
@@ -1282,6 +1298,13 @@ void VdcHost::deliverToAudience(NotificationAudience &aAudience, VdcApiConnectio
       }
     }
   }
+  // then notify controller
+  #if ENABLE_LOCALCONTROLLER
+  if (mLocalController && aAudience.mZoneGroupAddressed && !aAudience.empty()) {
+    // it is important not to call this for empty audiences, as it instantiates zone states!
+    mLocalController->processNotificationToZoneAndGroup(aAudience.mZoneID, aAudience.mGroup, aNotification, aParams);
+  }
+  #endif // ENABLE_LOCALCONTROLLER
 }
 
 
@@ -1572,15 +1595,6 @@ ErrorPtr VdcHost::handleNotificationForParams(VdcApiConnectionPtr aApiConnection
           audienceOk = true; // zone_id/group is valid audience spec
           DsGroup group = (DsGroup)o->uint16Value();
           addToAudienceByZoneAndGroup(audience, zone, group);
-          #if ENABLE_LOCALCONTROLLER
-          if (mLocalController && !audience.empty()) {
-            // it is important not to call this for empty audiences, as it instantiates zone states!
-            if (!mLocalController->processNotificationToZoneAndGroup(zone, group, aMethod, aParams)) {
-              LOG(LOG_INFO, "processNotificationToZoneAndGroup returned false and prevented devlivering notification");
-              return respErr;
-            }
-          }
-          #endif // ENABLE_LOCALCONTROLLER
         }
       }
     }
