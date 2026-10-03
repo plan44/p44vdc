@@ -333,7 +333,7 @@ ScriptObjPtr BinaryInputBehaviour::getInfo()
   ObjectValuePtr info = new ObjectValue;
   info->setMemberByName("behaviour", new StringValue(behaviourTypeIdentifier()));
   info->setMemberByName("type", new StringValue(inputTypeIds[mConfiguredInputType]));
-  info->setMemberByName("usage", new NumericValue(getUsage()));
+  info->setMemberByName("usage", new IntegerValue(getUsage()));
   return info;
 }
 

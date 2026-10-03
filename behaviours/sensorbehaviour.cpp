@@ -620,7 +620,7 @@ ScriptObjPtr SensorBehaviour::getInfo()
   info->setMemberByName("unit", new StringValue(valueUnitName(getSensorUnit(), false)));
   info->setMemberByName("symbol", new StringValue(valueUnitName(getSensorUnit(), true)));
   info->setMemberByName("type", new StringValue(sensorTypeIds[getSensorType()]));
-  info->setMemberByName("usage", new NumericValue(getUsage()));
+  info->setMemberByName("usage", new IntegerValue(getUsage()));
   info->setMemberByName("min", new NumericValue(getMin()));
   info->setMemberByName("max", new NumericValue(getMax()));
   info->setMemberByName("resolution", new NumericValue(getResolution()));

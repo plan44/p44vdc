@@ -217,6 +217,10 @@ namespace p44 {
     /// send a zone event
     void sendZoneEvent(ZoneDescriptorPtr aZone, DsGroup aOriginatingGroup, const string& aReason);
 
+  private:
+
+    void sendZoneEventUnwound(ZoneDescriptorPtr aZone, DsGroup aAffectedGroup, const string& aReason);
+
   protected:
 
     // property access implementation

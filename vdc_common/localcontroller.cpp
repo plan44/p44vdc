@@ -178,7 +178,7 @@ void ZoneState::getApiRepresentation(ApiValuePtr aApiObjectValue)
   gs = aApiObjectValue->newObject();
   gs->add("TemperatureZone", NUM_API_VALUE(gs, mCurrentTemp));
   gs->add("TemperatureSetPoint", NUM_API_VALUE(gs, mTempSetPoint));
-  gs->add("heatingLevel", NUM_API_VALUE(gs, mTempSetPoint));
+  gs->add("heatingLevel", NUM_API_VALUE(gs, mHeatingLevel));
   aApiObjectValue->add(string_format("%d", group_roomtemperature_control), gs);
 }
 
@@ -210,7 +210,7 @@ ScriptObjPtr ZoneState::getGroupState(DsGroup aGroup)
     case group_roomtemperature_control:
       state->setMemberByName("TemperatureZone", NUM_SCRIPT_VALUE(mCurrentTemp));
       state->setMemberByName("TemperatureSetPoint", NUM_SCRIPT_VALUE(mTempSetPoint));
-      state->setMemberByName("heatingLevel", NUM_SCRIPT_VALUE(mTempSetPoint));
+      state->setMemberByName("heatingLevel", NUM_SCRIPT_VALUE(mHeatingLevel));
       break;
     default:
       break;
@@ -347,13 +347,15 @@ void ZoneDescriptor::processZoneSensorChange(SensorBehaviour &aSensorBehaviour, 
 {
   // TODO: enhance, like averaging etc.
   // process sensors relevant for room temperature control
-  if (aSensorBehaviour.getSensorType()==sensorType_temperature && aSensorBehaviour.getUsage()==usage_room) {
-    // broadcast as zone temperature
-    LocalController::sharedLocalController()->setControlValue(mZoneID, group_roomtemperature_control, "TemperatureZone", aCurrentValue);
-  }
-  else if (aSensorBehaviour.getSensorType()==sensorType_temperature && aSensorBehaviour.getUsage()==usage_user) {
-    // broadcast as zone set point
-    LocalController::sharedLocalController()->setControlValue(mZoneID, group_roomtemperature_control, "TemperatureSetPoint", aCurrentValue);
+  if (aCurrentValue!=aPreviousValue) { // prevent non-updates (and recursions that could go with these)
+    if (aSensorBehaviour.getSensorType()==sensorType_temperature && aSensorBehaviour.getUsage()==usage_room) {
+      // broadcast as zone temperature
+      LocalController::sharedLocalController()->setControlValue(mZoneID, group_roomtemperature_control, "TemperatureZone", aCurrentValue);
+    }
+    else if (aSensorBehaviour.getSensorType()==sensorType_temperature && aSensorBehaviour.getUsage()==usage_user) {
+      // broadcast as zone set point
+      LocalController::sharedLocalController()->setControlValue(mZoneID, group_roomtemperature_control, "TemperatureSetPoint", aCurrentValue);
+    }
   }
 }
 
@@ -609,9 +611,8 @@ int ZoneList::getZoneIdByName(const string aZoneNameOrId)
 void ZoneList::sendZoneEvent(ZoneDescriptorPtr aZone, DsGroup aAffectedGroup, const string& aReason)
 {
   if (!hasSinks()) return; // optimisation
-  sendEvent(new ZoneObj(aZone, aAffectedGroup, aReason));
+  postSendingEvent(new ZoneObj(aZone, aAffectedGroup, aReason));
 }
-
 
 
 // MARK: - ZoneList persistence
@@ -1760,7 +1761,7 @@ bool LocalController::processInputChange(BinaryInputBehaviour &aBinaryInputBehav
       e->setMemberByName("group", new IntegerValue(group));
       e->setMemberByName("previousvalue", new IntegerValue(aPreviousState));
       e->setMemberByName("value", new ValueSourceObj(&aBinaryInputBehaviour));
-      sendEvent(e);
+      postSendingEvent(e);
     }
   }
   // local actions
@@ -1796,7 +1797,7 @@ bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, dou
       e->setMemberByName("group", new IntegerValue(group));
       e->setMemberByName("previousvalue", new NumericValue(aPreviousValue));
       e->setMemberByName("value", new ValueSourceObj(&aSensorBehaviour));
-      sendEvent(e);
+      postSendingEvent(e);
     }
   }
   // local actions
@@ -2205,18 +2206,26 @@ void LocalController::notificationDeliveredToZoneAndGroup(DsZoneID aZoneId, DsGr
         if ((o = aParams->get("value"))) {
           // get value
           double value = o->doubleValue();
+          OLOG(LOG_NOTICE, "Zone '%s' receives new control value %s=%.2f", zone->getName().c_str(), name.c_str(), value);
           // now process the value (updates channel values, but does not yet apply them)
+          bool changed = false;
           if (name=="TemperatureZone") {
-            zone->mZoneState.mCurrentTemp = value;
+            if (setIfChanged(zone->mZoneState.mCurrentTemp, value)) changed = true;
           }
           else if (name=="TemperatureSetPoint") {
-            zone->mZoneState.mTempSetPoint = value;
+            if (setIfChanged(zone->mZoneState.mTempSetPoint, value)) changed = true;
           }
           else if (name=="heatingLevel") {
-            zone->mZoneState.mHeatingLevel = value;
+            if (setIfChanged(zone->mZoneState.mHeatingLevel, value)) changed = true;
           }
-          // change of temperature or set point is a room state change
-          zone->reportZoneState(aNotification, group_roomtemperature_control);
+          else {
+            OLOG(LOG_WARNING, "Zone '%s' received unknown control value %s=%.2f", zone->getName().c_str(), name.c_str(), value);
+          }
+          // Note: only reporting changes is essential, as otherwise processing might never settle
+          if (changed) {
+            // change of temperature or set point is a room state change
+            zone->reportZoneState(aNotification, group_roomtemperature_control);
+          }
         }
       }
     }
@@ -2615,54 +2624,6 @@ static void state_func(BuiltinFunctionContextPtr f)
 }
 
 
-// setcontrolvalue(name, value) // send to all devices (zone0) with no group
-// setcontrolvalue(name, value, zone_or_device) // send to devices in zone of any group
-// setcontrolvalue(name, value, zone_or_device, groupname_or_id) // send to devices in zone that are member of specified group
-FUNC_ARG_DEFS(setcontrolvalue, { text }, { numeric }, { text|numeric|optionalarg }, { text|numeric|optionalarg } );
-static void setcontrolvalue_func(BuiltinFunctionContextPtr f)
-{
-  ZoneObj* z = dynamic_cast<ZoneObj*>(f->thisObj().get());
-  assert(z);
-  string name = f->arg(0)->stringValue();
-  double value = f->arg(1)->doubleValue();
-
-  DevicePtr device;
-  DsZoneID zoneid = 0;
-  DsGroup group = group_undefined;
-  if (f->numArgs()>2) {
-    ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByNameOrId(f->arg(1)->stringValue());
-    if (zone) {
-      // is a zone
-      zoneid = zone->getZoneId();
-    }
-    else {
-      // might be a device
-      device = VdcHost::sharedVdcHost()->getDeviceByNameOrDsUid(f->arg(2)->stringValue());
-      if (!device) {
-        f->finish(new ErrorValue(ScriptError::NotFound, "Zone or Device '%s' not found", f->arg(1)->stringValue().c_str()));
-      }
-    }
-    if (f->numArgs()>3) {
-      const GroupDescriptor* gdP = VdcHost::groupInfoByNameOrNo(f->arg(3)->stringValue());
-      if (!gdP) {
-        f->finish(new ErrorValue(ScriptError::NotFound, "Group '%s' not found", f->arg(1)->stringValue().c_str()));
-      }
-      group = gdP->no;
-    }
-  }
-  // issue to audience
-  NotificationAudience audience;
-  if (device) {
-    VdcHost::sharedVdcHost()->addToAudienceByDsuid(audience, device->getDsUid());
-  }
-  else {
-    VdcHost::sharedVdcHost()->addToAudienceByZoneAndGroup(audience, zoneid, group);
-  }
-  LocalController::sharedLocalController()->setControlValue(audience, name, value);
-  f->finish();
-}
-
-
 static const BuiltinMemberDescriptor zoneMembers[] = {
   MEMBER_DEF(zoneid, builtinvalue),
   MEMBER_DEF(name, builtinvalue),
@@ -2978,6 +2939,52 @@ static void zoneevent_func(BuiltinFunctionContextPtr f)
       new ZoneFilter(zoneFilter, affectedGroupFilter, reasonFilter)
     )
   );
+}
+
+
+// setcontrolvalue(name, value) // send to all devices (zone0) with no group
+// setcontrolvalue(name, value, zone_or_device) // send to devices in zone of any group
+// setcontrolvalue(name, value, zone_or_device, groupname_or_id) // send to devices in zone that are member of specified group
+FUNC_ARG_DEFS(setcontrolvalue, { text }, { numeric }, { text|numeric|optionalarg }, { text|numeric|optionalarg } );
+static void setcontrolvalue_func(BuiltinFunctionContextPtr f)
+{
+  string name = f->arg(0)->stringValue();
+  double value = f->arg(1)->doubleValue();
+
+  DevicePtr device;
+  DsZoneID zoneid = 0;
+  DsGroup group = group_undefined;
+  if (f->numArgs()>2) {
+    ZoneDescriptorPtr zone = LocalController::sharedLocalController()->mLocalZones.getZoneByNameOrId(f->arg(2)->stringValue());
+    if (zone) {
+      // is a zone
+      zoneid = zone->getZoneId();
+    }
+    else {
+      // might be a device
+      device = VdcHost::sharedVdcHost()->getDeviceByNameOrDsUid(f->arg(2)->stringValue());
+      if (!device) {
+        f->finish(new ErrorValue(ScriptError::NotFound, "Zone or Device '%s' not found", f->arg(2)->stringValue().c_str()));
+      }
+    }
+    if (f->numArgs()>3) {
+      const GroupDescriptor* gdP = VdcHost::groupInfoByNameOrNo(f->arg(3)->stringValue());
+      if (!gdP) {
+        f->finish(new ErrorValue(ScriptError::NotFound, "Group '%s' not found", f->arg(3)->stringValue().c_str()));
+      }
+      group = gdP->no;
+    }
+  }
+  // issue to audience
+  NotificationAudience audience;
+  if (device) {
+    VdcHost::sharedVdcHost()->addToAudienceByDsuid(audience, device->getDsUid());
+  }
+  else {
+    VdcHost::sharedVdcHost()->addToAudienceByZoneAndGroup(audience, zoneid, group);
+  }
+  LocalController::sharedLocalController()->setControlValue(audience, name, value);
+  f->finish();
 }
 
 
