@@ -343,21 +343,19 @@ void ZoneDescriptor::reportZoneState(const string& aReason, DsGroup aAffectedGro
 }
 
 
-
 void ZoneDescriptor::processZoneSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue)
 {
   // TODO: enhance, like averaging etc.
-  // process sensors relevant for room temperature
+  // process sensors relevant for room temperature control
   if (aSensorBehaviour.getSensorType()==sensorType_temperature && aSensorBehaviour.getUsage()==usage_room) {
-    mZoneState.mCurrentTemp = aCurrentValue;
-    reportZoneState("sensor", group_roomtemperature_control);
+    // broadcast as zone temperature
+    LocalController::sharedLocalController()->setControlValue(mZoneID, group_roomtemperature_control, "TemperatureZone", aCurrentValue);
   }
   else if (aSensorBehaviour.getSensorType()==sensorType_temperature && aSensorBehaviour.getUsage()==usage_user) {
-    mZoneState.mTempSetPoint = aCurrentValue;
-    reportZoneState("user", group_roomtemperature_control);
+    // broadcast as zone set point
+    LocalController::sharedLocalController()->setControlValue(mZoneID, group_roomtemperature_control, "TemperatureSetPoint", aCurrentValue);
   }
 }
-
 
 
 // MARK: - ZoneDescriptor persistence
@@ -2113,6 +2111,25 @@ void LocalController::setOutputChannelValues(NotificationAudience &aAudience, st
 }
 
 
+void LocalController::setControlValue(DsZoneID aZone, DsGroup aGroup, string aName, double aValue)
+{
+  NotificationAudience audience;
+  mVdcHost.addToAudienceByZoneAndGroup(audience, aZone, aGroup);
+  setControlValue(audience, aName, aValue);
+}
+
+
+void LocalController::setControlValue(NotificationAudience &aAudience, string aName, double aValue)
+{
+  JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
+  params->setType(apivalue_object);
+  // { "notification":"setControlValue", "zone_id":22001, "group":48 }
+  string method = "setControlValue";
+  params->add("name", params->newString(aName));
+  params->add("value", params->newDouble(aValue));
+  mVdcHost.deliverToAudience(aAudience, VdcApiConnectionPtr(), method, params);
+}
+
 
 void LocalController::deviceAdded(DevicePtr aDevice)
 {
@@ -2150,8 +2167,8 @@ bool LocalController::processNotificationToZoneAndGroup(DsZoneID aZoneId, DsGrou
   // Notes:
   // - even in mRemoteControlled mode, we process the zone state
   // - this is called only once for notifications actually addressed to a zone and group, and the audience is not-empty
-  // - this is called **before** actual delivery and can prevent it by returning false
   // - zone will be created when not yet existing in the local zones list (but this method is called only when audience is not empty)
+  // - this is called **after** actual delivery has happened/initiated
   ZoneDescriptorPtr zone = mLocalZones.getZoneById(aZoneId, true);
   if (zone) {
     ApiValuePtr o;
@@ -2198,17 +2215,12 @@ bool LocalController::processNotificationToZoneAndGroup(DsZoneID aZoneId, DsGrou
           else if (name=="heatingLevel") {
             zone->mZoneState.mHeatingLevel = value;
           }
-          else {
-            // unknown value, silently ignore, no push
-            return true; // must return true, otherwise delivery of this notification is prevented!
-          }
           // change of temperature or set point is a room state change
           zone->reportZoneState(aNotification, group_roomtemperature_control);
         }
       }
     }
   } // if zone
-  return true; // must return true, otherwise delivery of this notification is prevented!
 }
 
 
@@ -2646,13 +2658,7 @@ static void setcontrolvalue_func(BuiltinFunctionContextPtr f)
   else {
     VdcHost::sharedVdcHost()->addToAudienceByZoneAndGroup(audience, zoneid, group);
   }
-  JsonApiValuePtr params = JsonApiValuePtr(new JsonApiValue);
-  params->setType(apivalue_object);
-  // { "notification":"saveScene", "zone_id":0, "group":1, "scene":5 }
-  string method = "setControlValue";
-  params->add("name", params->newString(name));
-  params->add("value", params->newDouble(value));
-  VdcHost::sharedVdcHost()->deliverToAudience(audience, VdcApiConnectionPtr(), method, params);
+  LocalController::sharedLocalController()->setControlValue(audience, name, value);
   f->finish();
 }
 

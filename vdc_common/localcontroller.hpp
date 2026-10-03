@@ -597,6 +597,10 @@ namespace p44 {
     void setOutputChannelValues(DsZoneID aZone, DsGroup aGroup, string aChannelId, double aValue, MLMicroSeconds aTransitionTimeOverride = Infinite);
     void setOutputChannelValues(NotificationAudience &aAudience, string aChannelId, double aValue, MLMicroSeconds aTransitionTimeOverride = Infinite);
 
+    /// set control values
+    void setControlValue(DsZoneID aZone, DsGroup aGroup, string aName, double aValue);
+    void setControlValue(NotificationAudience &aAudience, string aName, double aValue);
+
     /// called when delivery of a scene call or dimming notification to a device has been executed
     /// @param aDevice the device
     /// @param aDeliveryState the delivery state
