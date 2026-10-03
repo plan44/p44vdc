@@ -1743,12 +1743,17 @@ bool LocalController::processInputChange(BinaryInputBehaviour &aBinaryInputBehav
   if (cf!=controllerFunc_none) {
     DsZoneID zoneID = aBinaryInputBehaviour.getDevice().getZoneID();
     DsGroup group = aBinaryInputBehaviour.getGroup();
-    if (cf==controllerFunc_zone_input) {
-      // notify the ZoneDescriptor for default functionality
-      ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID);
-      if (zone) {
-        SOLOG(aBinaryInputBehaviour, LOG_NOTICE, "zone function for '%s': new input state: %d", zone->getName().c_str(), aCurrentState);
-        //zone->processZoneInputChange(aBinaryInputBehaviour, aCurrentState, aPreviousState);
+    if (mRemoteControlled) {
+      SOLOG(aBinaryInputBehaviour, LOG_WARNING, "local zone function configured, but ignored because remotely controlled");
+    }
+    else {
+      if (cf==controllerFunc_zone_input) {
+        // notify the ZoneDescriptor for default functionality
+        ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID);
+        if (zone) {
+          SOLOG(aBinaryInputBehaviour, LOG_NOTICE, "zone function for '%s': new input state: %d", zone->getName().c_str(), aCurrentState);
+          //zone->processZoneInputChange(aBinaryInputBehaviour, aCurrentState, aPreviousState);
+        }
       }
     }
     // send to event sinks of localcontroller
@@ -1779,12 +1784,17 @@ bool LocalController::processSensorChange(SensorBehaviour &aSensorBehaviour, dou
   if (cf!=controllerFunc_none) {
     DsZoneID zoneID = aSensorBehaviour.getDevice().getZoneID();
     DsGroup group = aSensorBehaviour.getGroup();
-    if (cf==controllerFunc_zone_input) {
-      // notify the ZoneDescriptor for default functionality
-      ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID);
-      if (zone) {
-        SOLOG(aSensorBehaviour, LOG_NOTICE, "zone function for '%s': new input state: %.3f", zone->getName().c_str(), aCurrentValue);
-        zone->processZoneSensorChange(aSensorBehaviour, aCurrentValue, aPreviousValue);
+    if (mRemoteControlled) {
+      SOLOG(aSensorBehaviour, LOG_WARNING, "local zone function configured, but ignored because remotely controlled");
+    }
+    else {
+      if (cf==controllerFunc_zone_input) {
+        // notify the ZoneDescriptor for default functionality
+        ZoneDescriptorPtr zone = mLocalZones.getZoneById(zoneID);
+        if (zone) {
+          SOLOG(aSensorBehaviour, LOG_NOTICE, "zone function for '%s': new input state: %.3f", zone->getName().c_str(), aCurrentValue);
+          zone->processZoneSensorChange(aSensorBehaviour, aCurrentValue, aPreviousValue);
+        }
       }
     }
     // send to event sinks of localcontroller
