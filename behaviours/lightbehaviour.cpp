@@ -274,7 +274,7 @@ void LightBehaviour::performSceneActions(DsScenePtr aScene, SimpleCB aDoneCB)
     int rep = 2;
     MLMicroSeconds period = 2*Second;
     int onratio = 50;
-    // - can be parametrized: effectParam!=0 -> 0xrroopppp : rr=repetitions, oo=ontime ration, pppp=period in milliseconds
+    // - can be parametrized: effectParam!=0 -> 0xrroopppp : rr=repetitions, oo=ontime ratio in %, pppp=period in milliseconds
     uint32_t ep = lightScene->mEffectParam;
     if (ep!=0) {
       rep = (ep>>24) & 0xFF;
