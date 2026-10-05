@@ -187,7 +187,7 @@ bool ProxyDevice::handleBridgedDeviceNotification(const string aNotification, Js
   if (aNotification=="pushNotification") {
     JsonObjectPtr props;
     if (aParams->get("changedproperties", props, true)) {
-      updateCachedProperties(props);
+      updateLocallyAvailableProperties(props);
       return true;
     }
   }
@@ -239,6 +239,44 @@ bool ProxyDevice::localPropertyOverride(JsonObjectPtr aProps, PropertyAccessMode
       aProps->add("x-p44-bridgingFlags", JsonObject::newInt32(mDeviceSettings->bridgingFlags()));
       #endif
     }
+    // for now we don't have any overrides, so do not waste time for them
+    // TODO: re-enable when needed, otherwise delete, along with overrideRemoteProperties() in all behaviours!
+    #if 0
+    // also check behaviours for overrides
+    JsonObjectPtr elements;
+    JsonObjectPtr props;
+    string id;
+    JsonObjectPtr o;
+    if (aProps->get("outputDescription", props)) {
+      if (OutputBehaviourPtr ob = getOutput()) {
+        ob->overrideRemoteProperties(props, DsBehaviour::behaviourProps_descriptions, false);
+      }
+    }
+    if (aProps->get("buttonInputDescriptions", elements)) {
+      elements->resetKeyIteration();
+      while(elements->nextKeyValue(id, props)) {
+        if (ButtonBehaviourPtr bb = getButton(by_id, id)) {
+          bb->overrideRemoteProperties(props, DsBehaviour::behaviourProps_descriptions, false);
+        }
+      }
+    }
+    if (aProps->get("binaryInputDescriptions", elements)) {
+      elements->resetKeyIteration();
+      while(elements->nextKeyValue(id, props)) {
+        if (BinaryInputBehaviourPtr ib = getInput(by_id, id)) {
+          ib->overrideRemoteProperties(aProps, DsBehaviour::behaviourProps_descriptions, false);
+        }
+      }
+    }
+    if (aProps->get("sensorDescriptions", elements)) {
+      elements->resetKeyIteration();
+      while(elements->nextKeyValue(id, props)) {
+        if (SensorBehaviourPtr sb = getSensor(by_id, id)) {
+          sb->overrideRemoteProperties(aProps, DsBehaviour::behaviourProps_descriptions, false);
+        }
+      }
+    }
+    #endif // 0
   }
   else {
     // for write
@@ -268,17 +306,20 @@ void ProxyDevice::accessProperty(PropertyAccessMode aMode, ApiValuePtr aQueryObj
   JsonObjectPtr props = JsonApiValue::getAsJson(aQueryObject);
   string method;
   if (aMode==access_read) {
-    // read
+    // read from remote, maybe override some results with local value when we got the result, in handleProxyPropertyAccessResponse()
     method = "getProperty";
     params->add("query", props);
   }
   else {
-    // write
+    // write to remote, but first check for omitting/intercepting some properties not meant for the remote
     if (!localPropertyOverride(props, aMode)) {
       // nothing to set at all (e.g. everything consumed locally) -> 
       if (aAccessCompleteCB) aAccessCompleteCB(ApiValuePtr(), ErrorPtr());
       return;
     }
+    // make sure we mirror changes to settings locally
+    updateLocallyAvailableProperties(props);
+    // now send to remote
     method = "setProperty";
     params->add("properties", props);
     if (aMode==access_write_preload) {
@@ -319,7 +360,10 @@ void ProxyDevice::handleProxyPropertyAccessResponse(PropertyAccessMode aMode, Pr
 
 // MARK: - cached properties
 
-void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
+// we get here on setup initially, and on further property read's results and write intentions,
+// so we'll always have up-to-date versions of the to-be-cached roperties
+// (=those to be locally used by localcontroller and script functions)
+void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
 {
   JsonObjectPtr elements;
   JsonObjectPtr props;
@@ -343,21 +387,8 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (ButtonBehaviourPtr bb = getButton(by_id, id)) {
-        // update plain button state first
         FOCUSOLOG("process button '%s' state push: %s", id.c_str(), JsonObject::text(props));
-        if (props->get("value", o)) {
-          bb->injectState(o->boolValue());
-        }
-        // check and forward actions and clicks
-        if (props->get("actionMode", o)) {
-          VdcButtonActionMode actionMode = static_cast<VdcButtonActionMode>(o->int32Value());
-          if (props->get("actionId", o)) {
-            bb->sendAction(actionMode, o->int32Value());
-          }
-        }
-        else if (props->get("clickType", o)) {
-          bb->injectClick(static_cast<DsClickType>(o->int32Value()), false);
-        }
+        bb->updateMirroredProperties(props, DsBehaviour::behaviourProps_states);
       }
     }
   }
@@ -366,10 +397,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     while(elements->nextKeyValue(id, props)) {
       if (BinaryInputBehaviourPtr ib = getInput(by_id, id)) {
         FOCUSOLOG("process input '%s' state push: %s", id.c_str(), JsonObject::text(props));
-        if (props->get("value", o)) {
-          if (o->isType(json_type_null)) ib->invalidateInputState();
-          else ib->updateInputState(o->int32Value());
-        }
+        ib->updateMirroredProperties(props, DsBehaviour::behaviourProps_states);
       }
     }
   }
@@ -378,10 +406,7 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
     while(elements->nextKeyValue(id, props)) {
       if (SensorBehaviourPtr sb = getSensor(by_id, id)) {
         FOCUSOLOG("process sensor '%s' state push: %s", id.c_str(), JsonObject::text(props));
-        if (props->get("value", o)) {
-          if (o->isType(json_type_null)) sb->invalidateSensorValue();
-          else sb->updateSensorValue(o->doubleValue());
-        }
+        sb->updateMirroredProperties(props, DsBehaviour::behaviourProps_states);
       }
     }
   }
@@ -442,60 +467,55 @@ void ProxyDevice::updateCachedProperties(JsonObjectPtr aProps)
       }
     }
   }
-  // - button settings needed for localcontroller
+  // - button descriptions/settings needed for local control and p44script
+  if (aProps->get("buttonInputDescriptions", elements)) {
+    elements->resetKeyIteration();
+    while(elements->nextKeyValue(id, props)) {
+      if (ButtonBehaviourPtr bb = getButton(by_id, id)) {
+        bb->updateMirroredProperties(props, DsBehaviour::behaviourProps_descriptions);
+      }
+    }
+  }
   if (aProps->get("buttonInputSettings", elements)) {
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (ButtonBehaviourPtr bb = getButton(by_id, id)) {
         FOCUSOLOG("update cached button '%s' settings from: %s", id.c_str(), JsonObject::text(props));
-        // we need group, mode, function and channel for LocalController::processButtonClick
-        if (props->get("group", o)) {
-          bb->setGroup(static_cast<DsGroup>(o->int32Value()));
-        }
-        if (props->get("mode", o)) {
-          bb->mButtonMode = static_cast<DsButtonMode>(o->int32Value());
-        }
-        if (props->get("function", o)) {
-          bb->mButtonFunc = static_cast<DsButtonFunc>(o->int32Value());
-        }
-        if (props->get("channel", o)) {
-          bb->mButtonChannel = static_cast<DsChannelType>(o->int32Value());
-        }
+        bb->updateMirroredProperties(props, DsBehaviour::behaviourProps_settings);
       }
     }
   }
-  // - input settings needed for local event monitoring in evaluators/p44script
+  // - input descriptions/settings needed for local control and p44script
+  if (aProps->get("binaryInputDescriptions", elements)) {
+    elements->resetKeyIteration();
+    while(elements->nextKeyValue(id, props)) {
+      if (BinaryInputBehaviourPtr ib = getInput(by_id, id)) {
+        ib->updateMirroredProperties(aProps, DsBehaviour::behaviourProps_descriptions);
+      }
+    }
+  }
   if (aProps->get("binaryInputSettings", elements)) {
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (BinaryInputBehaviourPtr ib = getInput(by_id, id)) {
-        FOCUSOLOG("update cached input '%s' settings from: %s", id.c_str(), JsonObject::text(props));
-        // we may need group
-        if (props->get("group", o)) {
-          ib->setGroup(static_cast<DsGroup>(o->int32Value()));
-        }
+        ib->updateMirroredProperties(props, DsBehaviour::behaviourProps_settings);
       }
     }
   }
-  // - sensor settings needed for local event monitoring in evaluators/p44script
+  // - sensor descriptions/settings needed for local control and p44script
+  if (aProps->get("sensorDescriptions", elements)) {
+    elements->resetKeyIteration();
+    while(elements->nextKeyValue(id, props)) {
+      if (SensorBehaviourPtr sb = getSensor(by_id, id)) {
+        sb->updateMirroredProperties(aProps, DsBehaviour::behaviourProps_descriptions);
+      }
+    }
+  }
   if (aProps->get("sensorSettings", elements)) {
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (SensorBehaviourPtr sb = getSensor(by_id, id)) {
-        FOCUSOLOG("update cached sensor '%s' settings from: %s", id.c_str(), JsonObject::text(props));
-        // we may need group
-        if (props->get("group", o)) {
-          sb->setGroup(static_cast<DsGroup>(o->int32Value()));
-        }
-        // we may need the channel (for dimmer "sensors")
-        if (props->get("channel", o)) {
-          sb->mSensorChannel = static_cast<DsChannelType>(o->int32Value());
-        }
-        // we may need the function (for dimmer "sensors")
-        if (props->get("function", o)) {
-          // TODO: enable when ready
-          sb->mSensorFunc = static_cast<VdcSensorFunc>(o->int32Value());
-        }
+        sb->updateMirroredProperties(props, DsBehaviour::behaviourProps_settings);
       }
     }
   }
@@ -570,8 +590,8 @@ void ProxyDevice::configureStructure(JsonObjectPtr aDeviceJSON)
       call("setProperty", p, NoOP);
     }
   }
-  // get the properties we cache locally for addressing and information
-  updateCachedProperties(aDeviceJSON);
+  // get the properties we also maintain locally for addressing, information, localcontroller and scripting
+  updateLocallyAvailableProperties(aDeviceJSON);
 }
 
 

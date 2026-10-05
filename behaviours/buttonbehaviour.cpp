@@ -249,6 +249,48 @@ void ButtonBehaviour::setGroup(DsGroup aGroup)
 }
 
 
+void ButtonBehaviour::setAndPropagateGroup(DsGroup aGroup)
+{
+  // for unchangeably paired (rocker) buttons, automatically change group on counterpart
+  if (mFixedButtonMode==buttonMode_rockerDown_pairWith1 || mFixedButtonMode==buttonMode_rockerUp_pairWith1) {
+    // also change group in button1
+    OLOG(LOG_NOTICE,"paired button group changed in button0 -> also changed in button1");
+    ButtonBehaviourPtr bb = mDevice.getButton(1); if (bb) bb->setGroup(aGroup);
+  }
+  else if (mFixedButtonMode==buttonMode_rockerDown_pairWith0 || mFixedButtonMode==buttonMode_rockerUp_pairWith0) {
+    // also change group in button0
+    OLOG(LOG_NOTICE,"paired button group changed in button1 -> also changed in button0");
+    ButtonBehaviourPtr bb = mDevice.getButton(0); if (bb) bb->setGroup(aGroup);
+  }
+}
+
+
+void ButtonBehaviour::setDsMode(DsButtonMode aMode)
+{
+  if (aMode!=buttonMode_inactive && mFixedButtonMode!=buttonMode_inactive) {
+    // only one particular mode (aside from inactive) is allowed.
+    aMode = mFixedButtonMode;
+  }
+  setPVar(mButtonMode, aMode);
+}
+
+
+void ButtonBehaviour::setAndPropagateFunction(DsButtonFunc aFunc)
+{
+  // for unchangeably paired (rocker) buttons, automatically change function on counterpart
+  if (mFixedButtonMode==buttonMode_rockerDown_pairWith1 || mFixedButtonMode==buttonMode_rockerUp_pairWith1) {
+    // also change function in button1
+    OLOG(LOG_NOTICE,"paired button function changed in button0 -> also changed in button1");
+    ButtonBehaviourPtr bb = mDevice.getButton(1); if (bb) bb->setFunction(aFunc);
+  }
+  else if (mFixedButtonMode==buttonMode_rockerDown_pairWith0 || mFixedButtonMode==buttonMode_rockerUp_pairWith0) {
+    // also change function in button0
+    OLOG(LOG_NOTICE,"paired button function changed in button1 -> also changed in button0");
+    ButtonBehaviourPtr bb = mDevice.getButton(0); if (bb) bb->setFunction(aFunc);
+  }
+}
+
+
 void ButtonBehaviour::setChannel(DsChannelType aChannel)
 {
   if (setPVar(mButtonChannel, aChannel)) {
@@ -1344,41 +1386,15 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
       switch (aPropertyDescriptor->fieldKey()) {
         // Settings properties
         case group_key+settings_key_offset:
-          setGroup((DsGroup)aPropValue->int32Value());
-          // for unchangeably paired (rocker) buttons, automatically change group on counterpart
-          if (mFixedButtonMode==buttonMode_rockerDown_pairWith1 || mFixedButtonMode==buttonMode_rockerUp_pairWith1) {
-            // also change group in button1
-            OLOG(LOG_NOTICE,"paired button group changed in button0 -> also changed in button1");
-            ButtonBehaviourPtr bb = mDevice.getButton(1); if (bb) bb->setGroup((DsGroup)aPropValue->int32Value());
-          }
-          else if (mFixedButtonMode==buttonMode_rockerDown_pairWith0 || mFixedButtonMode==buttonMode_rockerUp_pairWith0) {
-            // also change group in button0
-            OLOG(LOG_NOTICE,"paired button group changed in button1 -> also changed in button0");
-            ButtonBehaviourPtr bb = mDevice.getButton(0); if (bb) bb->setGroup((DsGroup)aPropValue->int32Value());
-          }
+          // set group, possibly propagate to paired buttons
+          setAndPropagateGroup((DsGroup)aPropValue->int32Value());
           return true;
         case mode_key+settings_key_offset: {
-          DsButtonMode m = (DsButtonMode)aPropValue->int32Value();
-          if (m!=buttonMode_inactive && mFixedButtonMode!=buttonMode_inactive) {
-            // only one particular mode (aside from inactive) is allowed.
-            m = mFixedButtonMode;
-          }
-          setPVar(mButtonMode, m);
+          setDsMode((DsButtonMode)aPropValue->int32Value());
           return true;
         }
         case function_key+settings_key_offset:
-          setFunction((DsButtonFunc)aPropValue->int32Value());
-          // for unchangeably paired (rocker) buttons, automatically change function on counterpart
-          if (mFixedButtonMode==buttonMode_rockerDown_pairWith1 || mFixedButtonMode==buttonMode_rockerUp_pairWith1) {
-            // also change function in button1
-            OLOG(LOG_NOTICE,"paired button function changed in button0 -> also changed in button1");
-            ButtonBehaviourPtr bb = mDevice.getButton(1); if (bb) bb->setFunction((DsButtonFunc)aPropValue->int32Value());
-          }
-          else if (mFixedButtonMode==buttonMode_rockerDown_pairWith0 || mFixedButtonMode==buttonMode_rockerUp_pairWith0) {
-            // also change function in button0
-            OLOG(LOG_NOTICE,"paired button function changed in button1 -> also changed in button0");
-            ButtonBehaviourPtr bb = mDevice.getButton(0); if (bb) bb->setFunction((DsButtonFunc)aPropValue->int32Value());
-          }
+          setAndPropagateFunction((DsButtonFunc)aPropValue->int32Value());
           return true;
         case channel_key+settings_key_offset:
           setChannel((DsChannelType)aPropValue->int32Value());
@@ -1413,6 +1429,68 @@ bool ButtonBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
   // not my field, let base class handle it
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
 }
+
+
+#if ENABLE_PROXYDEVICES
+
+// MARK: mirrored property support for device proxies
+
+void ButtonBehaviour::updateMirroredProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection)
+{
+  // process common behaviour properties
+  inherited::updateMirroredProperties(aProps, aPropSection);
+  // process this behaviour type's properties
+  JsonObjectPtr o;
+  switch (aPropSection) {
+    case behaviourProps_descriptions:
+      if (aProps->get("supportsLocalKeyMode", o)) mSupportsLocalKeyMode = o->boolValue();
+      if (aProps->get("buttonID", o)) mButtonID = o->int32Value();
+      if (aProps->get("buttonType", o)) mButtonType = (VdcButtonType)o->int32Value();
+      if (aProps->get("buttonElementID", o)) mButtonElementID = (VdcButtonElement)o->int32Value();
+      if (aProps->get("combinables", o)) mCombinables = o->int32Value();
+      // Note: we do not mirror sourceID, this must be the local one
+      break;
+    case behaviourProps_settings:
+      // we need group, mode, function and channel for LocalController::processButtonClick
+      if (aProps->get("group", o)) setAndPropagateGroup((DsGroup)o->int32Value());
+      if (aProps->get("mode", o)) setDsMode((DsButtonMode)o->int32Value());
+      if (aProps->get("function", o)) setAndPropagateFunction((DsButtonFunc)o->int32Value());
+      if (aProps->get("channel", o)) mButtonChannel = static_cast<DsChannelType>(o->int32Value());
+      if (aProps->get("setsLocalPriority", o)) setSetsLocalPriority(o->boolValue());
+      if (aProps->get("callsPresent", o)) setCallsPresent(o->boolValue());
+      if (aProps->get("x-p44-buttonActionMode", o)) mButtonActionMode = (VdcButtonActionMode)o->int32Value();
+      if (aProps->get("x-p44-buttonActionId", o)) mButtonActionId = (uint8_t) o->int32Value();
+      // we don't need to mirror state machine settings, these are of relevance only to the actual button, not the proxy
+      break;
+    case behaviourProps_states:
+      // update plain button state first
+      if (aProps->get("value", o)) injectState(o->boolValue());
+      // then check and forward actions and clicks
+      if (aProps->get("actionMode", o)) {
+        VdcButtonActionMode actionMode = static_cast<VdcButtonActionMode>(o->int32Value());
+        if (aProps->get("actionId", o)) sendAction(actionMode, o->int32Value());
+      }
+      else if (aProps->get("clickType", o)) {
+        injectClick(static_cast<DsClickType>(o->int32Value()), false);
+      }
+      break;
+    default:
+      break;
+  }
+  // nothing of all this must be made persistent!
+  markClean();
+}
+
+void ButtonBehaviour::overrideRemoteProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection, bool aForWrite)
+{
+  inherited::overrideRemoteProperties(aProps, aPropSection, aForWrite);
+  // We do NOT need to override value source IDs, as local and remoted IDs are the same (dSUID is the same)
+  // nothing must be made persistent!
+  markClean();
+}
+
+
+#endif // ENABLE_PROXYDEVICES
 
 
 // MARK: - description/shortDesc

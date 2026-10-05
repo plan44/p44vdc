@@ -222,6 +222,13 @@ namespace p44 {
     // combined field access for all types of properties
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
 
+    #if ENABLE_PROXYDEVICES
+    /// When we support proxy devices, we need to mirror some properties from the remote
+    /// @param a aProps behaviour level properties to check
+    virtual void updateMirroredProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection) P44_OVERRIDE;
+    virtual void overrideRemoteProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection, bool aForWrite) P44_OVERRIDE;
+    #endif // ENABLE_PROXYDEVICES
+
     // persistence implementation
     virtual const char *tableName() P44_OVERRIDE;
     virtual size_t numFieldDefs() P44_OVERRIDE;

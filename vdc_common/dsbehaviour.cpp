@@ -376,6 +376,43 @@ bool DsBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, 
 }
 
 
+#if ENABLE_PROXYDEVICES
+
+// MARK: mirrored property support for device proxies
+
+void DsBehaviour::updateMirroredProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection)
+{
+  JsonObjectPtr o;
+  switch (aPropSection) {
+    case behaviourProps_descriptions:
+      if (aProps->get("name", o)) mControllerFunction = (VdcControllerFunction)o->int32Value();
+      if (aProps->get("dsIndex", o)) mControllerFunction = (VdcControllerFunction)o->int32Value();
+      break;
+    case behaviourProps_settings:
+      if (aProps->get("x-p44-controllerFunction", o)) mControllerFunction = (VdcControllerFunction)o->int32Value();
+      if (aProps->get("x-p44-colorClass", o)) mColorClass = (DsClass)o->int32Value();
+      break;
+    case behaviourProps_states:
+      if (aProps->get("error", o)) setHardwareError((VdcHardwareError)o->int32Value()); // pushes if changed
+      break;
+    default:
+      break;
+  }
+  // nothing of all this must be made persistent!
+  markClean();
+}
+
+
+void DsBehaviour::overrideRemoteProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection, bool aForWrite)
+{
+  /* NOP so far in base class */
+  // nothing must be made persistent!
+  markClean();
+}
+
+
+#endif // ENABLE_PROXYDEVICES
+
 
 // MARK: - description/shortDesc/logging
 

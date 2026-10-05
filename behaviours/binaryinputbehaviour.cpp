@@ -604,6 +604,61 @@ bool BinaryInputBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPr
 }
 
 
+#if ENABLE_PROXYDEVICES
+
+// MARK: mirrored property support for device proxies
+
+void BinaryInputBehaviour::updateMirroredProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection)
+{
+  // process common behaviour properties
+  inherited::updateMirroredProperties(aProps, aPropSection);
+  // process this behaviour type's properties
+  JsonObjectPtr o;
+  switch (aPropSection) {
+    case behaviourProps_descriptions:
+      if (aProps->get("sensorFunction", o)) mHardwareInputType = (DsBinaryInputType)o->int32Value();
+      if (aProps->get("inputUsage", o)) mInputUsage = (VdcUsageHint)o->int32Value();
+      if (aProps->get("inputType", o)) mReportsChanges = o->int32Value()>0;
+      if (aProps->get("updateInterval")) mUpdateInterval = o->doubleValue()*Second;
+      if (aProps->get("aliveSignInterval")) mAliveSignInterval = o->doubleValue()*Second;
+      if (aProps->get("maxPushInterval")) mMaxPushInterval = o->doubleValue()*Second;
+      // Note: we do not mirror sourceID, this must be the local one
+      break;
+    case behaviourProps_settings:
+      if (aProps->get("group", o)) mBinInputGroup = (DsGroup)o->int32Value();
+      if (aProps->get("sensorFunction", o)) mConfiguredInputType = (DsBinaryInputType)o->int32Value();
+      if (aProps->get("minPushInterval", o)) mMinPushInterval = (MLMicroSeconds)(o->doubleValue()*Second);
+      if (aProps->get("changesOnlyInterval", o)) mChangesOnlyInterval = (MLMicroSeconds)(o->doubleValue()*Second);
+      break;
+    case behaviourProps_states:
+      if (aProps->get("value", o)) {
+        if (o->isType(json_type_null)) invalidateInputState();
+        else {
+          InputState i = o->int32Value();
+          if (aProps->get("extendedValue", o)) i = o->int32Value(); // mirror extended value, if available
+          updateInputState(i);
+        }
+      }
+      break;
+    default:
+      break;
+  }
+  // nothing of all this must be made persistent!
+  markClean();
+}
+
+
+void BinaryInputBehaviour::overrideRemoteProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection, bool aForWrite)
+{
+  inherited::overrideRemoteProperties(aProps, aPropSection, aForWrite);
+  // We do NOT need to override value source IDs, as local and remoted IDs are the same (dSUID is the same)
+  // nothing must be made persistent!
+  markClean();
+}
+
+
+#endif // ENABLE_PROXYDEVICES
+
 
 // MARK: - description/shortDesc
 

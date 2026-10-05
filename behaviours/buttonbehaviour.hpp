@@ -150,6 +150,9 @@ namespace p44 {
     /// set group
     virtual void setGroup(DsGroup aGroup) P44_OVERRIDE;
 
+    /// set button group and propagate to paired buttons, if any
+    void setAndPropagateGroup(DsGroup aGroup);
+
     /// get group
     virtual DsGroup getGroup() P44_OVERRIDE { return mButtonGroup; };
 
@@ -159,8 +162,11 @@ namespace p44 {
     /// set function
     virtual void setFunction(DsButtonFunc aFunc) { setPVar(mButtonFunc, aFunc); };
 
+    /// set button group and propagate to paired buttons, if any
+    void setAndPropagateFunction(DsButtonFunc aFunc);
+
     /// set mode
-    void setDsMode(DsButtonMode aMode) { setPVar(mButtonMode, aMode); };
+    void setDsMode(DsButtonMode aMode);
 
     /// set setLocalPriority flag
     void setSetsLocalPriority(bool aSetsLocalPriority) { setPVar(mSetsLocalPriority, aSetsLocalPriority); };
@@ -286,6 +292,13 @@ namespace p44 {
     virtual const PropertyDescriptorPtr getStateDescriptorByIndex(int aPropIndex, PropertyDescriptorPtr aParentDescriptor) P44_OVERRIDE;
     // combined field access for all types of properties
     virtual bool accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, PropertyDescriptorPtr aPropertyDescriptor) P44_OVERRIDE;
+
+    #if ENABLE_PROXYDEVICES
+    /// When we support proxy devices, we need to mirror some properties from the remote
+    /// @param a aProps behaviour level properties to check
+    virtual void updateMirroredProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection) P44_OVERRIDE;
+    virtual void overrideRemoteProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection, bool aForWrite) P44_OVERRIDE;
+    #endif // ENABLE_PROXYDEVICES
 
     // persistence implementation
     enum {

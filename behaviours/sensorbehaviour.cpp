@@ -1279,6 +1279,73 @@ bool SensorBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVal
   return inherited::accessField(aMode, aPropValue, aPropertyDescriptor);
 }
 
+#if ENABLE_PROXYDEVICES
+
+// MARK: mirrored property support for device proxies
+
+void SensorBehaviour::updateMirroredProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection)
+{
+  // process common behaviour properties
+  inherited::updateMirroredProperties(aProps, aPropSection);
+  // process this behaviour type's properties
+  JsonObjectPtr o;
+  switch (aPropSection) {
+    case behaviourProps_descriptions:
+      if(aProps->get("sensorType", o)) mSensorType = (VdcSensorType)o->int32Value();
+      if(aProps->get("sensorUsage", o)) mSensorUsage = (VdcUsageHint)o->int32Value();
+      // siunit, symbol derives from sensorType, no need to mirror
+      if(aProps->get("min", o)) mMin = o->doubleValue();
+      if(aProps->get("max", o)) mMax = o->doubleValue();
+      if(aProps->get("resolution", o)) mResolution = o->doubleValue();
+      if (aProps->get("updateInterval")) mUpdateInterval = o->doubleValue()*Second;
+      if (aProps->get("aliveSignInterval")) mAliveSignInterval = o->doubleValue()*Second;
+      if (aProps->get("maxPushInterval")) mMaxPushInterval = o->doubleValue()*Second;
+      // Note: we do not mirror sourceID, this must be the local one
+      break;
+    case behaviourProps_settings:
+      if (aProps->get("group", o)) mSensorGroup = (DsGroup)o->int32Value();
+      if (aProps->get("function", o)) mSensorFunc = (VdcSensorFunc)o->int32Value();
+      if (aProps->get("channel", o)) mSensorChannel = (DsChannelType)o->int32Value();
+      if (aProps->get("sync", o)) mDialSyncMode = (VdcDialSyncMode)o->int32Value();
+      if (aProps->get("minPushInterval", o)) mMinPushInterval = (MLMicroSeconds)(o->doubleValue()*Second);
+      if (aProps->get("changesOnlyInterval", o)) mChangesOnlyInterval = (MLMicroSeconds)(o->doubleValue()*Second);
+      break;
+    case behaviourProps_states:
+      if (aProps->get("value", o)) {
+        if (o->isType(json_type_null)) {
+          invalidateSensorValue();
+        }
+        else {
+          double value = o->doubleValue();
+          int contextId = -1;
+          if (aProps->get("contextId", o)) contextId = o->int32Value();
+          string s;
+          const char* contextMsg = nullptr;
+          if (aProps->get("contextMsg", o)) { s = o->stringValue(); contextMsg = s.c_str(); }
+          updateSensorValue(value, -1, true, contextId, contextMsg);
+        }
+      }
+      // note: we do not mirror age, but update our own age in updateSensorValue
+      break;
+    default:
+      break;
+  }
+  // nothing of all this must be made persistent!
+  markClean();
+}
+
+
+void SensorBehaviour::overrideRemoteProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection, bool aForWrite)
+{
+  inherited::overrideRemoteProperties(aProps, aPropSection, aForWrite);
+  // We do NOT need to override value source IDs, as local and remoted IDs are the same (dSUID is the same)
+  // nothing must be made persistent!
+  markClean();
+}
+
+
+#endif // ENABLE_PROXYDEVICES
+
 
 
 // MARK: - description/shortDesc

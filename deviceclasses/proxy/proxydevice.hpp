@@ -114,7 +114,7 @@ namespace p44 {
     void call(const string aMethod, JsonObjectPtr aParams, JSonMessageCB aResponseCB);
 
     void configureStructure(JsonObjectPtr aDeviceJSON);
-    void updateCachedProperties(JsonObjectPtr aProps);
+    void updateLocallyAvailableProperties(JsonObjectPtr aProps);
 
     void bridgingEnabled(StatusCB aCompletedCB, bool aFactoryReset);
 
