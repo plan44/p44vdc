@@ -510,13 +510,15 @@ bool ProxyVdc::isConfigured()
 #define NEEDED_DEVICE_PROPERTIES \
   "{" \
     "\"dSUID\":null, \"name\":null, \"zoneID\": null, \"x-p44-zonename\": null, " \
-    "\"outputDescription\":null, \"outputSettings\": null, \"modelFeatures\":null, " \
+    "\"primaryGroup\": null, " \
+    "\"modelFeatures\":null, " \
     "\"scenes\": { \"0\":null, \"5\":null }, " \
     "\"vendorName\":null, \"model\":null, \"configURL\":null, " \
+    "\"outputDescription\":null, \"outputSettings\": null, \"outputState\": null, " \
     "\"channelStates\":null, \"channelDescriptions\":null, " \
-    "\"sensorDescriptions\":null, \"sensorStates\":null, " \
-    "\"binaryInputDescriptions\":null, \"binaryInputStates\":null, " \
-    "\"buttonInputDescriptions\":null, \"buttonInputStates\":null, " \
+    "\"sensorDescriptions\":null, \"sensorSettings\":null, \"sensorStates\":null, " \
+    "\"binaryInputDescriptions\":null, \"binaryInputSettings\":null, \"binaryInputStates\":null, " \
+    "\"buttonInputDescriptions\":null, \"buttonInputSettings\":null, \"buttonInputStates\":null, " \
     "\"active\":null, " \
     "\"x-p44-bridgeable\":null, \"x-p44-bridged\":null, \"x-p44-bridgeAs\":null " \
   "}"

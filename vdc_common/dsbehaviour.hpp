@@ -78,6 +78,7 @@ namespace p44 {
     friend class DsScene;
     #if ENABLE_PROXYDEVICES
     friend class ProxyDevice;
+    friend class CustomChannel;
     #endif
 
   protected:
@@ -291,8 +292,7 @@ namespace p44 {
 
     #if ENABLE_PROXYDEVICES
     /// When we support proxy devices, we need to mirror some properties from the remote
-    /// @param a aDeviceLevelProps device level properties, this routine needs to pick and
-    ///   process any xxxxYyyyDescriptions/Settings/States that are relevant.
+    /// @param a aProps behaviour level properties to check
     typedef enum { behaviourProps_descriptions, behaviourProps_settings, behaviourProps_states } BehaviourPropSection;
     virtual void updateMirroredProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection);
     virtual void overrideRemoteProperties(JsonObjectPtr aProps, BehaviourPropSection aPropSection, bool aForWrite);

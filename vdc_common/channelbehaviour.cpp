@@ -904,6 +904,63 @@ bool ChannelBehaviour::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
 }
 
 
+#if ENABLE_PROXYDEVICES
+
+// MARK: mirrored channel property support for device proxies
+
+void CustomChannel::updateMirroredProperties(JsonObjectPtr aProps, DsBehaviour::BehaviourPropSection aPropSection)
+{
+  // process this behaviour type's properties
+  JsonObjectPtr o;
+  switch (aPropSection) {
+    case DsBehaviour::behaviourProps_descriptions:
+      if(aProps->get("name", o)) mName = o->stringValue();
+      // dsIndex is already correct from creation
+      if(aProps->get("channelType", o)) mChannelType = (DsChannelType)o->int32Value();
+      if(aProps->get("siunit", o)) mValueUnit = stringToValueUnit(o->stringValue());
+      if(aProps->get("min", o)) mMin = o->doubleValue();
+      if(aProps->get("max", o)) mMax = o->doubleValue();
+      if(aProps->get("resolution", o)) mResolution = o->doubleValue();
+      // Note: we do not mirror sourceID, this must be the local one
+      break;
+    case DsBehaviour::behaviourProps_settings:
+      // there are no channel settings
+      break;
+    case DsBehaviour::behaviourProps_states:
+      if (aProps->get("value", o)) {
+        double previousValue = mPreviousChannelValue;
+        bool newTarget = syncChannelValue(o->doubleValue(), true, true);
+        bool transitional = aProps->get("x-p44-transitional", o);
+        if (transitional) {
+          double transitionalValue = o->doubleValue();
+          // now in transition. Just started?
+          if (newTarget) {
+            // yes, just started, set up local transition simulation mirroring real transition
+            MLMicroSeconds estimatedRemaining = Infinite;
+            if (aProps->get("x-p44-transitiontimeleft", o)) {
+              estimatedRemaining = o->doubleValue()*Second;
+            }
+            startExternallyTimedTransition(estimatedRemaining);
+            // also trigger local value source
+            sendValueEvent();
+          }
+          reportChannelProgress(transitionalValue);
+        }
+        if (newTarget || transitional) {
+          mOutput.reportOutputState();
+        }
+      }
+      break;
+    default:
+      break;
+  }
+  // nothing of all this must be made persistent!
+  markClean();
+}
+
+#endif // ENABLE_PROXYDEVICES
+
+
 #if !REDUCED_FOOTPRINT
 // MARK: - string channel behaviour
 

@@ -490,6 +490,7 @@ namespace p44 {
   {
     typedef ChannelBehaviour inherited;
 
+  protected:
     double mMin; ///< minimum value
     double mMax; ///< maximum value
 
@@ -508,22 +509,29 @@ namespace p44 {
   typedef boost::intrusive_ptr<DialChannel> DialChannelPtr;
 
 
-  /// custom channel
+  /// custom channel (also used for proxying other channels)
   class CustomChannel : public DialChannel
   {
     typedef DialChannel inherited;
 
     string mName; ///< custom name, defaults to channelID
     ValueUnit mValueUnit; ///< custom value unit, defaults to none
+    DsChannelType mChannelType; ///< channel type
 
   public:
-    CustomChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mName = aChannelId; mValueUnit = VALUE_UNIT(valueUnit_none, unitScaling_1); };
-    virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
+    CustomChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId), mChannelType(channeltype_default) { mName = aChannelId; mValueUnit = VALUE_UNIT(valueUnit_none, unitScaling_1); };
+    virtual DsChannelType getChannelType() P44_OVERRIDE { return mChannelType; };
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return mValueUnit; };
     virtual const char* getName() const P44_OVERRIDE { return mName.c_str(); };
 
     void setName(const string aName) { mName = aName; };
     void setChannelUnit(ValueUnit aValueUnit) { mValueUnit = aValueUnit; };
+
+    #if ENABLE_PROXYDEVICES
+    /// When we support proxy devices, we need to mirror some properties from the remote
+    /// @param a aProps channel level properties to check
+    void updateMirroredProperties(JsonObjectPtr aProps, DsBehaviour::BehaviourPropSection aPropSection);
+    #endif // ENABLE_PROXYDEVICES
 
   };
   typedef boost::intrusive_ptr<CustomChannel> CustomChannelPtr;
