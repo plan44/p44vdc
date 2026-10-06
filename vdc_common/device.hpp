@@ -371,11 +371,11 @@ namespace p44 {
     /// @param aDeviceSettings specific device settings, if NULL, standard minimal settings will be used
     void installSettings(DeviceSettingsPtr aDeviceSettings = DeviceSettingsPtr());
 
-
     /// add a behaviour and set its index
     /// @param aBehaviour a newly created behaviour, will get added to the correct button/binaryInput/sensor/output
     ///   array, given the correct index value, and the behaviour id will be made unique if needed by appending an index
-    void addBehaviour(DsBehaviourPtr aBehaviour);
+    /// @param aExpectedIndex if >=0: the index we'd expect to get (to ensure consistency when replicating remote devices, e.g. proxy)
+    void addBehaviour(DsBehaviourPtr aBehaviour, int aExpectedIndex = -1);
 
     enum {
       by_id = -1, ///< aID string is only interpreted as id

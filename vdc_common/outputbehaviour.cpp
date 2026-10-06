@@ -88,9 +88,10 @@ void OutputBehaviour::setHardwareOutputConfig(VdcOutputFunction aOutputFunction,
 }
 
 
-void OutputBehaviour::addChannel(ChannelBehaviourPtr aChannel)
+void OutputBehaviour::addChannel(ChannelBehaviourPtr aChannel, int aExpectedIndex)
 {
   aChannel->mChannelIndex = (int)mChannels.size();
+  if (aExpectedIndex>=0 && aChannel->mChannelIndex!=aExpectedIndex) OLOG(LOG_CRIT, "inconsistent channel index");
   mChannels.push_back(aChannel);
 }
 

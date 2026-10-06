@@ -437,7 +437,7 @@ void Device::installSettings(DeviceSettingsPtr aDeviceSettings)
 
 // MARK: - behaviours
 
-void Device::addBehaviour(DsBehaviourPtr aBehaviour)
+void Device::addBehaviour(DsBehaviourPtr aBehaviour, int aExpectedIndex)
 {
   if (aBehaviour) {
     BehaviourVector *bvP = NULL;
@@ -474,6 +474,7 @@ void Device::addBehaviour(DsBehaviourPtr aBehaviour)
         aBehaviour->mBehaviourId = id; // assign it
         // assign the index
         aBehaviour->mIndex = bvP->size();
+        if (aExpectedIndex>=0 && aBehaviour->mIndex!=aExpectedIndex) OLOG(LOG_CRIT, "inconsistent behaviour index");
         // add it
         bvP->push_back(aBehaviour);
         break;

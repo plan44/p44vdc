@@ -114,9 +114,10 @@ namespace p44 {
 
     /// add a channel to the output
     /// @param aChannel the channel to add
+    /// @param aExpectedIndex if >=0: the index we'd expect to get (to ensure consistency when replicating remote devices, e.g. proxy)
     /// @note this is usually called by initialisation code of classes derived from OutputBehaviour to
     ///   add the behaviour specific channels.
-    void addChannel(ChannelBehaviourPtr aChannel);
+    void addChannel(ChannelBehaviourPtr aChannel, int aExpectedIndex = -1);
 
     /// get the actual output mode
     /// @return the actual output mode, never returns outputmode_default

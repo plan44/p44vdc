@@ -561,31 +561,41 @@ void ProxyDevice::configureStructure(JsonObjectPtr aDeviceJSON)
   string id;
   // - output
   if (aDeviceJSON->get("outputDescription", desc)) {
-    OutputBehaviourPtr o = OutputBehaviourPtr(new OutputBehaviour(*this));
-    o->setHardwareOutputConfig(outputFunction_custom, outputmode_default, usage_undefined, false, -1);
-    o->setHardwareName("proxy output");
-    addBehaviour(o);
+    OutputBehaviourPtr ob = OutputBehaviourPtr(new OutputBehaviour(*this));
+    ob->setHardwareOutputConfig(outputFunction_custom, outputmode_default, usage_undefined, false, -1);
+    ob->setHardwareName("proxy output");
+    addBehaviour(ob);
     // - channels
     if (aDeviceJSON->get("channelDescriptions", descs)) {
-#error need to add in the same dsIndex order as original, as indices matter
+      std::map<int, ChannelBehaviourPtr> chs;
       descs->resetKeyIteration();
       while(descs->nextKeyValue(id, desc)) {
-        ChannelBehaviourPtr ch = ChannelBehaviourPtr(new CustomChannel(*o, id));
-        o->addChannel(ch);
+        ChannelBehaviourPtr ch = ChannelBehaviourPtr(new CustomChannel(*ob, id));
+        // - add to map, adding to output needs to be in consistent dsIndex order
+        JsonObjectPtr o = desc->get("dsIndex");
+        if (o) chs[o->int32Value()] = ch;
+      }
+      for (auto pos = chs.begin(); pos!=chs.end(); ++pos) {
+        ob->addChannel(pos->second, pos->first);
       }
     }
   }
   // - buttons
   if (aDeviceJSON->get("buttonInputDescriptions", descs)) {
+    std::map<int, ButtonBehaviourPtr> bbs;
     descs->resetKeyIteration();
     while(descs->nextKeyValue(id, desc)) {
-#error need to add in the same dsIndex order as original, as indices matter
       ButtonBehaviourPtr bb = ButtonBehaviourPtr(new ButtonBehaviour(*this, id));
       // - for LocalController::processButtonClick we only need settings props,
       //   we get these in updateCachedProperties
       // - completely generic description is sufficient here
       bb->setHardwareName("proxy button");
-      addBehaviour(bb);
+      // - add to map, adding to device needs to be in consistent dsIndex order
+      JsonObjectPtr o = desc->get("dsIndex");
+      if (o) bbs[o->int32Value()] = bb;
+    }
+    for (auto pos = bbs.begin(); pos!=bbs.end(); ++pos) {
+      addBehaviour(pos->second, pos->first);
       // make button bridge exclusive
       JsonObjectPtr p = JsonObject::newBool(true);
       p = p->wrapAs("x-p44-bridgeExclusive")->wrapAs(id)->wrapAs("buttonInputSettings")->wrapAs("properties");
@@ -594,13 +604,18 @@ void ProxyDevice::configureStructure(JsonObjectPtr aDeviceJSON)
   }
   // - binary inputs
   if (aDeviceJSON->get("binaryInputDescriptions", descs)) {
-#error need to add in the same dsIndex order as original, as indices matter
+    std::map<int, BinaryInputBehaviourPtr> ibs;
     descs->resetKeyIteration();
     while(descs->nextKeyValue(id, desc)) {
       BinaryInputBehaviourPtr ib = BinaryInputBehaviourPtr(new BinaryInputBehaviour(*this, id));
       // - completely generic description is sufficient here
       ib->setHardwareName("proxy input");
-      addBehaviour(ib);
+      // - add to map, adding to device needs to be in consistent dsIndex order
+      JsonObjectPtr o = desc->get("dsIndex");
+      if (o) ibs[o->int32Value()] = ib;
+    }
+    for (auto pos = ibs.begin(); pos!=ibs.end(); ++pos) {
+      addBehaviour(pos->second, pos->first);
       // make input bridge exclusive
       JsonObjectPtr p = JsonObject::newBool(true);
       p = p->wrapAs("x-p44-bridgeExclusive")->wrapAs(id)->wrapAs("binaryInputSettings")->wrapAs("properties");
@@ -609,13 +624,18 @@ void ProxyDevice::configureStructure(JsonObjectPtr aDeviceJSON)
   }
   // - proxy sensor
   if (aDeviceJSON->get("sensorDescriptions", descs)) {
-#error need to add in the same dsIndex order as original, as indices matter
+    std::map<int, SensorBehaviourPtr> sbs;
     descs->resetKeyIteration();
     while(descs->nextKeyValue(id, desc)) {
       SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this, id));
       // - completely generic description is sufficient here
       sb->setHardwareName("proxy sensor");
-      addBehaviour(sb);
+      // - add to map, adding to device needs to be in consistent dsIndex order
+      JsonObjectPtr o = desc->get("dsIndex");
+      if (o) sbs[o->int32Value()] = sb;
+    }
+    for (auto pos = sbs.begin(); pos!=sbs.end(); ++pos) {
+      addBehaviour(pos->second, pos->first);
       // make sensor bridge exclusive
       JsonObjectPtr p = JsonObject::newBool(true);
       p = p->wrapAs("x-p44-bridgeExclusive")->wrapAs(id)->wrapAs("sensorSettings")->wrapAs("properties");
