@@ -57,8 +57,12 @@ ZoneState::ZoneState() :
   mLastCoolingScene(INVALID_SCENE_NO),
   mLastVentilationScene(INVALID_SCENE_NO),
   mCurrentTemp(INVALID_NUM),
+  mCurrentHumidity(INVALID_NUM),
   mTempSetPoint(INVALID_NUM),
-  mHeatingLevel(INVALID_NUM)
+  mHeatingLevel(INVALID_NUM),
+  mCurrentCO2(INVALID_NUM),
+  mCO2Threshold(INVALID_NUM),
+  mVentilationLevel(INVALID_NUM)
 {
   for (SceneArea i=0; i<=num_areas; ++i) {
     mLightOn[i] = false;
@@ -177,9 +181,16 @@ void ZoneState::getApiRepresentation(ApiValuePtr aApiObjectValue)
   // temperature control
   gs = aApiObjectValue->newObject();
   gs->add("TemperatureZone", NUM_API_VALUE(gs, mCurrentTemp));
+  gs->add("HumidityZone", NUM_API_VALUE(gs, mCurrentHumidity));
   gs->add("TemperatureSetPoint", NUM_API_VALUE(gs, mTempSetPoint));
   gs->add("heatingLevel", NUM_API_VALUE(gs, mHeatingLevel));
   aApiObjectValue->add(string_format("%d", group_roomtemperature_control), gs);
+  // ventilation control
+  gs = aApiObjectValue->newObject();
+  gs->add("CO2Zone", NUM_API_VALUE(gs, mCurrentCO2));
+  gs->add("CO2Threshold", NUM_API_VALUE(gs, mCO2Threshold));
+  gs->add("ventilationLevel", NUM_API_VALUE(gs, mVentilationLevel));
+  aApiObjectValue->add(string_format("%d", group_ventilation_control), gs);
 }
 
 
@@ -209,8 +220,14 @@ ScriptObjPtr ZoneState::getGroupState(DsGroup aGroup)
       break;
     case group_roomtemperature_control:
       state->setMemberByName("TemperatureZone", NUM_SCRIPT_VALUE(mCurrentTemp));
+      state->setMemberByName("HumidityZone", NUM_SCRIPT_VALUE(mCurrentHumidity));
       state->setMemberByName("TemperatureSetPoint", NUM_SCRIPT_VALUE(mTempSetPoint));
       state->setMemberByName("heatingLevel", NUM_SCRIPT_VALUE(mHeatingLevel));
+      break;
+    case group_ventilation_control:
+      state->setMemberByName("CO2Zone", NUM_SCRIPT_VALUE(mCurrentCO2));
+      state->setMemberByName("CO2Threshold", NUM_SCRIPT_VALUE(mCO2Threshold));
+      state->setMemberByName("ventilationLevel", NUM_SCRIPT_VALUE(mVentilationLevel));
       break;
     default:
       break;
@@ -355,6 +372,14 @@ void ZoneDescriptor::processZoneSensorChange(SensorBehaviour &aSensorBehaviour, 
     else if (aSensorBehaviour.getSensorType()==sensorType_temperature && aSensorBehaviour.getUsage()==usage_user) {
       // broadcast as zone set point
       LocalController::sharedLocalController()->setControlValue(mZoneID, group_roomtemperature_control, "TemperatureSetPoint", aCurrentValue);
+    }
+    else if (aSensorBehaviour.getSensorType()==sensorType_humidity && aSensorBehaviour.getUsage()==usage_room) {
+      // broadcast as zone temperature
+      LocalController::sharedLocalController()->setControlValue(mZoneID, group_ventilation_control, "HumidityZone", aCurrentValue);
+    }
+    else if (aSensorBehaviour.getSensorType()==sensorType_gas_CO2 && aSensorBehaviour.getUsage()==usage_room) {
+      // broadcast as zone CO2
+      LocalController::sharedLocalController()->setControlValue(mZoneID, group_ventilation_control, "CO2Zone", aCurrentValue);
     }
   }
 }
@@ -2222,11 +2247,23 @@ void LocalController::notificationDeliveredToZoneAndGroup(DsZoneID aZoneId, DsGr
           if (name=="TemperatureZone") {
             if (setIfChanged(zone->mZoneState.mCurrentTemp, value)) changed = true;
           }
+          if (name=="HumidityZone") {
+            if (setIfChanged(zone->mZoneState.mCurrentHumidity, value)) changed = true;
+          }
           else if (name=="TemperatureSetPoint") {
             if (setIfChanged(zone->mZoneState.mTempSetPoint, value)) changed = true;
           }
           else if (name=="heatingLevel") {
             if (setIfChanged(zone->mZoneState.mHeatingLevel, value)) changed = true;
+          }
+          if (name=="CO2Zone") {
+            if (setIfChanged(zone->mZoneState.mCurrentCO2, value)) changed = true;
+          }
+          else if (name=="CO2Threshold") {
+            if (setIfChanged(zone->mZoneState.mCO2Threshold, value)) changed = true;
+          }
+          else if (name=="ventilationLevel") {
+            if (setIfChanged(zone->mZoneState.mVentilationLevel, value)) changed = true;
           }
           else {
             OLOG(LOG_WARNING, "Zone '%s' received unknown control value %s=%.2f", zone->getName().c_str(), name.c_str(), value);
@@ -2613,7 +2650,6 @@ static ScriptObjPtr reason_accessor(BuiltInMemberLookup& aMemberLookup, ScriptOb
   assert(z);
   return new StringValue(z->eventReason());
 }
-
 
 
 // state(group_no_or_name)

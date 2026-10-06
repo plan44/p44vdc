@@ -81,8 +81,14 @@ namespace p44 {
 
     // Temperature control
     double mCurrentTemp; ///< current room temperature, as collected from room sensors
+    double mCurrentHumidity; ///< current room humidity, as collected from room sensors
     double mTempSetPoint; ///< current temperature set point
     double mHeatingLevel; ///< current heating/cooling level
+
+    // Ventilation control
+    double mCurrentCO2; ///< current CO2 level, as collected from room sensors
+    double mCO2Threshold; ///< current CO2 threshold
+    double mVentilationLevel; ///< current ventilation level
 
     ZoneState();
     bool stateFor(int aGroup, int aArea);
@@ -153,7 +159,6 @@ namespace p44 {
     ScriptObjPtr getGroupState(DsGroup aGroup) { return mZoneState.getGroupState(aGroup); }
 
     void processZoneSensorChange(SensorBehaviour &aSensorBehaviour, double aCurrentValue, double aPreviousValue);
-
 
   protected:
 
