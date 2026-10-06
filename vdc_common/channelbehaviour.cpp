@@ -179,6 +179,12 @@ ScriptObjPtr ChannelBehaviour::getInfo()
 {
   ObjectValuePtr info = new ObjectValue;
   info->setMemberByName("behaviour", new StringValue("outputchannel"));
+  info->setMemberByName("type", new StringValue(mChannelId));
+  info->setMemberByName("unit", new StringValue(valueUnitName(getChannelUnit(), false)));
+  info->setMemberByName("symbol", new StringValue(valueUnitName(getChannelUnit(), true)));
+  info->setMemberByName("min", new NumericValue(getMin()));
+  info->setMemberByName("max", new NumericValue(getMax()));
+  info->setMemberByName("resolution", new NumericValue(getResolution()));
   return info;
 }
 

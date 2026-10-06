@@ -2247,7 +2247,7 @@ void LocalController::notificationDeliveredToZoneAndGroup(DsZoneID aZoneId, DsGr
           if (name=="TemperatureZone") {
             if (setIfChanged(zone->mZoneState.mCurrentTemp, value)) changed = true;
           }
-          if (name=="HumidityZone") {
+          else if (name=="HumidityZone") {
             if (setIfChanged(zone->mZoneState.mCurrentHumidity, value)) changed = true;
           }
           else if (name=="TemperatureSetPoint") {

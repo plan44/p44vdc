@@ -25,7 +25,7 @@
 #define ALWAYS_DEBUG 0
 // - set FOCUSLOGLEVEL to non-zero log level (usually, 5,6, or 7==LOG_DEBUG) to get focus (extensive logging) for this file
 //   Note: must be before including "logger.hpp" (or anything that includes "logger.hpp")
-#define FOCUSLOGLEVEL 7
+#define FOCUSLOGLEVEL 6
 
 #include "proxydevice.hpp"
 
@@ -402,7 +402,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
   // - output group settings
   if (getOutput()) {
     if (aProps->get("outputSettings", props)) {
-      FOCUSOLOG("updating mirrored output settings: %s", JsonObject::text(props));
+      FOCUSOLOG("updating mirrored output settings: %s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
       // - output level color class
       if (props->get("colorClass", o)) {
         FOCUSOLOG("- update cached colorClass to %d", o->int32Value());
@@ -425,7 +425,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     }
     else {
       if (aProps->get("outputStates", props)) {
-        FOCUSOLOG("updating mirrored output states: %s", JsonObject::text(props));
+        FOCUSOLOG("updating mirrored output states:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
         if (props->get("error")) getOutput()->setHardwareError((VdcHardwareError)o->int32Value());
         if (props->get("localPriority")) getOutput()->setLocalPriority(o->boolValue());
       }
@@ -436,7 +436,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (CustomChannelPtr ccb = dynamic_pointer_cast<CustomChannel>(getChannelById(id))) {
-        FOCUSPOLOG(ccb, "update mirrored description properties: %s", JsonObject::text(props));
+        FOCUSPOLOG(ccb, "update mirrored description:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
         ccb->updateMirroredProperties(props, DsBehaviour::behaviourProps_descriptions);
       }
     }
@@ -445,7 +445,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (CustomChannelPtr ccb = dynamic_pointer_cast<CustomChannel>(getChannelById(id))) {
-        FOCUSPOLOG(ccb, "update mirrored settings properties: %s", JsonObject::text(props));
+        FOCUSPOLOG(ccb, "update mirrored settings:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
         ccb->updateMirroredProperties(props, DsBehaviour::behaviourProps_settings);
       }
     }
@@ -455,7 +455,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (ButtonBehaviourPtr bb = getButton(by_id, id)) {
-        FOCUSPOLOG(bb, "update mirrored description properties: %s", JsonObject::text(props));
+        FOCUSPOLOG(bb, "update mirrored description:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
         bb->updateMirroredProperties(props, DsBehaviour::behaviourProps_descriptions);
       }
     }
@@ -464,7 +464,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (ButtonBehaviourPtr bb = getButton(by_id, id)) {
-        FOCUSPOLOG(bb, "update mirrored settings properties: %s", JsonObject::text(props));
+        FOCUSPOLOG(bb, "update mirrored settings:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
         bb->updateMirroredProperties(props, DsBehaviour::behaviourProps_settings);
       }
     }
@@ -474,8 +474,8 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (BinaryInputBehaviourPtr ib = getInput(by_id, id)) {
-        FOCUSPOLOG(ib, "update mirrored description properties: %s", JsonObject::text(props));
-        ib->updateMirroredProperties(aProps, DsBehaviour::behaviourProps_descriptions);
+        FOCUSPOLOG(ib, "update mirrored description:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
+        ib->updateMirroredProperties(props, DsBehaviour::behaviourProps_descriptions);
       }
     }
   }
@@ -483,7 +483,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (BinaryInputBehaviourPtr ib = getInput(by_id, id)) {
-        FOCUSPOLOG(ib, "update mirrored settings properties: %s", JsonObject::text(props));
+        FOCUSPOLOG(ib, "update mirrored settings:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
         ib->updateMirroredProperties(props, DsBehaviour::behaviourProps_settings);
       }
     }
@@ -493,8 +493,8 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (SensorBehaviourPtr sb = getSensor(by_id, id)) {
-        FOCUSPOLOG(sb, "update mirrored description properties: %s", JsonObject::text(props));
-        sb->updateMirroredProperties(aProps, DsBehaviour::behaviourProps_descriptions);
+        FOCUSPOLOG(sb, "update mirrored description:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
+        sb->updateMirroredProperties(props, DsBehaviour::behaviourProps_descriptions);
       }
     }
   }
@@ -502,7 +502,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (SensorBehaviourPtr sb = getSensor(by_id, id)) {
-        FOCUSPOLOG(sb, "update mirrored settings properties: %s", JsonObject::text(props));
+        FOCUSPOLOG(sb, "update mirrored settings:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
         sb->updateMirroredProperties(props, DsBehaviour::behaviourProps_settings);
       }
     }
@@ -512,7 +512,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (ButtonBehaviourPtr bb = getButton(by_id, id)) {
-        FOCUSPOLOG(bb, "update mirrored state properties: %s", JsonObject::text(props));
+        FOCUSPOLOG(bb, "update mirrored state:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
         bb->updateMirroredProperties(props, DsBehaviour::behaviourProps_states);
       }
     }
@@ -521,7 +521,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (BinaryInputBehaviourPtr ib = getInput(by_id, id)) {
-        FOCUSPOLOG(ib, "update mirrored state properties: %s", JsonObject::text(props));
+        FOCUSPOLOG(ib, "update mirrored state:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
         ib->updateMirroredProperties(props, DsBehaviour::behaviourProps_states);
       }
     }
@@ -530,7 +530,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (SensorBehaviourPtr sb = getSensor(by_id, id)) {
-        FOCUSPOLOG(sb, "update mirrored state properties: %s", JsonObject::text(props));
+        FOCUSPOLOG(sb, "update mirrored state:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
         sb->updateMirroredProperties(props, DsBehaviour::behaviourProps_states);
       }
     }
@@ -540,7 +540,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
     elements->resetKeyIteration();
     while(elements->nextKeyValue(id, props)) {
       if (CustomChannelPtr ccb = dynamic_pointer_cast<CustomChannel>(getChannelById(id))) {
-        FOCUSPOLOG(ccb, "update mirrored state properties: %s", JsonObject::text(props));
+        FOCUSPOLOG(ccb, "update mirrored state:\n%s", JsonObject::text(props, JSON_C_TO_STRING_PRETTY));
         ccb->updateMirroredProperties(props, DsBehaviour::behaviourProps_states);
       }
     }
@@ -555,6 +555,7 @@ void ProxyDevice::updateLocallyAvailableProperties(JsonObjectPtr aProps)
 void ProxyDevice::configureStructure(JsonObjectPtr aDeviceJSON)
 {
   // replicate the basic structure / behaviours
+  FOCUSOLOG("device definition:\n%s", JsonObject::text(aDeviceJSON, JSON_C_TO_STRING_PRETTY));
   // as much as needed by localcontroller processing and value sources
   JsonObjectPtr desc;
   JsonObjectPtr descs;
@@ -630,6 +631,9 @@ void ProxyDevice::configureStructure(JsonObjectPtr aDeviceJSON)
       SensorBehaviourPtr sb = SensorBehaviourPtr(new SensorBehaviour(*this, id));
       // - completely generic description is sufficient here
       sb->setHardwareName("proxy sensor");
+      sb->mMin = 0;
+      sb->mMax = 0;
+      sb->mResolution = 0;
       // - add to map, adding to device needs to be in consistent dsIndex order
       JsonObjectPtr o = desc->get("dsIndex");
       if (o) sbs[o->int32Value()] = sb;

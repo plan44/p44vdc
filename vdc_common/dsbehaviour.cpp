@@ -385,8 +385,8 @@ void DsBehaviour::updateMirroredProperties(JsonObjectPtr aProps, BehaviourPropSe
   JsonObjectPtr o;
   switch (aPropSection) {
     case behaviourProps_descriptions:
-      if (aProps->get("name", o)) mControllerFunction = (VdcControllerFunction)o->int32Value();
-      if (aProps->get("dsIndex", o)) mControllerFunction = (VdcControllerFunction)o->int32Value();
+      if (aProps->get("name", o)) mHardwareName = o->stringValue();
+      // dsIndex cannot be set here, it needs to be consistent with the actual index, this must be ensured at creation
       break;
     case behaviourProps_settings:
       if (aProps->get("x-p44-controllerFunction", o)) mControllerFunction = (VdcControllerFunction)o->int32Value();
