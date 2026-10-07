@@ -1155,7 +1155,6 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     // - use command scene device settings
     installSettings(DeviceSettingsPtr(new CmdSceneDeviceSettings(*this)));
     OutputBehaviourPtr o = OutputBehaviourPtr(new ActionOutputBehaviour(*this));
-    o->setGroupMembership(defaultGroup, true);
     o->setHardwareName(hardwareName);
     addBehaviour(o);
   }
@@ -1239,7 +1238,6 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     installSettings(DeviceSettingsPtr(new ClimateDeviceSettings(*this)));
     // - create climate control valve output
     OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_simple, hscapability_heatingAndCooling));
-    cb->setGroupMembership(defaultGroup, true); // put into room temperature control group by default, NOT into standard blue)
     cb->setHardwareOutputConfig(outputFunction, outputFunction==outputFunction_switch ? outputmode_binary : outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName(hardwareName);
     addBehaviour(cb);
@@ -1252,7 +1250,6 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     installSettings(DeviceSettingsPtr(new FanCoilUnitDeviceSettings(*this)));
     // - create climate control fan coil unit output
     OutputBehaviourPtr cb = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_fancoilunit, hscapability_heatingAndCooling));
-    cb->setGroupMembership(defaultGroup, true); // put into room temperature control group...
     cb->setHardwareOutputConfig(outputFunction_internallyControlled, outputmode_gradual, usage_room, false, 0);
     cb->setHardwareName(hardwareName);
     addBehaviour(cb);
@@ -1274,7 +1271,6 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     }
     // - add ventilation behaviour
     VentilationBehaviourPtr vb = VentilationBehaviourPtr(new VentilationBehaviour(*this, vk));
-    vb->setGroupMembership(defaultGroup, true); // use the default group
     vb->setHardwareOutputConfig(outputFunction_dimmer, outputmode_gradual, usage_room, false, -1);
     vb->setHardwareName(hardwareName);
     addBehaviour(vb);
@@ -1314,7 +1310,6 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
     OutputBehaviourPtr out = OutputBehaviourPtr(new OutputBehaviour(*this));
     out->setHardwareOutputConfig(outputFunction, outputFunction==outputFunction_switch ? outputmode_binary : outputmode_gradual, usage_undefined, false, -1);
     out->setHardwareName(hardwareName);
-    out->setGroupMembership(defaultGroup, true); // put into default group
     // - add channel
     string channelid;
     if (aInitParams->get("channelid", o)) {
@@ -1335,6 +1330,9 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
       if (aInitParams->get("channelname", o)) cc->setName(o->stringValue());
       out->addChannel(cc);
     }
+    // make sure the output is at least in the default group
+    if (defaultGroup!=group_undefined) out->setGroupMembership(defaultGroup, true);
+    // now add to device
     addBehaviour(out);
   }
   else {
