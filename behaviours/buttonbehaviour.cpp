@@ -251,6 +251,7 @@ void ButtonBehaviour::setGroup(DsGroup aGroup)
 
 void ButtonBehaviour::setAndPropagateGroup(DsGroup aGroup)
 {
+  setGroup(aGroup);
   // for unchangeably paired (rocker) buttons, automatically change group on counterpart
   if (mFixedButtonMode==buttonMode_rockerDown_pairWith1 || mFixedButtonMode==buttonMode_rockerUp_pairWith1) {
     // also change group in button1
@@ -277,6 +278,7 @@ void ButtonBehaviour::setDsMode(DsButtonMode aMode)
 
 void ButtonBehaviour::setAndPropagateFunction(DsButtonFunc aFunc)
 {
+  setFunction(aFunc);
   // for unchangeably paired (rocker) buttons, automatically change function on counterpart
   if (mFixedButtonMode==buttonMode_rockerDown_pairWith1 || mFixedButtonMode==buttonMode_rockerUp_pairWith1) {
     // also change function in button1
