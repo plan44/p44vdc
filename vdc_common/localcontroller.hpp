@@ -73,8 +73,11 @@ namespace p44 {
     // Heating State
     SceneNo mLastHeatingScene; ///< last heating scene called
 
-    // Heating State
+    // Cooling State
     SceneNo mLastCoolingScene; ///< last cooling scene called
+
+    // Window State
+    SceneNo mLastWindowScene; ///< last window scene called
 
     // Ventilation State
     SceneNo mLastVentilationScene; ///< last ventilation scene called

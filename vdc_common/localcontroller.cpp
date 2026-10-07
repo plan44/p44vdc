@@ -55,6 +55,7 @@ ZoneState::ZoneState() :
   mLastShadowScene(INVALID_SCENE_NO),
   mLastHeatingScene(INVALID_SCENE_NO),
   mLastCoolingScene(INVALID_SCENE_NO),
+  mLastWindowScene(INVALID_SCENE_NO),
   mLastVentilationScene(INVALID_SCENE_NO),
   mCurrentTemp(INVALID_NUM),
   mCurrentHumidity(INVALID_NUM),
@@ -98,6 +99,7 @@ void ZoneState::setLastSceneFor(int aGroup, SceneNo aSceneNo)
     case group_grey_shadow: mLastShadowScene = aSceneNo; break;
     case group_blue_heating: mLastHeatingScene = aSceneNo; break;
     case group_blue_cooling: mLastCoolingScene = aSceneNo; break;
+    case group_blue_windows: mLastWindowScene = aSceneNo; break;
     case group_blue_ventilation: mLastVentilationScene = aSceneNo; break;
   }
 }
@@ -111,6 +113,7 @@ SceneNo ZoneState::lastSceneFor(int aGroup)
     case group_grey_shadow: return mLastShadowScene;
     case group_blue_heating: return mLastHeatingScene;
     case group_blue_cooling: return mLastCoolingScene;
+    case group_blue_windows: return mLastWindowScene;
     case group_blue_ventilation: return mLastVentilationScene;
     default: return INVALID_SCENE_NO;
   }
@@ -127,7 +130,7 @@ string ZoneState::description()
     "- lastGlobalScene:%s\n"
     "- lastLightScene:%s, lastDim=%d, lightOn=%d/areas1234=%d%d%d%d\n"
     "- lastShadowScene:%s, shadesOpen=%d/%d%d%d%d\n"
-    "- lastHeatingScene:%s, lastCoolingScene:%s, lastVentilationScene:%s\n"
+    "- lastHeatingScene:%s, lastCoolingScene:%s, lastWindowScene:%s, lastVentilationScene:%s\n"
     "- currentTemp: %.1f ºC, setPoint: %.1f ºC",
     VdcHost::sceneText(mLastGlobalScene, true).c_str(),
     VdcHost::sceneText(mLastLightScene, false).c_str(), (int)mLastDim,
@@ -136,6 +139,7 @@ string ZoneState::description()
     mShadesOpen[0], mShadesOpen[1], mShadesOpen[2], mShadesOpen[3], mShadesOpen[4],
     VdcHost::sceneText(mLastHeatingScene, false).c_str(),
     VdcHost::sceneText(mLastCoolingScene, false).c_str(),
+    VdcHost::sceneText(mLastWindowScene, false).c_str(),
     VdcHost::sceneText(mLastVentilationScene, false).c_str(),
     mCurrentTemp, mTempSetPoint
   );
@@ -174,6 +178,10 @@ void ZoneState::getApiRepresentation(ApiValuePtr aApiObjectValue)
   gs = aApiObjectValue->newObject();
   gs->add("scene", SCENE_API_VALUE(gs, lastSceneFor(group_blue_cooling)));
   aApiObjectValue->add(string_format("%d", group_blue_cooling), gs);
+  // window
+  gs = aApiObjectValue->newObject();
+  gs->add("scene", SCENE_API_VALUE(gs, lastSceneFor(group_blue_windows)));
+  aApiObjectValue->add(string_format("%d", group_blue_windows), gs);
   // ventilation
   gs = aApiObjectValue->newObject();
   gs->add("scene", SCENE_API_VALUE(gs, lastSceneFor(group_blue_ventilation)));
