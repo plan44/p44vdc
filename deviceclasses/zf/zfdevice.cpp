@@ -40,13 +40,13 @@ using namespace p44;
 
 ZfDevice::ZfDevice(ZfVdc *aVdcP, ZfDeviceType aDeviceType) :
   Device(aVdcP),
-  zfDeviceType(aDeviceType),
-  lastMessageTime(Never),
-  lastRSSI(INVALID_RSSI)
+  mZfDeviceType(aDeviceType),
+  mLastMessageTime(Never),
+  mLastRSSI(INVALID_RSSI)
 {
-  iconBaseName = "zf";
-  groupColoredIcon = true;
-  lastMessageTime = MainLoop::now(); // consider packet received at time of creation (to avoid devices starting inactive)
+  mIconBaseName = "zf";
+  mGroupColoredIcon = true;
+  mLastMessageTime = MainLoop::now(); // consider packet received at time of creation (to avoid devices starting inactive)
 }
 
 
@@ -66,13 +66,13 @@ bool ZfDevice::identifyDevice(IdentifyDeviceCB aIdentifyCB)
 
 ZfAddress ZfDevice::getAddress() const
 {
-  return zfAddress;
+  return mZfAddress;
 }
 
 
 ZfSubDevice ZfDevice::getSubDevice() const
 {
-  return subDevice;
+  return mSubDevice;
 }
 
 
@@ -97,7 +97,7 @@ string ZfDevice::hardwareGUID() const
 string ZfDevice::modelName() const
 {
   // base class "model", derived classes might have nicer model names
-  return string_format("ZF device type %d", zfDeviceType);
+  return string_format("ZF device type %d", mZfDeviceType);
 }
 
 
@@ -109,8 +109,8 @@ string ZfDevice::vendorName() const
 
 void ZfDevice::setAddressingInfo(ZfAddress aAddress, ZfSubDevice aSubDeviceIndex)
 {
-  zfAddress = aAddress;
-  subDevice = aSubDeviceIndex;
+  mZfAddress = aAddress;
+  mSubDevice = aSubDeviceIndex;
   deriveDsUid();
 }
 
@@ -120,11 +120,11 @@ void ZfDevice::setAddressingInfo(ZfAddress aAddress, ZfSubDevice aSubDeviceIndex
 bool ZfDevice::getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix)
 {
   bool iconFound = false;
-  if (iconBaseName) {
-    if (groupColoredIcon)
-      iconFound = getClassColoredIcon(iconBaseName, getDominantColorClass(), aIcon, aWithData, aResolutionPrefix);
+  if (mIconBaseName) {
+    if (mGroupColoredIcon)
+      iconFound = getClassColoredIcon(mIconBaseName, getDominantColorClass(), aIcon, aWithData, aResolutionPrefix);
     else
-      iconFound = getIcon(iconBaseName, aIcon, aWithData, aResolutionPrefix);
+      iconFound = getIcon(mIconBaseName, aIcon, aWithData, aResolutionPrefix);
   }
   if (iconFound)
     return true;
@@ -179,9 +179,9 @@ void ZfDevice::checkPresence(PresenceCB aPresenceResultHandler)
 int ZfDevice::opStateLevel()
 {
   int opState = -1;
-  if (lastRSSI>INVALID_RSSI) {
+  if (mLastRSSI>INVALID_RSSI) {
     // first judge from last RSSI
-    opState = 1+(lastRSSI-WORST_RSSI)*99/(BEST_RSSI-WORST_RSSI); // 1..100 range
+    opState = 1+(mLastRSSI-WORST_RSSI)*99/(BEST_RSSI-WORST_RSSI); // 1..100 range
     if (opState<1) opState = 1;
     else if (opState>100) opState = 100;
   }
@@ -192,10 +192,8 @@ int ZfDevice::opStateLevel()
 string ZfDevice::getOpStateText()
 {
   string t;
-  if (lastRSSI>INVALID_RSSI) {
-    string_format_append(t, "%ddBm (", lastRSSI);
-    format_duration_append(t, (MainLoop::now()-lastMessageTime)/Second, 2);
-    t += " ago)";
+  if (mLastRSSI>INVALID_RSSI) {
+    string_format_append(t, "%ddBm", mLastRSSI);
   }
   else {
     t += "unseen";
@@ -204,12 +202,20 @@ string ZfDevice::getOpStateText()
 }
 
 
+MLMicroSeconds ZfDevice::getOpStateTimestamp()
+{
+  // Note mLastMessageTime is set to now at startup, so additionally check lastRSSI
+  if (mLastRSSI<=INVALID_RSSI) return Never;
+  return mLastMessageTime;
+}
+
+
 
 void ZfDevice::handlePacket(ZfPacketPtr aPacket)
 {
   // remember last message time
-  lastMessageTime = MainLoop::now();
-  lastRSSI = aPacket->rssi;
+  mLastMessageTime = MainLoop::now();
+  mLastRSSI = aPacket->rssi;
   processPacket(aPacket);
 }
 
@@ -219,8 +225,8 @@ void ZfDevice::handlePacket(ZfPacketPtr aPacket)
 string ZfDevice::description()
 {
   string s = inherited::description();
-  string_format_append(s, "\n- ZF Address = 0x%08X, subDevice=%d", zfAddress, subDevice);
-  string_format_append(s, "\n- device type %d", zfDeviceType);
+  string_format_append(s, "\n- ZF Address = 0x%08X, subDevice=%d", mZfAddress, mSubDevice);
+  string_format_append(s, "\n- device type %d", mZfDeviceType);
   return s;
 }
 
@@ -279,16 +285,16 @@ bool ZfDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue, Pro
       switch (aPropertyDescriptor->fieldKey()) {
         case messageage_key:
           // Note lastMessageTime is set to now at startup, so additionally check lastRSSI
-          if (lastMessageTime==Never || lastRSSI<=INVALID_RSSI)
+          if (mLastMessageTime==Never || mLastRSSI<=INVALID_RSSI)
             aPropValue->setNull();
           else
-            aPropValue->setDoubleValue((double)(MainLoop::now()-lastMessageTime)/Second);
+            aPropValue->setDoubleValue((double)(MainLoop::now()-mLastMessageTime)/Second);
           return true;
         case rssi_key:
-          if (lastRSSI<=INVALID_RSSI)
+          if (mLastRSSI<=INVALID_RSSI)
             aPropValue->setNull();
           else
-            aPropValue->setInt32Value(lastRSSI);
+            aPropValue->setInt32Value(mLastRSSI);
           return true;
       }
     }

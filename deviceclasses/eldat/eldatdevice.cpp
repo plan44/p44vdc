@@ -190,13 +190,11 @@ string EldatDevice::getOpStateText()
   string t;
   if (mLastRSSI>INVALID_RSSI) {
     if (mLastRSSI==0) {
-      t.append("unknown dBm (");
+      t.append("unknown dBm");
     }
     else {
-      string_format_append(t, "%ddBm (", mLastRSSI);
+      string_format_append(t, "%ddBm", mLastRSSI);
     }
-    format_duration_append(t, (MainLoop::now()-mLastMessageTime)/Second, 2);
-    t += " ago)";
   }
   else {
     t += "unseen";
@@ -204,6 +202,13 @@ string EldatDevice::getOpStateText()
   return t;
 }
 
+
+MLMicroSeconds EldatDevice::getOpStateTimestamp()
+{
+  // Note mLastMessageTime is set to now at startup, so additionally check lastRSSI
+  if (mLastRSSI<=INVALID_RSSI) return Never;
+  return mLastMessageTime;
+}
 
 
 void EldatDevice::handleMessage(EldatMode aMode, int aRSSI, string aData)
@@ -216,8 +221,6 @@ void EldatDevice::handleMessage(EldatMode aMode, int aRSSI, string aData)
   }
   reportOpState();
 }
-
-
 
 
 string EldatDevice::description()

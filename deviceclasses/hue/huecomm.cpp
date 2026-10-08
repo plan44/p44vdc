@@ -332,7 +332,8 @@ public:
     // SSDP UUID has the form      : 2f402f80-da50-11e1-9b23-001788....123456
     // DNSSD bridgeid has the form :                         001788fffe123456
     string bi = lowerCase(aId);
-    if (bi.size()==16) return bi; // as-is
+    if (bi.size()==0) return "unknown_bridgeID";
+    if (bi.size()==16 || bi.size()<18) return bi; // as-is, either DNSSD form or too short to be UUID
     return bi.substr(bi.size()-12,6)+"fffe"+bi.substr(bi.size()-6,6);
   }
 

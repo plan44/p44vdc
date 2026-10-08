@@ -479,12 +479,10 @@ string EnoceanDevice::getOpStateText()
     t += "timeout, ";
   }
   if (mLastRSSI>INVALID_RSSI) {
-    string_format_append(t, "%ddBm (", mLastRSSI);
+    string_format_append(t, "%ddBm", mLastRSSI);
     if (mLastRepeaterCount>0) {
       string_format_append(t, "%d Rep., ", mLastRepeaterCount);
     }
-    format_duration_append(t, (MainLoop::now()-mLastPacketTime)/Second, 2);
-    t += " ago)";
   }
   else {
     t += "unseen";
@@ -503,6 +501,13 @@ string EnoceanDevice::getOpStateText()
   return t;
 }
 
+
+MLMicroSeconds EnoceanDevice::getOpStateTimestamp()
+{
+  // Note mLastPacketTime is set to now at startup, so additionally check lastRSSI
+  if (mLastRSSI<=INVALID_RSSI) return Never;
+  return mLastPacketTime;
+}
 
 
 string EnoceanDevice::description()
@@ -762,7 +767,7 @@ bool EnoceanDevice::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
       // read properties
       switch (aPropertyDescriptor->fieldKey()) {
         case packetage_key:
-          // Note lastPacketTime is set to now at startup, so additionally check lastRSSI
+          // Note mLastPacketTime is set to now at startup, so additionally check lastRSSI
           if (mLastPacketTime==Never || mLastRSSI<=INVALID_RSSI)
             aPropValue->setNull();
           else

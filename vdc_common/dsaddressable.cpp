@@ -533,6 +533,7 @@ enum {
   statusText_key,
   opStateLevel_key,
   opStateText_key,
+  opStateAge_key,
   logLevelOffset_key,
   deviceIcon16_key,
   iconName_key,
@@ -578,6 +579,7 @@ PropertyDescriptorPtr DsAddressable::getDescriptorByIndex(int aPropIndex, int aD
     { "x-p44-statusText", apivalue_string, statusText_key, OKEY(dsAddressable_key) },
     { "x-p44-opStateLevel", apivalue_uint64, opStateLevel_key, OKEY(dsAddressable_key) },
     { "x-p44-opStateText", apivalue_string, opStateText_key, OKEY(dsAddressable_key) },
+    { "x-p44-opStateAge", apivalue_double, opStateAge_key, OKEY(dsAddressable_key) },
     { "x-p44-logLevelOffset", apivalue_int64, logLevelOffset_key, OKEY(dsAddressable_key) },
     { "deviceIcon16", apivalue_binary, deviceIcon16_key, OKEY(dsAddressable_key) },
     { "deviceIconName", apivalue_string, iconName_key, OKEY(dsAddressable_key) },
@@ -661,6 +663,11 @@ bool DsAddressable::accessField(PropertyAccessMode aMode, ApiValuePtr aPropValue
         case statusText_key: aPropValue->setStringValue(getStatusText()); return true;
         case opStateLevel_key: { int l=opStateLevel(); if (l<0) aPropValue->setNull(); else aPropValue->setUint16Value(l); return true; }
         case opStateText_key: aPropValue->setStringValue(getOpStateText()); return true;
+        case opStateAge_key: {
+          if (getOpStateTimestamp()==Never) return false; // do not show when not in use
+          aPropValue->setDoubleValue((double)(MainLoop::now()-getOpStateTimestamp())/Second);
+          return true;
+        }
         case logLevelOffset_key: { int o=getLocalLogLevelOffset(); if (o==0) return false; else aPropValue->setInt32Value(o); return true; }
         case objectDescription_key: aPropValue->setStringValue(description()); return true;
         case deviceIcon16_key: { string icon; if (getDeviceIcon(icon, true, "icon16")) { aPropValue->setBinaryValue(icon); return true; } else return false; }

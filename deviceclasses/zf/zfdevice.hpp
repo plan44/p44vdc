@@ -66,18 +66,18 @@ namespace p44 {
   {
     typedef Device inherited;
 
-    MLMicroSeconds lastMessageTime; ///< time when device received last message (or device was created)
-    int16_t lastRSSI; ///< RSSI of last packet received
+    MLMicroSeconds mLastMessageTime; ///< time when device received last message (or device was created)
+    int16_t mLastRSSI; ///< RSSI of last packet received
 
   protected:
 
-    ZfAddress zfAddress; ///< the enocean device address
-    ZfDeviceType zfDeviceType; ///< the type of device
-    ZfSubDevice subDevice; ///< the subdevice number (relevant when one physical ZF device is represented as multiple vdSDs)
+    ZfAddress mZfAddress; ///< the enocean device address
+    ZfDeviceType mZfDeviceType; ///< the type of device
+    ZfSubDevice mSubDevice; ///< the subdevice number (relevant when one physical ZF device is represented as multiple vdSDs)
 
-    string functionDesc; ///< short functional description (like: button, windowhandle, sensor...)
-    const char *iconBaseName; ///< icon base name
-    bool groupColoredIcon; ///< if set, use color suffix with icon base name
+    string mFunctionDesc; ///< short functional description (like: button, windowhandle, sensor...)
+    const char *mIconBaseName; ///< icon base name
+    bool mGroupColoredIcon; ///< if set, use color suffix with icon base name
 
 
   public:
@@ -103,7 +103,7 @@ namespace p44 {
 
     /// return time when last packet was received for this device
     /// @return time when last packet was received or Never
-    MLMicroSeconds getLastMessageTime() { return lastMessageTime; };
+    MLMicroSeconds getLastMessageTime() { return mLastMessageTime; };
 
     /// check presence of this addressable
     /// @param aPresenceResultHandler will be called to report presence status
@@ -146,11 +146,11 @@ namespace p44 {
     virtual void setAddressingInfo(ZfAddress aAddress, ZfSubDevice aSubDeviceIndex);
 
     /// set the icon info for the enocean device
-    void setIconInfo(const char *aIconBaseName, bool aGroupColored) { iconBaseName = aIconBaseName; groupColoredIcon = aGroupColored; };
+    void setIconInfo(const char *aIconBaseName, bool aGroupColored) { mIconBaseName = aIconBaseName; mGroupColoredIcon = aGroupColored; };
 
     /// set short functional description for this device (explaining the EEP in short, like "button", "sensor", "window handle")
     /// @param aString the description string
-    void setFunctionDesc(string aString) { functionDesc = aString; };
+    void setFunctionDesc(string aString) { mFunctionDesc = aString; };
 
 
     /// disconnect device. For EnOcean, this means breaking the pairing (learn-in) with the device
@@ -187,7 +187,7 @@ namespace p44 {
 
     /// get the ZF device type
     /// @return ZF device type
-    ZfDeviceType getZfDeviceType() { return zfDeviceType; }
+    ZfDeviceType getZfDeviceType() { return mZfDeviceType; }
 
     /// description of object, mainly for debug and logging
     /// @return textual description of object
@@ -216,6 +216,9 @@ namespace p44 {
     /// Get short text to describe the operation state (such as radio RSSI, critical battery level, etc.)
     /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
     virtual string getOpStateText() P44_OVERRIDE;
+
+    /// @return last operation state relevant timestamp, usually when device was last communicated with
+    virtual MLMicroSeconds getOpStateTimestamp() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)
@@ -258,7 +261,7 @@ namespace p44 {
   {
     typedef ZfDevice inherited;
 
-    MLTicket pressedTicket;
+    MLTicket mPressedTicket;
 
   public:
 

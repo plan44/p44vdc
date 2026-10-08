@@ -372,6 +372,8 @@ namespace p44 {
     /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
     virtual string getOpStateText() P44_OVERRIDE;
 
+    /// @return last operation state relevant timestamp, usually when device was last communicated with
+    virtual MLMicroSeconds getOpStateTimestamp() P44_OVERRIDE;
 
     /// Get icon data or name
     /// @param aIcon string to put result into (when method returns true)

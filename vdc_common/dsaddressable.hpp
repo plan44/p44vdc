@@ -377,6 +377,9 @@ namespace p44 {
     /// @return string, really short, intended to be shown as a narrow column in a device/vdc list
     virtual string getOpStateText() { return ""; };
 
+    /// @return last operation state relevant timestamp, usually when device was last communicated with
+    virtual MLMicroSeconds getOpStateTimestamp() { return Never; };
+
     /// @}
 
 
