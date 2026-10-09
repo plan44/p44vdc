@@ -68,8 +68,8 @@ const char *inputTypeIds[numBinaryInputTypes] = {
   "sun", ///< solar radiation (sun light above threshold)
   "thermostat", ///< thermostat (temperature below user-adjusted threshold)
   "low_battery", ///< device has low battery
-  "window_open", ///< window is open
-  "door_open", ///< door is open
+  "window_closed", ///< window is closed
+  "door_closed", ///< door is closed
   "window_handle", ///< TRI-STATE! Window handle, has extendedValue showing closed/open/tilted, bool value is just closed/open
   "garage_open", ///< garage door is open
   "sun_protection", ///< protect against too much sunlight
