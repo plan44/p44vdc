@@ -295,6 +295,15 @@ void VdcHost::postEvent(VdchostEvent aEvent)
     sendEvent(new StringValue(vdcHostEventNames[aEvent]));
   }
   #endif // P44SCRIPT_FULL_SUPPORT
+  #if ENABLE_GENERIC_API_PUSH
+  VdcApiConnectionPtr api = getVdcHost().genericPushApi();
+  if (api) {
+    // create event list with one element: { "<deviceeventid>": null }
+    ApiValuePtr events = api->newApiValue()->wrapNull(vdcHostEventNames[aEvent]);
+    // pushnotification for vdchost with just the device event
+    pushNotification(api, ApiValuePtr(), events);
+  }
+  #endif // ENABLE_GENERIC_API_PUSH
 }
 
 
