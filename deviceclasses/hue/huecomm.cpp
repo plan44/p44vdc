@@ -759,6 +759,7 @@ void HueComm::apiAction(HueApiOperation::HttpMethods aMethod, const char* aUrlSu
 {
   if (!mApiReady && !aNoAutoURL) {
     if (aResultHandler) aResultHandler(JsonObjectPtr(), ErrorPtr(new HueCommError(HueCommError::ApiNotReady)));
+    return;
   }
   string url;
   if (aNoAutoURL) {
