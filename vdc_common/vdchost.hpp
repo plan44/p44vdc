@@ -502,7 +502,8 @@ namespace p44 {
     /// Put vDC controllers into learn-in mode
     /// @param aLearnHandler handler to call when a learn-in action occurs
     /// @param aDisableProximityCheck true to disable proximity check (e.g. minimal RSSI requirement for some EnOcean devices)
-    void startLearning(LearnCB aLearnHandler, bool aDisableProximityCheck = false);
+    /// @param aOnlyEstablish yes to only learn in, no to only learn out, undefined to allow both learn in and out
+    void startLearning(LearnCB aLearnHandler, bool aDisableProximityCheck = false, Tristate aOnlyEstablish = undefined);
 
     /// stop learning mode
     void stopLearning();

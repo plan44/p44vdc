@@ -1262,6 +1262,10 @@ ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMet
     if (o) {
       disableProximity = o->boolValue();
     }
+    //
+    Tristate onlyEstablish = undefined;
+    o = aParams->get("onlyEstablish");
+    if (o) onlyEstablish = o->boolValue() ? yes : no;
     // get timeout
     o = aParams->get("seconds");
     int seconds = 30; // default to 30
@@ -1281,7 +1285,7 @@ ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMet
     else {
       // start learning
       learnIdentifyRequest = aRequest; // remember so we can cancel it when we receive a separate cancel request
-      startLearning(boost::bind(&P44VdcHost::learnHandler, this, aRequest, _1, _2), disableProximity);
+      startLearning(boost::bind(&P44VdcHost::learnHandler, this, aRequest, _1, _2), disableProximity, onlyEstablish);
       learnIdentifyTicket.executeOnce(boost::bind(&P44VdcHost::learnHandler, this, aRequest, false, Error::err<P44VdcError>(408, "learn timeout")), seconds*Second);
     }
   }

@@ -892,14 +892,16 @@ void VdcHost::removeDevice(DevicePtr aDevice, bool aForget)
 
 
 
-void VdcHost::startLearning(LearnCB aLearnHandler, bool aDisableProximityCheck)
+void VdcHost::startLearning(LearnCB aLearnHandler, bool aDisableProximityCheck, Tristate aOnlyEstablish)
 {
   // enable learning in all class containers
   mLearnHandler = aLearnHandler;
   mLearningMode = true;
-  LOG(LOG_NOTICE, "=== start learning%s", aDisableProximityCheck ? " with proximity check disabled" : "");
+  LOG(LOG_NOTICE, "=== start learning %s%s",
+    aOnlyEstablish==undefined ? "in or out" : (aOnlyEstablish==yes ? "in only" : "out only"),
+    aDisableProximityCheck ? " with proximity check disabled" : "");
   for (VdcMap::iterator pos = mVdcs.begin(); pos != mVdcs.end(); ++pos) {
-    pos->second->setLearnMode(true, aDisableProximityCheck, undefined);
+    pos->second->setLearnMode(true, aDisableProximityCheck, aOnlyEstablish);
   }
 }
 
