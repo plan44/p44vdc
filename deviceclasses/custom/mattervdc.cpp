@@ -162,6 +162,7 @@ ErrorPtr MatterVdc::handleMethod(VdcApiRequestPtr aRequest, const string &aMetho
     respErr = Error::ok();
   }
   else if (aMethod=="dquit") {
+    if (!mMatterConnector) return TextError::err("no matter controller connected, cannot quit");
     ApiValuePtr a;
     int exitcode = EXIT_SUCCESS;
     if ((a = aParams->get("exitcode"))) {
