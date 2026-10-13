@@ -2960,6 +2960,31 @@ static void zone_func(BuiltinFunctionContextPtr f)
 }
 
 
+const ScriptObjPtr ZonesObj::memberByName(const string aName, TypeInfo aMemberAccessFlags) const
+{
+  ZoneDescriptorPtr zone = mZoneList.getZoneByNameOrId(aName);
+  if (zone) return new ZoneObj(zone);
+  return ScriptObjPtr(); // no such zone
+}
+
+
+void ZonesObj::appendFieldNames(FieldNameList& aList, TypeInfo aTypeRequirements) const
+{
+  for (ZoneList::ZonesVector::iterator pos = mZoneList.mZones.begin(); pos!=mZoneList.mZones.end(); ++pos) {
+    aList.push_back(string_format("%d",(*pos)->getZoneId()));
+  }
+}
+
+
+
+// zones object
+static ScriptObjPtr zones_accessor(BuiltInMemberLookup& aMemberLookup, ScriptObjPtr aParentObj, ScriptObjPtr aObjToWrite, BuiltinMemberDescriptor*)
+{
+  return new ZonesObj(LocalController::sharedLocalController()->mLocalZones);
+}
+
+
+
 // zoneevent(zone_filter, group_filter, reason_filter)
 FUNC_ARG_DEFS(zoneevent, { text|numeric|null|optionalarg }, { text|numeric|null|optionalarg }, { text|optionalarg } );
 static void zoneevent_func(BuiltinFunctionContextPtr f)
@@ -3065,6 +3090,7 @@ static const BuiltinMemberDescriptor localControllerFuncs[] = {
   FUNC_DEF_W_ARG(savescene, executable|anyvalid),
   FUNC_DEF_W_ARG(set, executable|anyvalid),
   FUNC_DEF_W_ARG(zone, executable|objectvalue),
+  MEMBER_DEF(zones, builtinvalue),
   FUNC_DEF_W_ARG(zoneevent, executable|objectvalue),
   FUNC_DEF_W_ARG(setcontrolvalue, executable|objectvalue),
   FUNC_DEF_W_ARG(controllerevent, executable|objectvalue),

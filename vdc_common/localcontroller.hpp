@@ -640,6 +640,21 @@ namespace p44 {
   namespace P44Script {
 
 
+    /// represents all zones
+    class ZonesObj : public StructuredValue
+    {
+      typedef StructuredValue inherited;
+
+      ZoneList& mZoneList;
+    public:
+      ZonesObj(ZoneList& aZoneList) : mZoneList(aZoneList) {};
+      virtual TypeInfo getTypeInfo() const P44_OVERRIDE { return objectvalue|keeporiginal; }
+      virtual const ScriptObjPtr memberByName(const string aName, TypeInfo aMemberAccessFlags = none) const P44_OVERRIDE;
+    protected:
+      virtual void appendFieldNames(FieldNameList& aList, TypeInfo aTypeRequirements) const P44_OVERRIDE;
+    };
+
+
     /// represents changed zone state
     class ZoneObj : public StructuredLookupObject
     {
