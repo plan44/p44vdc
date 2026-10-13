@@ -2264,7 +2264,7 @@ void LocalController::notificationDeliveredToZoneAndGroup(DsZoneID aZoneId, DsGr
           else if (name=="heatingLevel") {
             if (setIfChanged(zone->mZoneState.mHeatingLevel, value)) changed = true;
           }
-          if (name=="CO2Zone") {
+          else if (name=="CO2Zone") {
             if (setIfChanged(zone->mZoneState.mCurrentCO2, value)) changed = true;
           }
           else if (name=="CO2Threshold") {
