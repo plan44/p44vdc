@@ -28,6 +28,7 @@
 #include "binaryinputbehaviour.hpp"
 #include "lightbehaviour.hpp"
 #include "shadowbehaviour.hpp"
+#include "climatecontrolbehaviour.hpp"
 
 using namespace p44;
 
@@ -59,9 +60,11 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
       mDigitalIoType = digitalio_input;
     else if (mode=="light")
       mDigitalIoType = digitalio_light;
-    else if (mode=="relay") {
+    else if (mode=="relay")
       mDigitalIoType = digitalio_relay;
-    } else if (mode=="blind") {
+    else if (mode=="valve")
+      mDigitalIoType = digitalio_valve;
+    else if (mode=="blind") {
       // ioname = "<upPinSpec>:<downPinSpec>"
       size_t t = ioname.find(":");
       if (t != string::npos) {
@@ -145,6 +148,21 @@ DigitalIODevice::DigitalIODevice(StaticVdc *aVdcP, const string &aDeviceConfig) 
     s->mPosition->syncChannelValue(100, false, true); // assume fully up at beginning
     addBehaviour(s);
   }
+  else if (mDigitalIoType==digitalio_valve) {
+    // on/off valve controlling output
+    // Digital output
+    mIndicatorOutput = IndicatorOutputPtr(new IndicatorOutput(ioname.c_str(), false));
+    // - is heating
+    mColorClass = class_blue_climate;
+    // - valve needs climate control scene table (ClimateControlScene)
+    installSettings(DeviceSettingsPtr(new ClimateDeviceSettings(*this)));
+    // - create climate control outout
+    OutputBehaviourPtr ob = OutputBehaviourPtr(new ClimateControlBehaviour(*this, climatedevice_simple, hscapability_heatingAndCooling));
+    ob->setGroupMembership(group_roomtemperature_control, true); // put into room temperature control group by default, NOT into standard blue)
+    ob->setHardwareOutputConfig(outputFunction_switch, outputmode_binary, usage_room, false, 0);
+    ob->setHardwareName("Valve, on/off");
+    addBehaviour(ob);
+  }
 	deriveDsUid();
 }
 
@@ -187,7 +205,8 @@ void DigitalIODevice::applyChannelValues(SimpleCB aDoneCB, bool aForDimming)
     // simple switch output, activates at 50% of possible output range
     ChannelBehaviourPtr ch = getOutput()->getChannelByIndex(0);
     if (ch->needsApplying()) {
-      mIndicatorOutput->set(ch->getChannelValueBool());
+      double val = getOutput()->outputValueAccordingToMode(ch->getChannelValue(), 0);
+      mIndicatorOutput->set(val);
       ch->channelValueApplied();
     }
   }
@@ -268,6 +287,7 @@ string DigitalIODevice::modelName() const
     case digitalio_light: return "Light controlling output";
     case digitalio_relay: return "Relay controlling output";
     case digitalio_blind: return "Blind controlling output";
+    case digitalio_valve: return "Climate control valve output";
     default: return "Digital I/O";
   }
 }
@@ -293,13 +313,13 @@ string DigitalIODevice::description()
 {
   string s = inherited::description();
   if (mButtonInput)
-    string_format_append(s, "\n- Button at Digital IO '%s'", mButtonInput->getName().c_str());
+    string_format_append(s, "\n- Button at digital IO '%s'", mButtonInput->getName().c_str());
   if (mDigitalInput)
-    string_format_append(s, "\n- Input at Digital IO '%s'", mDigitalInput->getName().c_str());
+    string_format_append(s, "\n- Input at digital IO '%s'", mDigitalInput->getName().c_str());
   if (mIndicatorOutput)
-    string_format_append(s, "\n- Switch output at Digital IO '%s'", mIndicatorOutput->getName().c_str());
+    string_format_append(s, "\n- Switch output at digital IO '%s'", mIndicatorOutput->getName().c_str());
   if (mBlindsOutputUp && mBlindsOutputDown)
-    string_format_append(s, "\n Blinds output at Digital IO %s", blindsName().c_str());
+    string_format_append(s, "\n Blinds output at digital IO %s", blindsName().c_str());
   return s;
 }
 

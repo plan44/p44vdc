@@ -47,6 +47,7 @@ namespace p44 {
       digitalio_input, // binary input
       digitalio_light, // light output
       digitalio_relay, // general purpose relay output
+      digitalio_valve, // climate control on/off valve
       digitalio_blind, // blind output
     } DigitalIoType;
 

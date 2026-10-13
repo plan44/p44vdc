@@ -158,7 +158,7 @@ double LightBehaviour::outputValueAccordingToMode(double aChannelValue, int aCha
     return inherited::outputValueAccordingToMode(brightnessToOutput(aChannelValue, 100), aChannelIndex);
   }
   // switched light, check threshold
-  return mBrightness->getChannelValue() >= mOnThreshold ? mBrightness->getMax() : mBrightness->getMin();
+  return aChannelValue >= mOnThreshold ? mBrightness->getMax() : mBrightness->getMin();
 }
 
 

@@ -369,15 +369,13 @@ void AnalogIODevice::deriveDsUid()
 
 string AnalogIODevice::modelName()
 {
-  if (mAnalogIOType==analogio_dimmer)
-    return "Dimmer output";
-  if (mAnalogIOType==analogio_cwwwdimmer)
-    return "CW/WW dimmer outputs";
-  if (mAnalogIOType==analogio_rgbdimmer)
-    return "RGB(W) dimmer outputs";
-  if (mAnalogIOType==analogio_valve)
-    return "Heating Valve output";
-  return "Analog I/O";
+  switch (mAnalogIOType) {
+    case analogio_dimmer: return "Dimmer output";
+    case analogio_cwwwdimmer: return "CW/WW dimmer outputs";
+    case analogio_rgbdimmer: return "RGB(W) dimmer outputs";
+    case analogio_valve: return "Climate control valve output";
+    default: return "Analog I/O";
+  }
 }
 
 
@@ -398,13 +396,13 @@ string AnalogIODevice::description()
 {
   string s = inherited::description();
   if (mAnalogIOType==analogio_dimmer)
-    string_format_append(s, "\n- Dimmer at Analog output '%s'", mAnalogIO->getName().c_str());
+    string_format_append(s, "\n- Dimmer at analog output '%s'", mAnalogIO->getName().c_str());
   else if (mAnalogIOType==analogio_cwwwdimmer)
-    string_format_append(s, "\n- Tunable White Dimmer with CW/WW outputs '%s'/'%s'", mAnalogIO->getName().c_str(), mAnalogIO2->getName().c_str());
+    string_format_append(s, "\n- Tunable white dimmer with CW/WW outputs '%s'/'%s'", mAnalogIO->getName().c_str(), mAnalogIO2->getName().c_str());
   else if (mAnalogIOType==analogio_rgbdimmer)
-    string_format_append(s, "\n- Color Dimmer with RGB outputs '%s', '%s', '%s'; White: '%s'", mAnalogIO->getName().c_str(), mAnalogIO2->getName().c_str(), mAnalogIO3->getName().c_str(), mAnalogIO4 ? mAnalogIO4->getName().c_str() : "none");
+    string_format_append(s, "\n- Color dimmer with RGB outputs '%s', '%s', '%s'; White: '%s'", mAnalogIO->getName().c_str(), mAnalogIO2->getName().c_str(), mAnalogIO3->getName().c_str(), mAnalogIO4 ? mAnalogIO4->getName().c_str() : "none");
   else if (mAnalogIOType==analogio_valve)
-    string_format_append(s, "\nHeating Valve @ '%s'", mAnalogIO->getName().c_str());
+    string_format_append(s, "\nClimate control valve @ '%s'", mAnalogIO->getName().c_str());
   else if (mAnalogIOType==analogio_sensor)
     string_format_append(s, "\nSensor @ '%s', scaling=%.4f, offset=%.1f", mAnalogIO->getName().c_str(), mScaling, mOffset);
   return s;
