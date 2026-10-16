@@ -2449,7 +2449,7 @@ bool LocalController::handleLocalControllerMethod(ErrorPtr &aError, VdcApiReques
         g->add("name", g->newString(gi ? gi->name : "UNKNOWN"));
         g->add("kind", g->newUint64(gi ? gi->kind : 0));
         g->add("color", g->newString(string_format("#%06X", gi ? gi->hexcolor : 0x999999)));
-        g->add("symbol", g->newString(gi->symbol));
+        g->add("symbol", g->newString(gi ? gi->symbol : "-"));
         result->add(string_format("%d", i), g);
       }
     }
