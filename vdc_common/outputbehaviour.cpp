@@ -200,7 +200,7 @@ void OutputBehaviour::setGroupMembership(DsGroup aGroup, bool aIsMember)
       VdcApiConnectionPtr api = mDevice.getVdcHost().getBridgeApi();
       if (api) {
         ApiValuePtr q = api->newApiValue();
-        q = q->wrapNull("groups")->wrapAs("outputSettings.groups");
+        q = q->wrapNull("groups")->wrapAs("outputSettings");
         mDevice.pushNotification(api, q, ApiValuePtr());
       }
     }
@@ -210,7 +210,7 @@ void OutputBehaviour::setGroupMembership(DsGroup aGroup, bool aIsMember)
     VdcApiConnectionPtr api = mDevice.getVdcHost().genericPushApi();
     if (api) {
       ApiValuePtr q = api->newApiValue();
-      q = q->wrapNull("groups")->wrapAs("outputSettings.groups");
+      q = q->wrapNull("groups")->wrapAs("outputSettings");
       mDevice.pushNotification(api, q, ApiValuePtr());
     }
     #endif // ENABLE_GENERIC_API_PUSH
