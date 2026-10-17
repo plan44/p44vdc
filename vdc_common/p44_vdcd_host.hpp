@@ -398,6 +398,7 @@ namespace p44 {
   private:
 
     void pausedHandler(ScriptCodeThreadPtr aPausedThread);
+    void sourceCodeChangedHandler(SourceHostPtr aChangedSource);
 
     bool isDebugging() const;
     void setDebugging(bool aDebug);

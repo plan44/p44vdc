@@ -1451,6 +1451,7 @@ P44ScriptManager::P44ScriptManager(ScriptingDomainPtr aScriptingDomain) :
 {
   assert(mScriptingDomain);
   mScriptingDomain->setPauseHandler(boost::bind(&P44ScriptManager::pausedHandler, this, _1));
+  mScriptingDomain->setSourceChangeHandler(boost::bind(&P44ScriptManager::sourceCodeChangedHandler, this, _1));
 }
 
 
@@ -1568,6 +1569,23 @@ void P44ScriptManager::setResultAndPosInfo(ApiValuePtr aIntoApiValue, ScriptObjP
 }
 
 
+void P44ScriptManager::sourceCodeChangedHandler(SourceHostPtr aChangedSource)
+{
+  // issue a generic API pushnotification for the change
+  #if ENABLE_GENERIC_API_PUSH
+  // when we have a webui capable of receiving pushes, always push
+  VdcApiConnectionPtr api = P44VdcHost::sharedP44VdcHost().genericPushApi();
+  if (api) {
+    ApiValuePtr q = api->newApiValue();
+    // x-p44-scripts.sources.dev_xxx.scene_17.lastModified
+    q = q->wrapNull("changedat")->wrapAs(aChangedSource->getSourceUid());
+    q = q->wrapAs("sources")->wrapAs("x-p44-scripts");
+    P44VdcHost::sharedP44VdcHost().pushNotificationUnwound(api, q, ApiValuePtr());
+  }
+  #endif // ENABLE_GENERIC_API_PUSH
+}
+
+
 enum {
   // script manager level properties
   sources_key,
@@ -1595,6 +1613,7 @@ enum {
   logprefix_key,
   unstored_key,
   readonly_key,
+  lastModified_key,
   isScript_key,
   breakpoints_key,
   numScriptHostProperties
@@ -1727,6 +1746,7 @@ PropertyDescriptorPtr P44ScriptManager::getDescriptorByIndex(int aPropIndex, int
     { "logprefix", apivalue_string, logprefix_key, OKEY(sourcehost_key) },
     { "unstored", apivalue_bool, unstored_key, OKEY(sourcehost_key) },
     { "readonly", apivalue_bool, readonly_key, OKEY(sourcehost_key) },
+    { "changedat", apivalue_int64, lastModified_key, OKEY(sourcehost_key) },
     { "script", apivalue_bool, isScript_key, OKEY(sourcehost_key) },
     { "breakpoints", apivalue_bool+propflag_container, breakpoints_key, OKEY(breakpoints_list_key) },
   };
@@ -1852,6 +1872,9 @@ bool P44ScriptManager::accessField(PropertyAccessMode aMode, ApiValuePtr aPropVa
             return true;
           case readonly_key:
             aPropValue->setBoolValue(host->isReadOnly());
+            return true;
+          case lastModified_key:
+            aPropValue->setUint64Value(host->lastModified());
             return true;
           case isScript_key:
             aPropValue->setBoolValue(host->isScript());

@@ -251,6 +251,10 @@ namespace p44 {
     /// @return true if push could be sent, false otherwise (e.g. no vdSM connection, or device not yet announced)
     bool pushNotification(VdcApiConnectionPtr aApi, ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, bool aForwardQuery = false);
 
+    /// sams as pushNotification, but unwind stack first by scheduling actual call on mainloop
+    void pushNotificationUnwound(VdcApiConnectionPtr aApi, ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, bool aForwardQuery = false);
+
+
     /// @}
 
 

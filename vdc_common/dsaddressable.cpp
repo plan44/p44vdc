@@ -310,6 +310,18 @@ void DsAddressable::methodCompleted(VdcApiRequestPtr aRequest, ErrorPtr aError)
 }
 
 
+void DsAddressable::pushNotificationUnwound(VdcApiConnectionPtr aApi, ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, bool aForwardQuery)
+{
+  MainLoop::currentMainLoop().executeNow(boost::bind(
+    &DsAddressable::pushNotification,
+    this,
+    aApi,
+    aPropertyQuery,
+    aEvents,
+    aForwardQuery
+  ));
+}
+
 
 bool DsAddressable::pushNotification(VdcApiConnectionPtr aApi, ApiValuePtr aPropertyQuery, ApiValuePtr aEvents, bool aForwardQuery)
 {
