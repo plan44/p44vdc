@@ -764,6 +764,9 @@ namespace p44 {
     /// Note: this can be called multiple times (but will not have any further effect after the first time)
     void enableAsSingleDevice();
 
+    /// @return true when actually enabled as single device
+    bool isEnabledAsSingleDevice() { return deviceActions.get(); }
+
     /// @name interaction with subclasses, actually representing physical I/O
     /// @{
 

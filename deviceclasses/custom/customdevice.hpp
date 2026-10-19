@@ -373,6 +373,7 @@ namespace p44 {
     string mModelVersionString; ///< the string to be returned by vdcModelVersion()
     string mConfigUrl; ///< custom value for configURL if not empty
     bool mForwardIdentify; ///< if set, "VDCIDENTIFY" messages will be sent, and vdc will show the "identification" capability in the vDC API
+    bool mHasDynamicDefinitions; ///< if set, the vdc will have dynamicDefinitions capability set in vdc properties.
 
   public:
 
@@ -418,6 +419,10 @@ namespace p44 {
     /// @param aWithData if set, PNG data is returned, otherwise only name
     /// @return true if there is an icon, false if not
     virtual bool getDeviceIcon(string &aIcon, bool aWithData, const char *aResolutionPrefix) P44_OVERRIDE;
+
+    /// vdcs can have definitions of parameters, states, and properties changing depending on the device information
+    /// @return if true, this vDC should be queried for all actions parameters, states and properties descriptions
+    virtual bool dynamicDefinitions() P44_OVERRIDE { return mHasDynamicDefinitions; }
 
     /// @}
 

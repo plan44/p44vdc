@@ -157,6 +157,12 @@ CustomDevice::CustomDevice(Vdc *aVdcP, bool aSimpleText) :
 }
 
 
+CustomVdc& CustomDevice::getCustomVdc()
+{
+  return *(static_cast<CustomVdc *>(mVdcP));
+}
+
+
 CustomDevice::~CustomDevice()
 {
 }
@@ -1517,6 +1523,10 @@ ErrorPtr CustomDevice::configureDevice(JsonObjectPtr aInitParams)
   if (deviceActions && mSimpletext) {
     return TextError::err("Single devices must use JSON protocol");
   }
+  if (isEnabledAsSingleDevice()) {
+    // this is a single device, so signal dynamic definitions
+    getCustomVdc().mHasDynamicDefinitions = true;
+  }
   #endif // ENABLE_CUSTOM_SINGLEDEVICE
   // check for default name
   if (aInitParams->get("name", o)) {
@@ -1561,7 +1571,8 @@ void CustomDevice::propertyChanged(ValueDescriptorPtr aChangedProperty)
 
 CustomVdc::CustomVdc(int aInstanceNumber, VdcHost *aVdcHostP, int aTag) :
   Vdc(aInstanceNumber, aVdcHostP, aTag),
-  mForwardIdentify(false)
+  mForwardIdentify(false),
+  mHasDynamicDefinitions(false)
 {
   mIconBaseName = "vdc_cust";
 }
