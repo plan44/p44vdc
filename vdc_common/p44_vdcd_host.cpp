@@ -1369,6 +1369,28 @@ ErrorPtr P44VdcHost::handleMethod(VdcApiRequestPtr aRequest,  const string &aMet
     }
   }
   #endif // ENABLE_UBUS
+  #if ENABLE_GENERIC_API_PUSH
+  else if (aMethod=="x-p44-pushEvent") {
+    VdcApiConnectionPtr api = getVdcHost().genericPushApi();
+    respErr = Error::ok(); // return NULL response
+    if (api) {
+      ApiValuePtr o = aParams->get("name");
+      if (!o) {
+        respErr = Error::err<P44VdcError>(415, "missing 'name'");
+      }
+      else {
+        string en = o->stringValue();
+        // optional data
+        o = aParams->get("data");
+        if (!o) { o = api->newApiValue(); o->setNull(); }
+        // create event list with one element: { "<deviceeventid>": <data>|null }
+        ApiValuePtr events = o->wrapAs(en);
+        // pushnotification for vdchost with just the device event
+        pushNotification(api, ApiValuePtr(), events);
+      }
+    }
+  }
+  #endif // ENABLE_GENERIC_API_PUSH
   #if P44SCRIPT_REGISTERED_SOURCE
   else if (mScriptManager && mScriptManager->handleScriptManagerMethod(respErr, aRequest, aMethod, aParams)) {
     return respErr;
