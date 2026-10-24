@@ -162,10 +162,12 @@ LedChainDevicePtr LedChainVdc::addLedChainDevice(int aX, int aDx, int aY, int aD
     // add to container
     simpleIdentifyAndAddDevice(newDev);
     // add to view
+    mRootView->enter();
     if (newDev->mLightView->getZOrder()==0) newDev->mLightView->setZOrder(aZOrder);
     newDev->mLightView->setAutoAdjust(autoadjust);
     mRootView->setPositioningMode(P44View::noAdjust);
     mRootView->pushView(newDev->mLightView);
+    mRootView->leave();
     // - re-render
     if (mLedArrangement) mLedArrangement->render();
     return boost::dynamic_pointer_cast<LedChainDevice>(newDev);
@@ -182,7 +184,9 @@ void LedChainVdc::removeDevice(DevicePtr aDevice, bool aForget)
     // - remove single device from superclass
     inherited::removeDevice(aDevice, aForget);
     // - remove device's view
+    mRootView->enter();
     mRootView->removeView(dev->mLightView);
+    mRootView->leave();
     // - re-render
     if (mLedArrangement) mLedArrangement->render();
   }
