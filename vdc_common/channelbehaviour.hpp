@@ -434,7 +434,7 @@ namespace p44 {
     uint32_t mNumIndices; ///< number of valid indices (indices are 0..numIndices-1)
 
   public:
-    IndexChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 1; mEnforceResolution = true, mNumIndices = 0; };
+    IndexChannel(OutputBehaviour &aOutput, const string aChannelId) : inherited(aOutput, aChannelId) { mResolution = 1; mEnforceResolution = true; mNumIndices = 0; };
     virtual DsChannelType getChannelType() P44_OVERRIDE { return channeltype_default; }; ///< no real dS channel type
     virtual ValueUnit getChannelUnit() P44_OVERRIDE { return VALUE_UNIT(valueUnit_none, unitScaling_1); };
     virtual const char* getName() const P44_OVERRIDE { return "index"; };
