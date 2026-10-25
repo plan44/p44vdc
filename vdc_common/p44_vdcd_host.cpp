@@ -292,12 +292,14 @@ ErrorPtr P44VdcHost::processLedDataRequest(JsonObjectPtr aRequest, string& aRawR
   if (mLedChainArrangement) {
     // which view to look at
     P44ViewPtr view;
+    mLedChainArrangement->rootViewEnter();
     if (aRequest->get("view", o)) {
       view = mLedChainArrangement->getRootView()->findView(o->stringValue());
     }
     if (!view) {
       view = mLedChainArrangement->getRootView();
     }
+    mLedChainArrangement->rootViewLeave();
     if (aRequest->get("dx", o)) {
       // specific area from view
       PixelRect area;
@@ -310,21 +312,29 @@ ErrorPtr P44VdcHost::processLedDataRequest(JsonObjectPtr aRequest, string& aRawR
         area.y = 0;
         if (aRequest->get("y", o)) area.y = o->int32Value();
         string rawrgb;
+        view->enter();
         view->ledRGBdata(aRawRgbResponse, area);
+        view->leave();
       }
     }
     else if (aRequest->get("status", o) && o->boolValue()) {
       // get view status
+      view->enter();
       aJsonResponse = view->viewStatus();
+      view->leave();
     }
     else if (aRequest->get("configure", o)) {
       // configure view
+      view->enter();
       err = view->configureView(o);
+      view->leave();
     }
     else if (aRequest->get("cover", o) && o->boolValue()) {
       // return the covered area
       aJsonResponse = JsonObject::newObj();
+      mLedChainArrangement->rootViewEnter();
       PixelRect cover = mLedChainArrangement->totalCover();
+      mLedChainArrangement->rootViewLeave();
       aJsonResponse->add("x", JsonObject::newInt32(cover.x));
       aJsonResponse->add("y", JsonObject::newInt32(cover.y));
       aJsonResponse->add("dx", JsonObject::newInt32(cover.dx));
