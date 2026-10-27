@@ -344,9 +344,9 @@ void LedChainDevice::stopTransitions()
 void LedChainDevice::stopSceneActions()
 {
   if (mLightView) {
-    mLightView->enter();
+    THREADED(mLightView->enter());
     mLightView->stopAnimations();
-    mLightView->leave();
+    THREADED(mLightView->leave());
   }
   inherited::stopSceneActions();
 }
@@ -411,7 +411,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
   pix.b = b;
   pix.a = 255;
   // access views
-  mLightView->enter();
+  THREADED(mLightView->enter());
   mLightView->setAlpha(cl->brightnessForHardware()*255/100); // alpha is brightness, scaled down to 0..255
   P44ViewPtr targetView = mLightView->findView("LIGHT"); // where to direct extras to
   if (!targetView) targetView = mLightView;
@@ -466,7 +466,7 @@ void LedChainDevice::applyChannelValueSteps(bool aForDimming)
     // simple area, just set foreground color
     mLightView->setForegroundColor(pix);
   }
-  mLightView->leave();
+  THREADED(mLightView->leave());
   getLedChainVdc().mLedArrangement->render(); // update
   // next step
   if (moreSteps) {
