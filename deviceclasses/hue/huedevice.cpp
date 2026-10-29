@@ -327,6 +327,12 @@ string HueDevice::getOpStateText()
 void HueDevice::checkPresence(PresenceCB aPresenceResultHandler)
 {
   // query the device
+  if (!hueComm().apiReady() && isPresent()) {
+    // API not ready but previously present - just leave checking to base class (which keeps current state)
+    // because "API not ready" is likely due ongoing rescan right now
+    inherited::checkPresence(aPresenceResultHandler);
+    return;
+  }
   string url = string_format("/lights/%s", mLightID.c_str());
   hueComm().apiQuery(url.c_str(), boost::bind(&HueDevice::presenceStateReceived, this, aPresenceResultHandler, _1, _2));
 }

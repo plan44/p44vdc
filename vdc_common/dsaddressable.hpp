@@ -126,6 +126,10 @@ namespace p44 {
     /// @return true if device has been announced
     bool isAnnounced() { return mAnnounced != Never; }
 
+    /// @return last known presence status
+    /// @note calling this does not cause any update of the actual presence state. See checkPresence() for this.
+    bool isPresent() { return mPresent; }
+
     /// the real (always modern, 34 hex) dSUID
     const DsUid &getDsUid() { return mDSUID; };
 
