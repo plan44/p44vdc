@@ -151,7 +151,6 @@ string HuePersistence::schemaUpgradeSQL(int aFromVersion, int &aToVersion)
 
 
 #define HUE_RECOLLECT_INTERVAL (30*Minute)
-#define PSEUDO_UUID_FOR_FIXED_API "fixed_api_base_URL" // used in place of uuid in fixed-IP case
 
 void HueVdc::initialize(StatusCB aCompletedCB, bool aFactoryReset)
 {
@@ -438,10 +437,11 @@ void HueVdc::searchResultHandler(Tristate aOnlyEstablish, ErrorPtr aError)
         mBridgeApiURL.clear();
       }
       // save the bridge parameters
-      aError = mDb.prefixedExecute("UPDATE $PREFIX_globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='%q', fixedURL=0",
+      aError = mDb.prefixedExecute("UPDATE $PREFIX_globs SET hueBridgeUUID='%q', hueBridgeUser='%q', hueApiURL='%q', fixedURL=%d",
         mBridgeIdentifier.c_str(),
         mBridgeUserName.c_str(),
-        mBridgeApiURL.c_str()
+        mBridgeApiURL.c_str(),
+        mFixedURL ? 1 : 0
       );
       if (Error::notOK(aError)) {
         OLOG(LOG_ERR, "Error saving hue bridge learn params: %s", aError->text());

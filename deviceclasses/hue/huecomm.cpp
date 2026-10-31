@@ -329,6 +329,7 @@ public:
 
   static string normalizedBridgeId(const string aId)
   {
+    if (aId==PSEUDO_UUID_FOR_FIXED_API) return aId; // as-is, this is a non-id but must remain comparable
     // SSDP UUID has the form      : 2f402f80-da50-11e1-9b23-001788....123456
     // DNSSD bridgeid has the form :                         001788fffe123456
     string bi = lowerCase(aId);
